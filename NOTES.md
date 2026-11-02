@@ -6,6 +6,9 @@
 3. Maui
 4. React
 
+### CSS Framework
+* Bulma: https://bulma.io/
+
 ## Backend
 * C#
 * SQL (PostgreSQL)
