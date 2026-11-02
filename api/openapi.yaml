@@ -1,0 +1,538 @@
+openapi: 3.0.3
+info:
+  title: Movie Tracker API
+  version: 0.1.0
+  description: |
+    Personal movie tracker (stage 1: movies, genres, diary, watchlist).
+
+    Conventions:
+    - Errors are returned as ProblemDetails (RFC 9457) with `application/problem+json`.
+    - Ratings are integers from 1 to 10 (equivalent to 0.5 to 5 stars).
+    - Dates use ISO 8601 (`date` or `date-time` in UTC).
+servers:
+  - url: http://localhost:5080
+    description: Local development
+
+# No authentication yet (will be added later)
+security: []
+
+tags:
+  - name: Movies
+    description: Movie catalog
+  - name: Genres
+    description: Genre master data
+  - name: Diary
+    description: Diary of viewings including ratings and reviews
+  - name: Watchlist
+    description: Movies to watch later
+
+paths:
+  /api/movies:
+    get:
+      tags: [Movies]
+      operationId: listMovies
+      summary: Search and list movies
+      parameters:
+        - name: search
+          in: query
+          description: Full-text search in title and original title
+          schema: { type: string, maxLength: 200 }
+        - name: genreId
+          in: query
+          schema: { type: integer, format: int32 }
+        - name: year
+          in: query
+          description: Release year
+          schema: { type: integer, format: int32, minimum: 1870, maximum: 2100 }
+        - name: sort
+          in: query
+          description: Sort order; a leading minus means descending.
+          schema:
+            type: string
+            enum: [title, -title, releaseDate, -releaseDate, createdAt, -createdAt]
+            default: title
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Page of movies
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MovieSummaryPage' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+    post:
+      tags: [Movies]
+      operationId: createMovie
+      summary: Create a movie
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MovieInput' }
+      responses:
+        '201':
+          description: Movie created
+          headers:
+            Location:
+              description: URL of the new movie
+              schema: { type: string, format: uri }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Movie' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '409':
+          description: A movie with this tmdbId already exists.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /api/movies/{movieId}:
+    parameters:
+      - $ref: '#/components/parameters/MovieId'
+    get:
+      tags: [Movies]
+      operationId: getMovie
+      summary: Get a movie
+      responses:
+        '200':
+          description: The movie
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Movie' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Movies]
+      operationId: updateMovie
+      summary: Replace a movie
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MovieInput' }
+      responses:
+        '200':
+          description: Updated movie
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Movie' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Another movie with this tmdbId already exists.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+    delete:
+      tags: [Movies]
+      operationId: deleteMovie
+      summary: Delete a movie
+      description: |
+        Fails with 409 as long as diary entries exist for this movie,
+        so the viewing history is not lost by accident.
+        A watchlist entry is deleted along with the movie.
+      responses:
+        '204': { description: Deleted }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Movie still has diary entries.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /api/movies/{movieId}/diary-entries:
+    parameters:
+      - $ref: '#/components/parameters/MovieId'
+    get:
+      tags: [Movies, Diary]
+      operationId: listMovieDiaryEntries
+      summary: List all viewings of a movie, newest first
+      responses:
+        '200':
+          description: Diary entries of the movie
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DiaryEntry' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/genres:
+    get:
+      tags: [Genres]
+      operationId: listGenres
+      summary: List all genres, alphabetically
+      responses:
+        '200':
+          description: Genres
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Genre' }
+
+  /api/diary-entries:
+    get:
+      tags: [Diary]
+      operationId: listDiaryEntries
+      summary: List diary entries, newest viewing first
+      parameters:
+        - name: from
+          in: query
+          description: Earliest viewing date (inclusive)
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          description: Latest viewing date (inclusive)
+          schema: { type: string, format: date }
+        - name: movieId
+          in: query
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Page of diary entries
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DiaryEntryPage' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+    post:
+      tags: [Diary]
+      operationId: createDiaryEntry
+      summary: Log a viewing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DiaryEntryInput' }
+      responses:
+        '201':
+          description: Entry created
+          headers:
+            Location:
+              description: URL of the new entry
+              schema: { type: string, format: uri }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DiaryEntry' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '422':
+          description: The referenced movie does not exist.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /api/diary-entries/{entryId}:
+    parameters:
+      - name: entryId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Diary]
+      operationId: getDiaryEntry
+      summary: Get a diary entry
+      responses:
+        '200':
+          description: The entry
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DiaryEntry' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Diary]
+      operationId: updateDiaryEntry
+      summary: Replace a diary entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DiaryEntryInput' }
+      responses:
+        '200':
+          description: Updated entry
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DiaryEntry' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422':
+          description: The referenced movie does not exist.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+    delete:
+      tags: [Diary]
+      operationId: deleteDiaryEntry
+      summary: Delete a diary entry
+      responses:
+        '204': { description: Deleted }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/watchlist:
+    get:
+      tags: [Watchlist]
+      operationId: listWatchlist
+      summary: List the watchlist, most recently added first
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Page of the watchlist
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WatchlistItemPage' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+
+  /api/watchlist/{movieId}:
+    parameters:
+      - $ref: '#/components/parameters/MovieId'
+    put:
+      tags: [Watchlist]
+      operationId: putWatchlistItem
+      summary: Add a movie to the watchlist (idempotent)
+      description: |
+        Creates the entry or updates its note.
+        `addedAt` stays unchanged on update.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WatchlistItemInput' }
+      responses:
+        '200':
+          description: Existing entry updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WatchlistItem' }
+        '201':
+          description: Entry created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WatchlistItem' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Watchlist]
+      operationId: deleteWatchlistItem
+      summary: Remove a movie from the watchlist
+      responses:
+        '204': { description: Removed }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  parameters:
+    MovieId:
+      name: movieId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, format: int32, minimum: 1, default: 1 }
+    PageSize:
+      name: pageSize
+      in: query
+      schema: { type: integer, format: int32, minimum: 1, maximum: 100, default: 20 }
+
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    ValidationError:
+      description: Invalid input
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ValidationProblemDetails' }
+
+  schemas:
+    Genre:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: integer, format: int32 }
+        name: { type: string }
+
+    MovieRef:
+      type: object
+      description: Compact movie reference for embedded representations
+      required: [id, title]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        releaseDate: { type: string, format: date, nullable: true }
+        posterUrl: { type: string, format: uri, nullable: true }
+
+    MovieSummary:
+      type: object
+      required: [id, title, genres, watchCount, onWatchlist]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        releaseDate: { type: string, format: date, nullable: true }
+        posterUrl: { type: string, format: uri, nullable: true }
+        genres:
+          type: array
+          items: { $ref: '#/components/schemas/Genre' }
+        latestRating:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 10
+          nullable: true
+          description: Rating (1-10) from the most recent diary entry that has a rating
+        watchCount:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Number of diary entries
+        onWatchlist: { type: boolean }
+
+    Movie:
+      allOf:
+        - $ref: '#/components/schemas/MovieSummary'
+        - type: object
+          required: [createdAt]
+          properties:
+            originalTitle: { type: string, nullable: true }
+            runtimeMinutes: { type: integer, format: int32, minimum: 1, nullable: true }
+            overview: { type: string, nullable: true }
+            tmdbId: { type: integer, format: int32, nullable: true }
+            lastWatchedOn: { type: string, format: date, nullable: true }
+            createdAt: { type: string, format: date-time }
+
+    MovieInput:
+      type: object
+      required: [title, genreIds]
+      additionalProperties: false
+      properties:
+        title: { type: string, minLength: 1, maxLength: 300 }
+        originalTitle: { type: string, maxLength: 300, nullable: true }
+        releaseDate: { type: string, format: date, nullable: true }
+        runtimeMinutes: { type: integer, format: int32, minimum: 1, maximum: 1500, nullable: true }
+        overview: { type: string, maxLength: 5000, nullable: true }
+        posterUrl: { type: string, format: uri, maxLength: 2000, nullable: true }
+        tmdbId: { type: integer, format: int32, minimum: 1, nullable: true }
+        genreIds:
+          type: array
+          uniqueItems: true
+          items: { type: integer, format: int32 }
+
+    DiaryEntry:
+      type: object
+      required: [id, movie, watchedOn, isRewatch, liked, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        movie: { $ref: '#/components/schemas/MovieRef' }
+        watchedOn: { type: string, format: date }
+        rating:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 10
+          nullable: true
+          description: Rating in half stars (1 = 0.5 stars, 10 = 5 stars)
+        review: { type: string, nullable: true }
+        isRewatch: { type: boolean }
+        liked: { type: boolean }
+        createdAt: { type: string, format: date-time }
+
+    DiaryEntryInput:
+      type: object
+      required: [movieId, watchedOn]
+      additionalProperties: false
+      properties:
+        movieId: { type: string, format: uuid }
+        watchedOn:
+          type: string
+          format: date
+          description: Must not be in the future.
+        rating:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 10
+          nullable: true
+          description: Rating in half stars (1 = 0.5 stars, 10 = 5 stars)
+        review: { type: string, maxLength: 20000, nullable: true }
+        isRewatch: { type: boolean, default: false }
+        liked: { type: boolean, default: false }
+
+    WatchlistItem:
+      type: object
+      required: [movie, addedAt]
+      properties:
+        movie: { $ref: '#/components/schemas/MovieRef' }
+        addedAt: { type: string, format: date-time }
+        note: { type: string, nullable: true }
+
+    WatchlistItemInput:
+      type: object
+      additionalProperties: false
+      properties:
+        note: { type: string, maxLength: 500, nullable: true }
+
+    PageMetadata:
+      type: object
+      required: [page, pageSize, totalCount]
+      properties:
+        page: { type: integer, format: int32 }
+        pageSize: { type: integer, format: int32 }
+        totalCount: { type: integer, format: int32 }
+
+    MovieSummaryPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMetadata'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/MovieSummary' }
+
+    DiaryEntryPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMetadata'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/DiaryEntry' }
+
+    WatchlistItemPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMetadata'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/WatchlistItem' }
+
+    ProblemDetails:
+      type: object
+      description: RFC 9457
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer, format: int32 }
+        detail: { type: string }
+        instance: { type: string }
+
+    ValidationProblemDetails:
+      allOf:
+        - $ref: '#/components/schemas/ProblemDetails'
+        - type: object
+          required: [errors]
+          properties:
+            errors:
+              type: object
+              description: Field name -> error messages
+              additionalProperties:
+                type: array
+                items: { type: string }
