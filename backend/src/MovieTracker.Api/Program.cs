@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
 using Microsoft.EntityFrameworkCore;
 using MovieTracker.Infrastructure;
 using MovieTracker.Infrastructure.Persistence;
@@ -11,6 +13,14 @@ builder.Services.AddInfrastructure(connectionString);
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
+
+builder.Services
+    .AddControllers(options =>
+        // Validation errors use the JSON property names ("genreIds") instead of the C# names ("GenreIds").
+        options.ModelMetadataDetailsProviders.Add(new SystemTextJsonValidationMetadataProvider()))
+    .AddJsonOptions(options =>
+        // Unknown properties in request bodies result in 400 (additionalProperties: false in the spec).
+        options.JsonSerializerOptions.UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow);
 
 var app = builder.Build();
 
@@ -27,5 +37,7 @@ if (app.Environment.IsDevelopment())
     var dbContext = scope.ServiceProvider.GetRequiredService<MovieTrackerDbContext>();
     await dbContext.Database.MigrateAsync();
 }
+
+app.MapControllers();
 
 app.Run();
