@@ -1,0 +1,74 @@
+# Requests for manual testing (VS Code REST Client, Rider, Visual Studio).
+# Run them top to bottom: later requests use IDs from earlier responses.
+
+@baseUrl = http://localhost:5080
+
+### Genres
+GET {{baseUrl}}/api/genres
+
+### Create a movie
+# @name createMovie
+POST {{baseUrl}}/api/movies
+Content-Type: application/json
+
+{
+  "title": "Alien",
+  "releaseDate": "1979-05-25",
+  "runtimeMinutes": 117,
+  "tmdbId": 348,
+  "genreIds": [27, 878]
+}
+
+### Get the movie
+GET {{baseUrl}}/api/movies/{{createMovie.response.body.$.id}}
+
+### Search movies
+GET {{baseUrl}}/api/movies?search=ali&sort=-releaseDate&page=1&pageSize=10
+
+### Validation error: missing title (model validation runs before the genre check)
+POST {{baseUrl}}/api/movies
+Content-Type: application/json
+
+{
+  "genreIds": [99999]
+}
+
+### Validation error: unknown property
+POST {{baseUrl}}/api/movies
+Content-Type: application/json
+
+{
+  "title": "Alien",
+  "genreIds": [],
+  "director": "Ridley Scott"
+}
+
+### Log a viewing
+# @name createDiaryEntry
+POST {{baseUrl}}/api/diary-entries
+Content-Type: application/json
+
+{
+  "movieId": "{{createMovie.response.body.$.id}}",
+  "watchedOn": "2026-10-31",
+  "rating": 9,
+  "review": "Still terrifying.",
+  "liked": true
+}
+
+### Diary
+GET {{baseUrl}}/api/diary-entries?from=2026-01-01
+
+### Delete the movie (expected: 409, it has a diary entry)
+DELETE {{baseUrl}}/api/movies/{{createMovie.response.body.$.id}}
+
+### Put the movie on the watchlist
+PUT {{baseUrl}}/api/watchlist/{{createMovie.response.body.$.id}}
+Content-Type: application/json
+
+{
+  "note": "Rewatch the director's cut"
+}
+
+### Watchlist
+GET {{baseUrl}}/api/watchlist
