@@ -12,6 +12,8 @@ namespace MovieTracker.Api.Queries;
 /// </summary>
 internal static class MovieQueries
 {
+    private const string LikeEscapeCharacter = @"\";
+
     public static IQueryable<Movie> Search(this IQueryable<Movie> movies, string? search)
     {
         if (string.IsNullOrWhiteSpace(search))
@@ -20,9 +22,11 @@ internal static class MovieQueries
         }
 
         var pattern = $"%{EscapeLikePattern(search.Trim())}%";
+        // The escape character must be passed explicitly: without it, Npgsql generates ESCAPE '' and the
+        // backslashes added by EscapeLikePattern would be matched literally.
         return movies.Where(movie =>
-            EF.Functions.ILike(movie.Title, pattern) ||
-            (movie.OriginalTitle != null && EF.Functions.ILike(movie.OriginalTitle, pattern)));
+            EF.Functions.ILike(movie.Title, pattern, LikeEscapeCharacter) ||
+            (movie.OriginalTitle != null && EF.Functions.ILike(movie.OriginalTitle, pattern, LikeEscapeCharacter)));
     }
 
     public static IQueryable<MovieSummaryRow> SelectSummaryRows(
