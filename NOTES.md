@@ -3,8 +3,10 @@
 ## Frontends
 1. Angular
 2. Vue
-3. Maui
-4. React
+3. Nuxt
+4. Maui
+5. React
+6. Svelte
 
 ### CSS Framework
 * Bulma: https://bulma.io/
