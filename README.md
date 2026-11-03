@@ -9,7 +9,7 @@ API-driven backend in C# with PostgreSQL, multiple frontends (Angular, Vue, Reac
 |-------------|----------------------------------------------------------|
 | `api/`      | OpenAPI specification -- the contract for all components |
 | `backend/`  | ASP.NET Core API, domain model, EF Core persistence      |
-| `frontend/` | Frontends (to come)                                      |
+| `frontend/` | Frontends, e.g. `frontend/angular/` (Angular + Bulma)    |
 
 ## Getting started
 
@@ -38,4 +38,12 @@ dotnet ef migrations add <Name> \
   --project src/MovieTracker.Infrastructure \
   --startup-project src/MovieTracker.Api \
   --output-dir Persistence/Migrations
+```
+
+## Angular frontend
+
+```bash
+cd frontend/angular
+npm install
+npm start   # http://localhost:4200, proxies /api to the backend
 ```
