@@ -30,6 +30,15 @@ dotnet run --project src/MovieTracker.Api
 The API listens on http://localhost:5080. The OpenAPI document generated from the code
 is available at http://localhost:5080/openapi/v1.json.
 
+## Running the tests
+
+```bash
+cd backend
+dotnet test
+```
+
+- `tests/MovieTracker.Domain.Tests`: unit tests of the domain model.
+
 ## Adding a migration
 
 ```bash
