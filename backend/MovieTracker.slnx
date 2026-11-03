@@ -5,6 +5,7 @@
     <Project Path="src/MovieTracker.Infrastructure/MovieTracker.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/MovieTracker.Api.Tests/MovieTracker.Api.Tests.csproj" />
     <Project Path="tests/MovieTracker.Domain.Tests/MovieTracker.Domain.Tests.csproj" />
   </Folder>
 </Solution>

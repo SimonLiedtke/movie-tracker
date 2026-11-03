@@ -38,6 +38,9 @@ dotnet test
 ```
 
 - `tests/MovieTracker.Domain.Tests`: unit tests of the domain model.
+- `tests/MovieTracker.Api.Tests`: integration tests of all endpoints. They start the API in memory against a
+  throwaway PostgreSQL container ([Testcontainers](https://dotnet.testcontainers.org/)), so Docker must be running.
+  The local development database is not touched.
 
 ## Adding a migration
 
