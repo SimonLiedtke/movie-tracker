@@ -1,0 +1,152 @@
+<h1 class="title">{{ id() ? 'Edit movie' : 'Add movie' }}</h1>
+
+<app-error-notification [error]="error()" (dismiss)="error.set(null)" />
+
+@if (loading()) {
+  <progress class="progress is-small is-primary" max="100"></progress>
+} @else {
+  <form class="box" [formGroup]="form" (ngSubmit)="save()" novalidate>
+    <div class="columns">
+      <div class="column">
+        <div class="field">
+          <label class="label" for="title">Title *</label>
+          <div class="control">
+            <input
+              id="title"
+              class="input"
+              formControlName="title"
+              [class.is-danger]="isInvalid('title')"
+            />
+          </div>
+          @if (isInvalid('title')) {
+            <p class="help is-danger">Please enter a title (at most 300 characters).</p>
+          }
+        </div>
+      </div>
+      <div class="column">
+        <div class="field">
+          <label class="label" for="originalTitle">Original title</label>
+          <div class="control">
+            <input
+              id="originalTitle"
+              class="input"
+              formControlName="originalTitle"
+              [class.is-danger]="isInvalid('originalTitle')"
+            />
+          </div>
+          @if (isInvalid('originalTitle')) {
+            <p class="help is-danger">At most 300 characters.</p>
+          }
+        </div>
+      </div>
+    </div>
+
+    <div class="columns">
+      <div class="column">
+        <div class="field">
+          <label class="label" for="releaseDate">Release date</label>
+          <div class="control">
+            <input id="releaseDate" class="input" type="date" formControlName="releaseDate" />
+          </div>
+        </div>
+      </div>
+      <div class="column">
+        <div class="field">
+          <label class="label" for="runtimeMinutes">Runtime (minutes)</label>
+          <div class="control">
+            <input
+              id="runtimeMinutes"
+              class="input"
+              type="number"
+              min="1"
+              max="1500"
+              formControlName="runtimeMinutes"
+              [class.is-danger]="isInvalid('runtimeMinutes')"
+            />
+          </div>
+          @if (isInvalid('runtimeMinutes')) {
+            <p class="help is-danger">Between 1 and 1500 minutes.</p>
+          }
+        </div>
+      </div>
+      <div class="column">
+        <div class="field">
+          <label class="label" for="tmdbId">TMDB ID</label>
+          <div class="control">
+            <input
+              id="tmdbId"
+              class="input"
+              type="number"
+              min="1"
+              formControlName="tmdbId"
+              [class.is-danger]="isInvalid('tmdbId')"
+            />
+          </div>
+          @if (isInvalid('tmdbId')) {
+            <p class="help is-danger">Must be a positive number.</p>
+          }
+        </div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="label" for="posterUrl">Poster URL</label>
+      <div class="control">
+        <input
+          id="posterUrl"
+          class="input"
+          type="url"
+          placeholder="https://…"
+          formControlName="posterUrl"
+          [class.is-danger]="isInvalid('posterUrl')"
+        />
+      </div>
+      @if (isInvalid('posterUrl')) {
+        <p class="help is-danger">Please enter a valid http(s) URL.</p>
+      }
+    </div>
+
+    <div class="field">
+      <label class="label" for="overview">Overview</label>
+      <div class="control">
+        <textarea
+          id="overview"
+          class="textarea"
+          rows="4"
+          formControlName="overview"
+          [class.is-danger]="isInvalid('overview')"
+        ></textarea>
+      </div>
+      @if (isInvalid('overview')) {
+        <p class="help is-danger">At most 5000 characters.</p>
+      }
+    </div>
+
+    <fieldset class="field">
+      <legend class="label">Genres</legend>
+      <div class="columns is-multiline is-mobile is-gapless">
+        @for (genre of genres(); track genre.id) {
+          <div class="column is-half-mobile is-one-quarter-tablet is-2-desktop">
+            <label class="checkbox">
+              <input
+                type="checkbox"
+                [checked]="hasGenre(genre.id)"
+                (change)="toggleGenre(genre.id, $any($event.target).checked)"
+              />
+              {{ genre.name }}
+            </label>
+          </div>
+        }
+      </div>
+    </fieldset>
+
+    <div class="field is-grouped mt-5">
+      <div class="control">
+        <button type="submit" class="button is-primary" [class.is-loading]="saving()">Save</button>
+      </div>
+      <div class="control">
+        <a class="button is-light" [routerLink]="id() ? ['/movies', id()] : ['/movies']">Cancel</a>
+      </div>
+    </div>
+  </form>
+}

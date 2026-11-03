@@ -1,0 +1,93 @@
+<h1 class="title">{{ id() ? 'Edit diary entry' : 'Log a viewing' }}</h1>
+
+<app-error-notification [error]="error()" (dismiss)="error.set(null)" />
+
+@if (loading()) {
+  <progress class="progress is-small is-primary" max="100"></progress>
+} @else {
+  <form class="box" [formGroup]="form" (ngSubmit)="save()" novalidate>
+    <div class="field">
+      <label class="label" for="movie">Movie *</label>
+      <app-movie-picker
+        inputId="movie"
+        [(selected)]="movie"
+        [invalid]="movieTouched() && !movie()"
+      />
+      @if (movieTouched() && !movie()) {
+        <p class="help is-danger">Please pick a movie.</p>
+      }
+    </div>
+
+    <div class="columns">
+      <div class="column">
+        <div class="field">
+          <label class="label" for="watchedOn">Watched on *</label>
+          <div class="control">
+            <input
+              id="watchedOn"
+              class="input"
+              type="date"
+              [max]="today"
+              formControlName="watchedOn"
+              [class.is-danger]="isInvalid('watchedOn')"
+            />
+          </div>
+          @if (isInvalid('watchedOn')) {
+            <p class="help is-danger">Please enter the date you watched the movie.</p>
+          }
+        </div>
+      </div>
+      <div class="column">
+        <div class="field">
+          <label class="label" for="rating">Rating</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="rating" formControlName="rating">
+                <option [ngValue]="null">No rating</option>
+                @for (option of ratingOptions; track option.value) {
+                  <option [ngValue]="option.value">{{ option.label }}</option>
+                }
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="label" for="review">Review</label>
+      <div class="control">
+        <textarea
+          id="review"
+          class="textarea"
+          rows="5"
+          formControlName="review"
+          [class.is-danger]="isInvalid('review')"
+        ></textarea>
+      </div>
+      @if (isInvalid('review')) {
+        <p class="help is-danger">At most 20,000 characters.</p>
+      }
+    </div>
+
+    <div class="field is-grouped is-grouped-multiline">
+      <div class="control">
+        <label class="checkbox"
+          ><input type="checkbox" formControlName="isRewatch" /> Rewatch</label
+        >
+      </div>
+      <div class="control">
+        <label class="checkbox"><input type="checkbox" formControlName="liked" /> Liked ♥</label>
+      </div>
+    </div>
+
+    <div class="field is-grouped mt-5">
+      <div class="control">
+        <button type="submit" class="button is-primary" [class.is-loading]="saving()">Save</button>
+      </div>
+      <div class="control">
+        <a class="button is-light" [routerLink]="cancelLink()">Cancel</a>
+      </div>
+    </div>
+  </form>
+}

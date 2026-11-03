@@ -1,0 +1,124 @@
+<div class="level is-mobile">
+  <div class="level-left">
+    <h1 class="title level-item">Diary</h1>
+  </div>
+  <div class="level-right">
+    <a class="button is-primary level-item" routerLink="/diary/new">Log a viewing</a>
+  </div>
+</div>
+
+<div class="box">
+  <div class="columns is-mobile is-multiline is-align-items-flex-end">
+    <div class="column is-half-mobile is-3-tablet">
+      <div class="field">
+        <label class="label" for="from">From</label>
+        <div class="control">
+          <input
+            id="from"
+            class="input"
+            type="date"
+            [value]="query().from ?? ''"
+            [max]="query().to ?? ''"
+            (change)="onFilter('from', $any($event.target).value)"
+          />
+        </div>
+      </div>
+    </div>
+    <div class="column is-half-mobile is-3-tablet">
+      <div class="field">
+        <label class="label" for="to">To</label>
+        <div class="control">
+          <input
+            id="to"
+            class="input"
+            type="date"
+            [value]="query().to ?? ''"
+            [min]="query().from ?? ''"
+            (change)="onFilter('to', $any($event.target).value)"
+          />
+        </div>
+      </div>
+    </div>
+    @if (query().from || query().to) {
+      <div class="column is-narrow">
+        <button class="button is-light" (click)="clearFilters()">Clear</button>
+      </div>
+    }
+  </div>
+</div>
+
+<app-error-notification [error]="error()" (dismiss)="error.set(null)" />
+
+@if (result(); as result) {
+  <p class="mb-4 has-text-grey">
+    {{ result.totalCount }} {{ result.totalCount === 1 ? 'entry' : 'entries' }}
+    @if (loading()) {
+      <span class="ml-2">· loading…</span>
+    }
+  </p>
+
+  @if (result.items.length) {
+    <div class="table-container">
+      <table class="table is-fullwidth is-hoverable">
+        <thead>
+          <tr>
+            <th>Watched on</th>
+            <th>Movie</th>
+            <th>Rating</th>
+            <th class="is-hidden-mobile">Review</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (entry of result.items; track entry.id) {
+            <tr>
+              <td class="is-nowrap">{{ entry.watchedOn }}</td>
+              <td>
+                <a [routerLink]="['/movies', entry.movie.id]" class="has-text-weight-semibold">{{
+                  entry.movie.title
+                }}</a>
+                @if (entry.movie.releaseDate) {
+                  <span class="has-text-grey"> ({{ yearOf(entry.movie.releaseDate) }})</span>
+                }
+                @if (entry.isRewatch) {
+                  <span class="tag is-light ml-1" title="Rewatch">↻</span>
+                }
+                @if (entry.liked) {
+                  <span class="has-text-danger ml-1" title="Liked">♥</span>
+                }
+              </td>
+              <td><app-rating [halfStars]="entry.rating" /></td>
+              <td class="is-hidden-mobile pre-wrap">{{ entry.review }}</td>
+              <td>
+                <div class="buttons is-right are-small is-flex-wrap-nowrap">
+                  <a class="button" [routerLink]="['/diary', entry.id, 'edit']">Edit</a>
+                  <button class="button is-danger is-outlined" (click)="deleteEntry(entry)">
+                    Delete
+                  </button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  } @else {
+    <div class="notification">
+      No diary entries
+      @if (query().from || query().to) {
+        in this period.
+      } @else {
+        yet. <a routerLink="/diary/new">Log your first viewing</a>.
+      }
+    </div>
+  }
+
+  <app-pagination
+    [page]="result.page"
+    [pageSize]="result.pageSize"
+    [totalCount]="result.totalCount"
+    (pageChange)="goToPage($event)"
+  />
+} @else if (loading()) {
+  <progress class="progress is-small is-primary" max="100"></progress>
+}

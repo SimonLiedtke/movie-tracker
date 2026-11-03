@@ -1,0 +1,95 @@
+<h1 class="title">Watchlist</h1>
+
+<app-error-notification [error]="error()" (dismiss)="error.set(null)" />
+
+@if (result(); as result) {
+  <p class="mb-4 has-text-grey">
+    {{ result.totalCount }} {{ result.totalCount === 1 ? 'movie' : 'movies' }} to watch
+    @if (loading()) {
+      <span class="ml-2">· loading…</span>
+    }
+  </p>
+
+  @for (item of result.items; track item.movie.id) {
+    <article class="media box">
+      <figure class="media-left" style="width: 64px">
+        <a [routerLink]="['/movies', item.movie.id]">
+          <app-poster [url]="item.movie.posterUrl" [title]="item.movie.title" />
+        </a>
+      </figure>
+      <div class="media-content">
+        <p>
+          <a class="has-text-weight-semibold" [routerLink]="['/movies', item.movie.id]">{{
+            item.movie.title
+          }}</a>
+          @if (item.movie.releaseDate) {
+            <span class="has-text-grey"> ({{ yearOf(item.movie.releaseDate) }})</span>
+          }
+        </p>
+        <p class="is-size-7 has-text-grey">Added {{ item.addedAt.slice(0, 10) }}</p>
+
+        @if (editing() === item.movie.id) {
+          <form
+            class="field has-addons mt-2"
+            (submit)="$event.preventDefault(); saveNote(item, note.value)"
+          >
+            <div class="control is-expanded">
+              <input
+                #note
+                class="input is-small"
+                maxlength="500"
+                placeholder="Why do you want to watch it?"
+                [value]="item.note ?? ''"
+                (keydown.escape)="editing.set(null)"
+              />
+            </div>
+            <div class="control">
+              <button
+                type="submit"
+                class="button is-small is-primary"
+                [class.is-loading]="saving()"
+              >
+                Save
+              </button>
+            </div>
+            <div class="control">
+              <button type="button" class="button is-small" (click)="editing.set(null)">
+                Cancel
+              </button>
+            </div>
+          </form>
+        } @else if (item.note) {
+          <p class="mt-2 pre-wrap">{{ item.note }}</p>
+        }
+      </div>
+      <div class="media-right">
+        <div class="buttons are-small is-right">
+          <a
+            class="button is-primary"
+            routerLink="/diary/new"
+            [queryParams]="{ movieId: item.movie.id }"
+          >
+            Log a viewing
+          </a>
+          <button class="button" (click)="editing.set(item.movie.id)">
+            {{ item.note ? 'Edit note' : 'Add note' }}
+          </button>
+          <button class="button is-danger is-outlined" (click)="remove(item)">Remove</button>
+        </div>
+      </div>
+    </article>
+  } @empty {
+    <div class="notification">
+      Your watchlist is empty. Add movies from their <a routerLink="/movies">movie page</a>.
+    </div>
+  }
+
+  <app-pagination
+    [page]="result.page"
+    [pageSize]="result.pageSize"
+    [totalCount]="result.totalCount"
+    (pageChange)="goToPage($event)"
+  />
+} @else if (loading()) {
+  <progress class="progress is-small is-primary" max="100"></progress>
+}

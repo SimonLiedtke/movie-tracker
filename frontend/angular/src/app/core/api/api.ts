@@ -1,0 +1,110 @@
+import { HttpClient } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
+import { Observable, shareReplay } from 'rxjs';
+import { toHttpParams } from './http-params';
+import {
+  DiaryEntry,
+  DiaryEntryRequest,
+  DiaryQuery,
+  Genre,
+  Movie,
+  MovieQuery,
+  MovieRequest,
+  MovieSummary,
+  PagedResponse,
+  PageQuery,
+  WatchlistItem,
+} from './models';
+
+// Relative URLs: the dev server proxies /api to the backend (see proxy.conf.json).
+const BASE = '/api';
+
+@Injectable({ providedIn: 'root' })
+export class GenresApi {
+  private readonly http = inject(HttpClient);
+
+  // Genres are seeded and do not change at runtime, so one request per session is enough.
+  private readonly genres$ = this.http.get<Genre[]>(`${BASE}/genres`).pipe(shareReplay(1));
+
+  list(): Observable<Genre[]> {
+    return this.genres$;
+  }
+}
+
+@Injectable({ providedIn: 'root' })
+export class MoviesApi {
+  private readonly http = inject(HttpClient);
+
+  list(query: MovieQuery = {}): Observable<PagedResponse<MovieSummary>> {
+    return this.http.get<PagedResponse<MovieSummary>>(`${BASE}/movies`, {
+      params: toHttpParams(query),
+    });
+  }
+
+  get(id: string): Observable<Movie> {
+    return this.http.get<Movie>(`${BASE}/movies/${id}`);
+  }
+
+  create(request: MovieRequest): Observable<Movie> {
+    return this.http.post<Movie>(`${BASE}/movies`, request);
+  }
+
+  update(id: string, request: MovieRequest): Observable<Movie> {
+    return this.http.put<Movie>(`${BASE}/movies/${id}`, request);
+  }
+
+  delete(id: string): Observable<void> {
+    return this.http.delete<void>(`${BASE}/movies/${id}`);
+  }
+
+  diaryEntries(id: string): Observable<DiaryEntry[]> {
+    return this.http.get<DiaryEntry[]>(`${BASE}/movies/${id}/diary-entries`);
+  }
+}
+
+@Injectable({ providedIn: 'root' })
+export class DiaryApi {
+  private readonly http = inject(HttpClient);
+
+  list(query: DiaryQuery = {}): Observable<PagedResponse<DiaryEntry>> {
+    return this.http.get<PagedResponse<DiaryEntry>>(`${BASE}/diary-entries`, {
+      params: toHttpParams(query),
+    });
+  }
+
+  get(id: string): Observable<DiaryEntry> {
+    return this.http.get<DiaryEntry>(`${BASE}/diary-entries/${id}`);
+  }
+
+  create(request: DiaryEntryRequest): Observable<DiaryEntry> {
+    return this.http.post<DiaryEntry>(`${BASE}/diary-entries`, request);
+  }
+
+  update(id: string, request: DiaryEntryRequest): Observable<DiaryEntry> {
+    return this.http.put<DiaryEntry>(`${BASE}/diary-entries/${id}`, request);
+  }
+
+  delete(id: string): Observable<void> {
+    return this.http.delete<void>(`${BASE}/diary-entries/${id}`);
+  }
+}
+
+@Injectable({ providedIn: 'root' })
+export class WatchlistApi {
+  private readonly http = inject(HttpClient);
+
+  list(query: PageQuery = {}): Observable<PagedResponse<WatchlistItem>> {
+    return this.http.get<PagedResponse<WatchlistItem>>(`${BASE}/watchlist`, {
+      params: toHttpParams(query),
+    });
+  }
+
+  /** Adds the movie to the watchlist, or updates the note if it is already on it. */
+  put(movieId: string, note: string | null): Observable<WatchlistItem> {
+    return this.http.put<WatchlistItem>(`${BASE}/watchlist/${movieId}`, { note });
+  }
+
+  remove(movieId: string): Observable<void> {
+    return this.http.delete<void>(`${BASE}/watchlist/${movieId}`);
+  }
+}

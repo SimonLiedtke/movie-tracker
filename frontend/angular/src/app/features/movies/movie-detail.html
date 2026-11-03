@@ -1,0 +1,163 @@
+<app-error-notification [error]="error()" (dismiss)="error.set(null)" />
+
+@if (movie(); as movie) {
+  <div class="columns">
+    <div class="column is-one-quarter-tablet is-one-fifth-desktop">
+      <app-poster [url]="movie.posterUrl" [title]="movie.title" />
+    </div>
+
+    <div class="column">
+      <h1 class="title">
+        {{ movie.title }}
+        @if (movie.releaseDate) {
+          <span class="has-text-grey has-text-weight-normal"
+            >({{ yearOf(movie.releaseDate) }})</span
+          >
+        }
+      </h1>
+      @if (movie.originalTitle && movie.originalTitle !== movie.title) {
+        <p class="subtitle is-6 has-text-grey">Original title: {{ movie.originalTitle }}</p>
+      }
+
+      <div class="tags">
+        @for (genre of movie.genres; track genre.id) {
+          <a
+            class="tag is-link is-light"
+            [routerLink]="['/movies']"
+            [queryParams]="{ genreId: genre.id }"
+          >
+            {{ genre.name }}
+          </a>
+        }
+      </div>
+
+      @if (movie.overview) {
+        <p class="block pre-wrap">{{ movie.overview }}</p>
+      }
+
+      <div class="field is-grouped is-grouped-multiline block">
+        @if (movie.releaseDate) {
+          <div class="control">
+            <div class="tags has-addons">
+              <span class="tag is-dark">Released</span
+              ><span class="tag">{{ movie.releaseDate }}</span>
+            </div>
+          </div>
+        }
+        @if (movie.runtimeMinutes) {
+          <div class="control">
+            <div class="tags has-addons">
+              <span class="tag is-dark">Runtime</span
+              ><span class="tag">{{ movie.runtimeMinutes }} min</span>
+            </div>
+          </div>
+        }
+        <div class="control">
+          <div class="tags has-addons">
+            <span class="tag is-dark">Watched</span><span class="tag">{{ movie.watchCount }}×</span>
+          </div>
+        </div>
+        @if (movie.lastWatchedOn) {
+          <div class="control">
+            <div class="tags has-addons">
+              <span class="tag is-dark">Last watched</span
+              ><span class="tag">{{ movie.lastWatchedOn }}</span>
+            </div>
+          </div>
+        }
+        @if (movie.tmdbId) {
+          <div class="control">
+            <a
+              class="tags has-addons"
+              [href]="'https://www.themoviedb.org/movie/' + movie.tmdbId"
+              target="_blank"
+              rel="noopener"
+            >
+              <span class="tag is-dark">TMDB</span><span class="tag">{{ movie.tmdbId }}</span>
+            </a>
+          </div>
+        }
+      </div>
+
+      @if (movie.latestRating) {
+        <p class="block is-size-4"><app-rating [halfStars]="movie.latestRating" /></p>
+      }
+
+      <div class="buttons">
+        <a class="button is-primary" routerLink="/diary/new" [queryParams]="{ movieId: movie.id }"
+          >Log a viewing</a
+        >
+        <button
+          class="button"
+          [class.is-info]="!movie.onWatchlist"
+          [class.is-light]="movie.onWatchlist"
+          [disabled]="busy()"
+          (click)="toggleWatchlist(movie)"
+        >
+          {{ movie.onWatchlist ? 'Remove from watchlist' : 'Add to watchlist' }}
+        </button>
+        <a class="button" [routerLink]="['/movies', movie.id, 'edit']">Edit</a>
+        <button
+          class="button is-danger is-outlined"
+          [disabled]="busy()"
+          (click)="deleteMovie(movie)"
+        >
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="title is-4 mt-5">Viewings</h2>
+  @if (entries().length) {
+    <div class="table-container">
+      <table class="table is-fullwidth is-hoverable">
+        <thead>
+          <tr>
+            <th>Watched on</th>
+            <th>Rating</th>
+            <th>Review</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (entry of entries(); track entry.id) {
+            <tr>
+              <td class="is-nowrap">
+                {{ entry.watchedOn }}
+                @if (entry.isRewatch) {
+                  <span class="tag is-light ml-1" title="Rewatch">↻</span>
+                }
+                @if (entry.liked) {
+                  <span class="has-text-danger ml-1" title="Liked">♥</span>
+                }
+              </td>
+              <td><app-rating [halfStars]="entry.rating" /></td>
+              <td class="pre-wrap">{{ entry.review }}</td>
+              <td class="has-text-right">
+                <div class="buttons is-right are-small">
+                  <a class="button" [routerLink]="['/diary', entry.id, 'edit']">Edit</a>
+                  <button
+                    class="button is-danger is-outlined"
+                    [disabled]="busy()"
+                    (click)="deleteEntry(entry)"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  } @else {
+    <p class="has-text-grey">Not watched yet.</p>
+  }
+} @else if (notFound()) {
+  <div class="notification is-warning is-light">
+    This movie does not exist (anymore). <a routerLink="/movies">Back to all movies</a>
+  </div>
+} @else if (loading()) {
+  <progress class="progress is-small is-primary" max="100"></progress>
+}

@@ -1,0 +1,20 @@
+@use 'bulma/bulma';
+
+.poster-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bulma-background);
+  color: var(--bulma-text-weak);
+  font-size: 3rem;
+}
+
+.rating-stars {
+  color: hsl(var(--bulma-warning-h), var(--bulma-warning-s), 45%);
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.pre-wrap {
+  white-space: pre-wrap;
+}
