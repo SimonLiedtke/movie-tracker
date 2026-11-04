@@ -9,12 +9,16 @@ public sealed class WatchlistItem
         // Required by EF Core.
     }
 
-    public WatchlistItem(Guid movieId, string? note, DateTimeOffset addedAt)
+    public WatchlistItem(Guid userId, Guid movieId, string? note, DateTimeOffset addedAt)
     {
+        UserId = userId;
         MovieId = movieId;
         Note = note;
         AddedAt = addedAt;
     }
+
+    /// <summary>The owner. Every user has their own watchlist.</summary>
+    public Guid UserId { get; private set; }
 
     public Guid MovieId { get; private set; }
 

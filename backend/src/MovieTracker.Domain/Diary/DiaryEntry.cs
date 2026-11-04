@@ -9,14 +9,18 @@ public sealed class DiaryEntry
         // Required by EF Core.
     }
 
-    public DiaryEntry(DiaryEntryDetails details, DateTimeOffset createdAt)
+    public DiaryEntry(Guid userId, DiaryEntryDetails details, DateTimeOffset createdAt)
     {
         Id = Guid.CreateVersion7(createdAt);
+        UserId = userId;
         CreatedAt = createdAt;
         Update(details);
     }
 
     public Guid Id { get; private set; }
+
+    /// <summary>The owner. Only they can see and change the entry.</summary>
+    public Guid UserId { get; private set; }
 
     public Guid MovieId { get; private set; }
 

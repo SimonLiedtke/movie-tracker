@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using MovieTracker.Domain.Movies;
+using MovieTracker.Domain.Users;
 using MovieTracker.Domain.Watchlist;
 
 namespace MovieTracker.Infrastructure.Persistence.Configurations;
@@ -11,18 +11,27 @@ internal sealed class WatchlistItemConfiguration : IEntityTypeConfiguration<Watc
     {
         builder.ToTable("watchlist_items");
 
-        // The movie ID is the primary key: a movie is either on the watchlist or not.
-        builder.HasKey(item => item.MovieId);
+        // A movie is either on a user's watchlist or not.
+        builder.HasKey(item => new { item.UserId, item.MovieId });
 
-        // Cascade: deleting a movie also removes it from the watchlist.
+        // Cascade: deleting a movie also removes it from all watchlists.
         builder
             .HasOne(item => item.Movie)
-            .WithOne()
-            .HasForeignKey<WatchlistItem>(item => item.MovieId)
+            .WithMany()
+            .HasForeignKey(item => item.MovieId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Cascade: deleting a user deletes their watchlist.
+        builder
+            .HasOne<User>()
+            .WithMany()
+            .HasForeignKey(item => item.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.Property(item => item.Note).HasMaxLength(500);
 
-        builder.HasIndex(item => item.AddedAt);
+        builder.HasIndex(item => new { item.UserId, item.AddedAt });
+        // For the movie side of the foreign key (the primary key starts with user_id).
+        builder.HasIndex(item => item.MovieId);
     }
 }

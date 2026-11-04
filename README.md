@@ -30,6 +30,28 @@ dotnet run --project src/MovieTracker.Api
 The API listens on http://localhost:5080. The OpenAPI document generated from the code
 is available at http://localhost:5080/openapi/v1.json.
 
+## Signing in with Google
+
+Users sign in with their Google account. Every user has their own diary and watchlist; the movie
+catalog is shared. Sign-in runs on the backend (OAuth "backend for frontend"): the API handles the
+Google redirect and keeps the session in an HttpOnly cookie, so the frontend never handles tokens.
+
+One-time setup for local development:
+
+1. In the [Google Cloud console](https://console.cloud.google.com/apis/credentials), configure the
+   OAuth consent screen (while it is in "Testing" mode, add your Google account as a test user).
+2. Create an OAuth client ID of type **Web application** with the authorized redirect URI
+   `http://localhost:4200/api/auth/callback/google` (the Angular dev server forwards `/api` to the backend).
+3. Store the credentials as user secrets (they stay out of the repository):
+
+   ```bash
+   cd backend
+   dotnet user-secrets set "Authentication:Google:ClientId" "<client id>" --project src/MovieTracker.Api
+   dotnet user-secrets set "Authentication:Google:ClientSecret" "<client secret>" --project src/MovieTracker.Api
+   ```
+
+Without these settings the API still starts, but signing in answers with 503.
+
 ## Running the tests
 
 ```bash

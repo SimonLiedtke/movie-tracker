@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Net.Mime;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MovieTracker.Api.Auth;
 using MovieTracker.Api.Contracts;
 using MovieTracker.Api.Queries;
 using MovieTracker.Domain.Movies;
@@ -56,7 +57,7 @@ public sealed class MoviesController(MovieTrackerDbContext db, TimeProvider time
         var rows = await ordered
             .ThenBy(movie => movie.Id) // stable order for paging
             .Paginate(page, pageSize)
-            .SelectSummaryRows(db)
+            .SelectSummaryRows(db, User.GetUserId())
             .ToListAsync(cancellationToken);
 
         return new PagedResponse<MovieSummaryResponse>(
@@ -147,15 +148,16 @@ public sealed class MoviesController(MovieTrackerDbContext db, TimeProvider time
             return NotFound();
         }
 
+        // Movies are shared by all users: the check includes other users' entries (without revealing them).
         if (await db.DiaryEntries.AnyAsync(entry => entry.MovieId == movieId, cancellationToken))
         {
             return Problem(
                 statusCode: StatusCodes.Status409Conflict,
                 title: "Movie has diary entries",
-                detail: "Delete the diary entries of this movie before deleting the movie.");
+                detail: "Movies that are in a diary cannot be deleted.");
         }
 
-        // Watchlist entry and genre assignments are removed by ON DELETE CASCADE in the database.
+        // Watchlist items and genre assignments are removed by ON DELETE CASCADE in the database.
         await db.Movies.Where(movie => movie.Id == movieId).ExecuteDeleteAsync(cancellationToken);
         return NoContent();
     }
@@ -171,9 +173,10 @@ public sealed class MoviesController(MovieTrackerDbContext db, TimeProvider time
             return NotFound();
         }
 
+        var userId = User.GetUserId();
         var rows = await db.DiaryEntries
             .AsNoTracking()
-            .Where(entry => entry.MovieId == movieId)
+            .Where(entry => entry.MovieId == movieId && entry.UserId == userId)
             .OrderByNewest()
             .SelectRows()
             .ToListAsync(cancellationToken);
@@ -186,7 +189,7 @@ public sealed class MoviesController(MovieTrackerDbContext db, TimeProvider time
         var row = await db.Movies
             .AsNoTracking()
             .Where(movie => movie.Id == movieId)
-            .SelectDetailRows(db)
+            .SelectDetailRows(db, User.GetUserId())
             .SingleOrDefaultAsync(cancellationToken);
 
         return row?.ToResponse();

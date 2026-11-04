@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc;
+using MovieTracker.Api.Auth;
 using MovieTracker.Api.Contracts;
 
 namespace MovieTracker.Api.Tests.Infrastructure;
@@ -13,7 +14,13 @@ public abstract class ApiTestBase(ApiFactory factory) : IAsyncLifetime
 
     protected ApiFactory Factory { get; } = factory;
 
-    protected HttpClient Client { get; } = factory.CreateClient();
+    /// <summary>Signed in as "alice".</summary>
+    protected HttpClient Client { get; } = CreateClient(factory, "alice");
+
+    /// <summary>Signed in as another user, to check that users cannot see each other's data.</summary>
+    protected HttpClient Bob { get; } = CreateClient(factory, "bob");
+
+    protected HttpClient Anonymous { get; } = CreateClient(factory, user: null);
 
     protected static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -22,7 +29,22 @@ public abstract class ApiTestBase(ApiFactory factory) : IAsyncLifetime
     public ValueTask DisposeAsync()
     {
         Client.Dispose();
+        Bob.Dispose();
+        Anonymous.Dispose();
         return ValueTask.CompletedTask;
+    }
+
+    protected static HttpClient CreateClient(ApiFactory factory, string? user, bool allowAutoRedirect = true)
+    {
+        var client = factory.CreateClient(new() { AllowAutoRedirect = allowAutoRedirect });
+        // Like the frontend, every request carries the CSRF header.
+        client.DefaultRequestHeaders.Add(CsrfHeaderMiddleware.HeaderName, "1");
+        if (user is not null)
+        {
+            client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, user);
+        }
+
+        return client;
     }
 
     protected async Task<MovieResponse> CreateMovieAsync(

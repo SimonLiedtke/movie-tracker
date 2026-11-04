@@ -4,6 +4,7 @@ using System.Net.Mime;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.EntityFrameworkCore;
+using MovieTracker.Api.Auth;
 using MovieTracker.Api.Contracts;
 using MovieTracker.Api.Queries;
 using MovieTracker.Domain.Watchlist;
@@ -16,6 +17,16 @@ namespace MovieTracker.Api.Controllers;
 [Tags("Watchlist")]
 public sealed class WatchlistController(MovieTrackerDbContext db, TimeProvider timeProvider) : ControllerBase
 {
+    /// <summary>Every user has their own watchlist.</summary>
+    private IQueryable<WatchlistItem> OwnItems
+    {
+        get
+        {
+            var userId = User.GetUserId();
+            return db.WatchlistItems.Where(item => item.UserId == userId);
+        }
+    }
+
     [HttpGet(Name = "listWatchlist")]
     [ProducesResponseType<PagedResponse<WatchlistItemResponse>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, MediaTypeNames.Application.ProblemJson)]
@@ -24,7 +35,7 @@ public sealed class WatchlistController(MovieTrackerDbContext db, TimeProvider t
         [FromQuery, Range(1, 100)] int pageSize = 20,
         CancellationToken cancellationToken = default)
     {
-        var items = db.WatchlistItems.AsNoTracking();
+        var items = OwnItems.AsNoTracking();
 
         var totalCount = await items.CountAsync(cancellationToken);
         var responses = await items
@@ -47,7 +58,7 @@ public sealed class WatchlistController(MovieTrackerDbContext db, TimeProvider t
         [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] WatchlistItemRequest? request,
         CancellationToken cancellationToken)
     {
-        var item = await db.WatchlistItems.FindAsync([movieId], cancellationToken);
+        var item = await db.WatchlistItems.FindAsync([User.GetUserId(), movieId], cancellationToken);
 
         if (item is not null)
         {
@@ -61,7 +72,7 @@ public sealed class WatchlistController(MovieTrackerDbContext db, TimeProvider t
             return NotFound();
         }
 
-        db.WatchlistItems.Add(new WatchlistItem(movieId, request?.Note, timeProvider.GetUtcNow()));
+        db.WatchlistItems.Add(new WatchlistItem(User.GetUserId(), movieId, request?.Note, timeProvider.GetUtcNow()));
         await db.SaveChangesAsync(cancellationToken);
 
         return StatusCode(StatusCodes.Status201Created, await FindResponseAsync(movieId, cancellationToken));
@@ -72,7 +83,7 @@ public sealed class WatchlistController(MovieTrackerDbContext db, TimeProvider t
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, MediaTypeNames.Application.ProblemJson)]
     public async Task<IActionResult> DeleteWatchlistItem(Guid movieId, CancellationToken cancellationToken)
     {
-        var deleted = await db.WatchlistItems
+        var deleted = await OwnItems
             .Where(item => item.MovieId == movieId)
             .ExecuteDeleteAsync(cancellationToken);
 
@@ -85,7 +96,7 @@ public sealed class WatchlistController(MovieTrackerDbContext db, TimeProvider t
     }
 
     private async Task<WatchlistItemResponse> FindResponseAsync(Guid movieId, CancellationToken cancellationToken) =>
-        await db.WatchlistItems
+        await OwnItems
             .AsNoTracking()
             .Where(item => item.MovieId == movieId)
             .Select(ToResponse)

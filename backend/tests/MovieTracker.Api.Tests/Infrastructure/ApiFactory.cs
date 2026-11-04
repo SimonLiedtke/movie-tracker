@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -50,14 +51,29 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         var db = scope.ServiceProvider.GetRequiredService<MovieTrackerDbContext>();
         // Genres are seed data and stay.
         await db.Database.ExecuteSqlRawAsync(
-            "TRUNCATE diary_entries, watchlist_items, movie_genres, movies RESTART IDENTITY CASCADE");
+            "TRUNCATE diary_entries, watchlist_items, movie_genres, movies, users RESTART IDENTITY CASCADE");
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
         builder.UseSetting("ConnectionStrings:MovieTracker", _postgres.GetConnectionString());
-        builder.ConfigureTestServices(services => services.AddSingleton<TimeProvider>(Clock));
+        // Dummy credentials: enough to register the Google handler, which the login endpoint redirects to.
+        builder.UseSetting("Authentication:Google:ClientId", "test-client-id");
+        builder.UseSetting("Authentication:Google:ClientSecret", "test-client-secret");
+
+        builder.ConfigureTestServices(services =>
+        {
+            services.AddSingleton<TimeProvider>(Clock);
+
+            // Requests are authenticated by TestAuthHandler instead of the session cookie.
+            services.AddAuthentication().AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, null);
+            services.PostConfigure<AuthenticationOptions>(options =>
+            {
+                options.DefaultAuthenticateScheme = TestAuthHandler.SchemeName;
+                options.DefaultChallengeScheme = TestAuthHandler.SchemeName;
+            });
+        });
     }
 
     public override async ValueTask DisposeAsync()

@@ -1,7 +1,8 @@
 import { Routes } from '@angular/router';
+import { authGuard, guestGuard } from './core/auth/auth.guard';
 
-export const routes: Routes = [
-  { path: '', pathMatch: 'full', redirectTo: 'movies' },
+/** Every page requires a session, except the sign-in page. */
+const protectedRoutes: Routes = [
   {
     path: 'movies',
     title: 'Movies · Movie Tracker',
@@ -42,5 +43,16 @@ export const routes: Routes = [
     title: 'Watchlist · Movie Tracker',
     loadComponent: () => import('./features/watchlist/watchlist').then((m) => m.Watchlist),
   },
-  { path: '**', redirectTo: 'movies' },
+];
+
+export const routes: Routes = [
+  {
+    path: '',
+    pathMatch: 'full',
+    title: 'Sign in · Movie Tracker',
+    canActivate: [guestGuard],
+    loadComponent: () => import('./features/login/login').then((m) => m.Login),
+  },
+  { path: '', canActivateChild: [authGuard], children: protectedRoutes },
+  { path: '**', redirectTo: '' },
 ];

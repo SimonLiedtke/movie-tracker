@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Net.Mime;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MovieTracker.Api.Auth;
 using MovieTracker.Api.Contracts;
 using MovieTracker.Api.Queries;
 using MovieTracker.Domain.Diary;
@@ -14,6 +15,16 @@ namespace MovieTracker.Api.Controllers;
 [Tags("Diary")]
 public sealed class DiaryEntriesController(MovieTrackerDbContext db, TimeProvider timeProvider) : ControllerBase
 {
+    /// <summary>Only the signed-in user's entries. Other users' entries are answered with 404, as if they did not exist.</summary>
+    private IQueryable<DiaryEntry> OwnEntries
+    {
+        get
+        {
+            var userId = User.GetUserId();
+            return db.DiaryEntries.Where(entry => entry.UserId == userId);
+        }
+    }
+
     [HttpGet(Name = "listDiaryEntries")]
     [ProducesResponseType<PagedResponse<DiaryEntryResponse>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, MediaTypeNames.Application.ProblemJson)]
@@ -31,7 +42,7 @@ public sealed class DiaryEntriesController(MovieTrackerDbContext db, TimeProvide
             return ValidationProblem(ModelState);
         }
 
-        var entries = db.DiaryEntries.AsNoTracking();
+        var entries = OwnEntries.AsNoTracking();
 
         if (fromDate is not null)
         {
@@ -91,7 +102,7 @@ public sealed class DiaryEntriesController(MovieTrackerDbContext db, TimeProvide
             return UnknownMovie(request.MovieId!.Value);
         }
 
-        var entry = new DiaryEntry(request.ToDetails(), timeProvider.GetUtcNow());
+        var entry = new DiaryEntry(User.GetUserId(), request.ToDetails(), timeProvider.GetUtcNow());
         db.DiaryEntries.Add(entry);
         await db.SaveChangesAsync(cancellationToken);
 
@@ -107,7 +118,7 @@ public sealed class DiaryEntriesController(MovieTrackerDbContext db, TimeProvide
     public async Task<ActionResult<DiaryEntryResponse>> UpdateDiaryEntry(
         Guid entryId, DiaryEntryRequest request, CancellationToken cancellationToken)
     {
-        var entry = await db.DiaryEntries.FindAsync([entryId], cancellationToken);
+        var entry = await OwnEntries.SingleOrDefaultAsync(e => e.Id == entryId, cancellationToken);
         if (entry is null)
         {
             return NotFound();
@@ -135,7 +146,7 @@ public sealed class DiaryEntriesController(MovieTrackerDbContext db, TimeProvide
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, MediaTypeNames.Application.ProblemJson)]
     public async Task<IActionResult> DeleteDiaryEntry(Guid entryId, CancellationToken cancellationToken)
     {
-        var deleted = await db.DiaryEntries
+        var deleted = await OwnEntries
             .Where(entry => entry.Id == entryId)
             .ExecuteDeleteAsync(cancellationToken);
 
@@ -149,7 +160,7 @@ public sealed class DiaryEntriesController(MovieTrackerDbContext db, TimeProvide
 
     private async Task<DiaryEntryResponse?> FindResponseAsync(Guid entryId, CancellationToken cancellationToken)
     {
-        var row = await db.DiaryEntries
+        var row = await OwnEntries
             .AsNoTracking()
             .Where(entry => entry.Id == entryId)
             .SelectRows()

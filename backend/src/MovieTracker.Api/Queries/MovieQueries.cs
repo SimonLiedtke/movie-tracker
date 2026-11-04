@@ -7,7 +7,8 @@ using MovieTracker.Infrastructure.Persistence;
 namespace MovieTracker.Api.Queries;
 
 /// <summary>
-/// Projections from movies to response rows. Rating is a value-converted type that EF Core
+/// Projections from movies to response rows. Movies are shared, but the statistics (rating, watch count,
+/// watchlist) are those of the given user only. Rating is a value-converted type that EF Core
 /// cannot dereference in SQL, so the queries project into rows first and map to responses in memory.
 /// </summary>
 internal static class MovieQueries
@@ -30,7 +31,7 @@ internal static class MovieQueries
     }
 
     public static IQueryable<MovieSummaryRow> SelectSummaryRows(
-        this IQueryable<Movie> movies, MovieTrackerDbContext db) =>
+        this IQueryable<Movie> movies, MovieTrackerDbContext db, Guid userId) =>
         movies.Select(movie => new MovieSummaryRow(
             movie.Id,
             movie.Title,
@@ -41,16 +42,16 @@ internal static class MovieQueries
                 .Select(genre => new GenreResponse(genre.Id, genre.Name))
                 .ToList(),
             db.DiaryEntries
-                .Where(entry => entry.MovieId == movie.Id && entry.Rating != null)
+                .Where(entry => entry.MovieId == movie.Id && entry.UserId == userId && entry.Rating != null)
                 .OrderByDescending(entry => entry.WatchedOn)
                 .ThenByDescending(entry => entry.CreatedAt)
                 .Select(entry => entry.Rating)
                 .FirstOrDefault(),
-            db.DiaryEntries.Count(entry => entry.MovieId == movie.Id),
-            db.WatchlistItems.Any(item => item.MovieId == movie.Id)));
+            db.DiaryEntries.Count(entry => entry.MovieId == movie.Id && entry.UserId == userId),
+            db.WatchlistItems.Any(item => item.MovieId == movie.Id && item.UserId == userId)));
 
     public static IQueryable<MovieDetailRow> SelectDetailRows(
-        this IQueryable<Movie> movies, MovieTrackerDbContext db) =>
+        this IQueryable<Movie> movies, MovieTrackerDbContext db, Guid userId) =>
         movies.Select(movie => new MovieDetailRow(
             movie.Id,
             movie.Title,
@@ -65,15 +66,15 @@ internal static class MovieQueries
                 .Select(genre => new GenreResponse(genre.Id, genre.Name))
                 .ToList(),
             db.DiaryEntries
-                .Where(entry => entry.MovieId == movie.Id && entry.Rating != null)
+                .Where(entry => entry.MovieId == movie.Id && entry.UserId == userId && entry.Rating != null)
                 .OrderByDescending(entry => entry.WatchedOn)
                 .ThenByDescending(entry => entry.CreatedAt)
                 .Select(entry => entry.Rating)
                 .FirstOrDefault(),
-            db.DiaryEntries.Count(entry => entry.MovieId == movie.Id),
-            db.WatchlistItems.Any(item => item.MovieId == movie.Id),
+            db.DiaryEntries.Count(entry => entry.MovieId == movie.Id && entry.UserId == userId),
+            db.WatchlistItems.Any(item => item.MovieId == movie.Id && item.UserId == userId),
             db.DiaryEntries
-                .Where(entry => entry.MovieId == movie.Id)
+                .Where(entry => entry.MovieId == movie.Id && entry.UserId == userId)
                 .Max(entry => (DateOnly?)entry.WatchedOn),
             movie.CreatedAt));
 

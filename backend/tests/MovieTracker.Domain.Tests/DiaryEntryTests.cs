@@ -10,12 +10,15 @@ public sealed class DiaryEntryTests
     public void Creates_an_entry_from_its_details()
     {
         var movieId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
 
         var entry = new DiaryEntry(
+            userId,
             new DiaryEntryDetails(movieId, new DateOnly(2026, 10, 31), new Rating(9), "Still terrifying.", IsRewatch: true, Liked: true),
             CreatedAt);
 
         Assert.Equal(7, entry.Id.Version);
+        Assert.Equal(userId, entry.UserId);
         Assert.Equal(movieId, entry.MovieId);
         Assert.Equal(new DateOnly(2026, 10, 31), entry.WatchedOn);
         Assert.Equal(new Rating(9), entry.Rating);
@@ -26,15 +29,18 @@ public sealed class DiaryEntryTests
     }
 
     [Fact]
-    public void Update_replaces_all_details()
+    public void Update_replaces_all_details_but_keeps_the_owner()
     {
+        var userId = Guid.NewGuid();
         var entry = new DiaryEntry(
+            userId,
             new DiaryEntryDetails(Guid.NewGuid(), new DateOnly(2026, 10, 31), new Rating(9), "Great", true, true),
             CreatedAt);
         var otherMovieId = Guid.NewGuid();
 
         entry.Update(new DiaryEntryDetails(otherMovieId, new DateOnly(2026, 11, 1), null, null, false, false));
 
+        Assert.Equal(userId, entry.UserId);
         Assert.Equal(otherMovieId, entry.MovieId);
         Assert.Equal(new DateOnly(2026, 11, 1), entry.WatchedOn);
         Assert.Null(entry.Rating);

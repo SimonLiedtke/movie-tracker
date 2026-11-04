@@ -1,44 +1,63 @@
-<nav class="navbar is-dark" aria-label="main navigation">
-  <div class="container">
-    <div class="navbar-brand">
-      <a
-        class="navbar-item has-text-weight-bold"
-        routerLink="/movies"
-        (click)="menuOpen.set(false)"
-      >
-        🎬&nbsp;Movie Tracker
-      </a>
-      <a
-        role="button"
-        class="navbar-burger"
-        [class.is-active]="menuOpen()"
-        aria-label="menu"
-        [attr.aria-expanded]="menuOpen()"
-        (click)="menuOpen.set(!menuOpen())"
-      >
-        <span aria-hidden="true"></span>
-        <span aria-hidden="true"></span>
-        <span aria-hidden="true"></span>
-        <span aria-hidden="true"></span>
-      </a>
-    </div>
-
-    <div class="navbar-menu" [class.is-active]="menuOpen()">
-      <div class="navbar-start" (click)="menuOpen.set(false)">
-        <a class="navbar-item" routerLink="/movies" routerLinkActive="is-selected">Movies</a>
-        <a class="navbar-item" routerLink="/diary" routerLinkActive="is-selected">Diary</a>
-        <a class="navbar-item" routerLink="/watchlist" routerLinkActive="is-selected">Watchlist</a>
+@if (auth.user(); as user) {
+  <nav class="navbar is-dark" aria-label="main navigation">
+    <div class="container">
+      <div class="navbar-brand">
+        <a
+          class="navbar-item has-text-weight-bold"
+          routerLink="/movies"
+          (click)="menuOpen.set(false)"
+        >
+          🎬&nbsp;Movie Tracker
+        </a>
+        <a
+          role="button"
+          class="navbar-burger"
+          [class.is-active]="menuOpen()"
+          aria-label="menu"
+          [attr.aria-expanded]="menuOpen()"
+          (click)="menuOpen.set(!menuOpen())"
+        >
+          <span aria-hidden="true"></span>
+          <span aria-hidden="true"></span>
+          <span aria-hidden="true"></span>
+          <span aria-hidden="true"></span>
+        </a>
       </div>
-      <div class="navbar-end">
-        <div class="navbar-item">
-          <a class="button is-primary" routerLink="/diary/new" (click)="menuOpen.set(false)"
-            >Log a viewing</a
+
+      <div class="navbar-menu" [class.is-active]="menuOpen()">
+        <div class="navbar-start" (click)="menuOpen.set(false)">
+          <a class="navbar-item" routerLink="/movies" routerLinkActive="is-selected">Movies</a>
+          <a class="navbar-item" routerLink="/diary" routerLinkActive="is-selected">Diary</a>
+          <a class="navbar-item" routerLink="/watchlist" routerLinkActive="is-selected"
+            >Watchlist</a
           >
+        </div>
+        <div class="navbar-end">
+          <div class="navbar-item">
+            <a class="button is-primary" routerLink="/diary/new" (click)="menuOpen.set(false)"
+              >Log a viewing</a
+            >
+          </div>
+          <div class="navbar-item">
+            @if (user.pictureUrl) {
+              <img
+                class="mr-2"
+                style="border-radius: 50%; max-height: 2rem"
+                [src]="user.pictureUrl"
+                alt=""
+                referrerpolicy="no-referrer"
+              />
+            }
+            <span class="mr-3" [attr.title]="user.email">{{ user.name }}</span>
+            <button class="button is-small is-light is-outlined" (click)="logout()">
+              Sign out
+            </button>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-</nav>
+  </nav>
+}
 
 <main class="section">
   <div class="container">

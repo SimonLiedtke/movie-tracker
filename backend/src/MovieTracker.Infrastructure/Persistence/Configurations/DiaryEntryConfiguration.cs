@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using MovieTracker.Domain.Diary;
+using MovieTracker.Domain.Users;
 using MovieTracker.Infrastructure.Persistence.Converters;
 
 namespace MovieTracker.Infrastructure.Persistence.Configurations;
@@ -27,6 +28,14 @@ internal sealed class DiaryEntryConfiguration : IEntityTypeConfiguration<DiaryEn
             .HasForeignKey(entry => entry.MovieId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasIndex(entry => entry.WatchedOn);
+        // Cascade: deleting a user deletes their diary.
+        builder
+            .HasOne<User>()
+            .WithMany()
+            .HasForeignKey(entry => entry.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Every query is scoped to one user, the diary is ordered by date.
+        builder.HasIndex(entry => new { entry.UserId, entry.WatchedOn });
     }
 }

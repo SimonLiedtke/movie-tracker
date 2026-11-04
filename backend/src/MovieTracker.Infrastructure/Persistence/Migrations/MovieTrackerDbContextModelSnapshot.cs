@@ -53,6 +53,10 @@ namespace MovieTracker.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20000)")
                         .HasColumnName("review");
 
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
                     b.Property<DateOnly>("WatchedOn")
                         .HasColumnType("date")
                         .HasColumnName("watched_on");
@@ -63,8 +67,8 @@ namespace MovieTracker.Infrastructure.Persistence.Migrations
                     b.HasIndex("MovieId")
                         .HasDatabaseName("ix_diary_entries_movie_id");
 
-                    b.HasIndex("WatchedOn")
-                        .HasDatabaseName("ix_diary_entries_watched_on");
+                    b.HasIndex("UserId", "WatchedOn")
+                        .HasDatabaseName("ix_diary_entries_user_id_watched_on");
 
                     b.ToTable("diary_entries", null, t =>
                         {
@@ -247,8 +251,55 @@ namespace MovieTracker.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("MovieTracker.Domain.Users.User", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("email");
+
+                    b.Property<string>("GoogleSubject")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("google_subject");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("PictureUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("picture_url");
+
+                    b.HasKey("Id")
+                        .HasName("pk_users");
+
+                    b.HasIndex("GoogleSubject")
+                        .IsUnique()
+                        .HasDatabaseName("ix_users_google_subject");
+
+                    b.ToTable("users", (string)null);
+                });
+
             modelBuilder.Entity("MovieTracker.Domain.Watchlist.WatchlistItem", b =>
                 {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
                     b.Property<Guid>("MovieId")
                         .HasColumnType("uuid")
                         .HasColumnName("movie_id");
@@ -262,11 +313,14 @@ namespace MovieTracker.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("note");
 
-                    b.HasKey("MovieId")
+                    b.HasKey("UserId", "MovieId")
                         .HasName("pk_watchlist_items");
 
-                    b.HasIndex("AddedAt")
-                        .HasDatabaseName("ix_watchlist_items_added_at");
+                    b.HasIndex("MovieId")
+                        .HasDatabaseName("ix_watchlist_items_movie_id");
+
+                    b.HasIndex("UserId", "AddedAt")
+                        .HasDatabaseName("ix_watchlist_items_user_id_added_at");
 
                     b.ToTable("watchlist_items", (string)null);
                 });
@@ -299,17 +353,31 @@ namespace MovieTracker.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_diary_entries_movies_movie_id");
 
+                    b.HasOne("MovieTracker.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_diary_entries_users_user_id");
+
                     b.Navigation("Movie");
                 });
 
             modelBuilder.Entity("MovieTracker.Domain.Watchlist.WatchlistItem", b =>
                 {
                     b.HasOne("MovieTracker.Domain.Movies.Movie", "Movie")
-                        .WithOne()
-                        .HasForeignKey("MovieTracker.Domain.Watchlist.WatchlistItem", "MovieId")
+                        .WithMany()
+                        .HasForeignKey("MovieId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_watchlist_items_movies_movie_id");
+
+                    b.HasOne("MovieTracker.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_watchlist_items_users_user_id");
 
                     b.Navigation("Movie");
                 });
