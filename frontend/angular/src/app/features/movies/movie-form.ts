@@ -1,16 +1,26 @@
-import { Component, effect, inject, input, signal } from '@angular/core';
+import { Component, effect, inject, input, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { catchError, of } from 'rxjs';
-import { GenresApi, MoviesApi } from '../../core/api/api';
+import { Observable, catchError, map, of, switchMap } from 'rxjs';
+import { GenresApi, MoviesApi, WatchlistApi } from '../../core/api/api';
 import { ApiError, toApiError } from '../../core/api/api-error';
 import { Movie, MovieRequest } from '../../core/api/models';
 import { ErrorNotification } from '../../shared/error-notification';
+import { AfterManualAdd } from '../../shared/movie-picker';
+
+interface Navigation {
+  path: unknown[];
+  queryParams?: Record<string, string>;
+}
 
 /** Empty strings become null, the backend expects absent values as null. */
 const orNull = <T>(value: T | '' | null): T | null => (value === '' ? null : value);
 
+/**
+ * Adds or edits a manually added movie: one that TMDB does not know, or that the user wants to describe
+ * themselves. Only its owner sees it. Movies from TMDB cannot be edited.
+ */
 @Component({
   selector: 'app-movie-form',
   imports: [ReactiveFormsModule, RouterLink, ErrorNotification],
@@ -19,9 +29,14 @@ const orNull = <T>(value: T | '' | null): T | null => (value === '' ? null : val
 export class MovieForm {
   private readonly router = inject(Router);
   private readonly moviesApi = inject(MoviesApi);
+  private readonly watchlistApi = inject(WatchlistApi);
 
   /** Route parameter; not set when adding a movie. */
   readonly id = input<string>();
+  /** Query parameter: title to start with, e.g. what the user searched for. */
+  readonly prefillTitle = input<string>(undefined, { alias: 'title' });
+  /** Query parameter: where to continue after adding, e.g. back to logging a viewing. */
+  readonly next = input<AfterManualAdd>();
 
   protected readonly genres = toSignal(
     inject(GenresApi)
@@ -42,16 +57,20 @@ export class MovieForm {
     runtimeMinutes: [null as number | null, [Validators.min(1), Validators.max(1500)]],
     overview: ['', Validators.maxLength(5000)],
     posterUrl: ['', [Validators.maxLength(2000), Validators.pattern(/^https?:\/\/\S+$/)]],
-    tmdbId: [null as number | null, Validators.min(1)],
     genreIds: [[] as number[]],
   });
 
   constructor() {
     effect(() => {
       const id = this.id();
-      if (id) {
-        this.load(id);
-      }
+      const title = this.prefillTitle();
+      untracked(() => {
+        if (id) {
+          this.load(id);
+        } else if (title) {
+          this.form.controls.title.setValue(title);
+        }
+      });
     });
   }
 
@@ -85,20 +104,55 @@ export class MovieForm {
       runtimeMinutes: value.runtimeMinutes,
       overview: orNull(value.overview.trim()),
       posterUrl: orNull(value.posterUrl.trim()),
-      tmdbId: value.tmdbId,
       genreIds: value.genreIds,
     };
 
     const id = this.id();
     this.saving.set(true);
     this.error.set(null);
-    (id ? this.moviesApi.update(id, request) : this.moviesApi.create(request)).subscribe({
-      next: (movie) => this.router.navigate(['/movies', movie.id]),
+    const save$: Observable<Navigation> = id
+      ? this.moviesApi.update(id, request).pipe(map((movie) => ({ path: ['/movies', movie.id] })))
+      : this.addAndContinue(request);
+    save$.subscribe({
+      next: (commands) =>
+        this.router.navigate(commands.path, { queryParams: commands.queryParams }),
       error: (error) => {
         this.saving.set(false);
         this.error.set(toApiError(error));
       },
     });
+  }
+
+  protected cancelLink(): unknown[] {
+    const id = this.id();
+    if (id) {
+      return ['/movies', id];
+    }
+    return [
+      this.next() === 'diary'
+        ? '/diary/new'
+        : this.next() === 'watchlist'
+          ? '/watchlist'
+          : '/movies',
+    ];
+  }
+
+  /** Creates the movie, then continues where the user came from. */
+  private addAndContinue(request: MovieRequest): Observable<Navigation> {
+    return this.moviesApi.create(request).pipe(
+      switchMap((movie): Observable<Navigation> => {
+        switch (this.next()) {
+          case 'diary':
+            return of({ path: ['/diary/new'], queryParams: { movieId: movie.id } });
+          case 'watchlist':
+            return this.watchlistApi
+              .put(movie.id, null)
+              .pipe(map(() => ({ path: ['/watchlist'] })));
+          default:
+            return of({ path: ['/movies', movie.id] });
+        }
+      }),
+    );
   }
 
   private load(id: string): void {
@@ -124,7 +178,6 @@ function toFormValue(movie: Movie) {
     runtimeMinutes: movie.runtimeMinutes,
     overview: movie.overview ?? '',
     posterUrl: movie.posterUrl ?? '',
-    tmdbId: movie.tmdbId,
     genreIds: movie.genres.map((genre) => genre.id),
   };
 }

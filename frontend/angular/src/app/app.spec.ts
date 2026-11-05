@@ -25,7 +25,11 @@ describe('App', () => {
     });
 
     const links = [...page.querySelectorAll('.navbar-start a')];
-    expect(links.map((link) => link.textContent?.trim())).toEqual(['Movies', 'Diary', 'Watchlist']);
+    expect(links.map((link) => link.textContent?.trim())).toEqual([
+      'My movies',
+      'Diary',
+      'Watchlist',
+    ]);
     expect(page.querySelector('.navbar-end')?.textContent).toContain('Alice');
     expect(page.querySelector('.navbar-end button')?.textContent).toContain('Sign out');
   });

@@ -13,9 +13,16 @@ import {
 } from 'rxjs';
 import { GenresApi, MoviesApi } from '../../core/api/api';
 import { ApiError, toApiError } from '../../core/api/api-error';
-import { MovieQuery, MovieSort, MovieSummary, PagedResponse } from '../../core/api/models';
+import {
+  MovieQuery,
+  MovieRef,
+  MovieSort,
+  MovieSummary,
+  PagedResponse,
+} from '../../core/api/models';
 import { yearOf } from '../../shared/dates';
 import { ErrorNotification } from '../../shared/error-notification';
+import { MoviePicker } from '../../shared/movie-picker';
 import { Pagination } from '../../shared/pagination';
 import { Poster } from '../../shared/poster';
 import { Rating } from '../../shared/rating';
@@ -47,7 +54,7 @@ function parseQuery(params: ParamMap): MovieQuery {
 
 @Component({
   selector: 'app-movie-list',
-  imports: [RouterLink, Poster, Rating, Pagination, ErrorNotification],
+  imports: [RouterLink, Poster, Rating, Pagination, ErrorNotification, MoviePicker],
   templateUrl: './movie-list.html',
 })
 export class MovieList {
@@ -99,6 +106,10 @@ export class MovieList {
       .pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed())
       // Not trimmed here: the input shows the URL value, so trimming would eat spaces while typing.
       .subscribe((search) => this.updateQuery({ search: search || undefined }, true));
+  }
+
+  protected openMovie(movie: MovieRef): void {
+    this.router.navigate(['/movies', movie.id]);
   }
 
   protected onSearch(value: string): void {

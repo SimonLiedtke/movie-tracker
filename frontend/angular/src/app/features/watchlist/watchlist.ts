@@ -2,11 +2,12 @@ import { Component, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Subject, catchError, map, of, startWith, switchMap, tap } from 'rxjs';
-import { WatchlistApi } from '../../core/api/api';
+import { MoviesApi, WatchlistApi } from '../../core/api/api';
 import { ApiError, toApiError } from '../../core/api/api-error';
-import { PagedResponse, WatchlistItem } from '../../core/api/models';
+import { MovieRef, PagedResponse, WatchlistItem } from '../../core/api/models';
 import { yearOf } from '../../shared/dates';
 import { ErrorNotification } from '../../shared/error-notification';
+import { MoviePicker } from '../../shared/movie-picker';
 import { Pagination } from '../../shared/pagination';
 import { Poster } from '../../shared/poster';
 
@@ -14,13 +15,14 @@ const PAGE_SIZE = 20;
 
 @Component({
   selector: 'app-watchlist',
-  imports: [RouterLink, Poster, Pagination, ErrorNotification],
+  imports: [RouterLink, Poster, Pagination, ErrorNotification, MoviePicker],
   templateUrl: './watchlist.html',
 })
 export class Watchlist {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly watchlistApi = inject(WatchlistApi);
+  private readonly moviesApi = inject(MoviesApi);
 
   protected readonly yearOf = yearOf;
   protected readonly result = signal<PagedResponse<WatchlistItem> | null>(null);
@@ -67,6 +69,22 @@ export class Watchlist {
 
   protected goToPage(page: number): void {
     this.router.navigate([], { queryParams: { page } });
+  }
+
+  /** Adds the movie at the top of the list (the newest come first). Already on it: nothing changes. */
+  protected add(movie: MovieRef): void {
+    // PUT replaces the note, so a movie that is already on the watchlist is left alone.
+    this.moviesApi
+      .get(movie.id)
+      .pipe(
+        switchMap((details) =>
+          details.onWatchlist ? of(null) : this.watchlistApi.put(movie.id, null),
+        ),
+      )
+      .subscribe({
+        next: () => (this.result()?.page === 1 ? this.reload.next() : this.goToPage(1)),
+        error: (error) => this.error.set(toApiError(error)),
+      });
   }
 
   protected saveNote(item: WatchlistItem, note: string): void {

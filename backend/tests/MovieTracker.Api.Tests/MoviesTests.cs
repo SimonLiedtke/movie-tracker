@@ -18,7 +18,6 @@ public sealed class MoviesTests(ApiFactory factory) : ApiTestBase(factory)
             runtimeMinutes = 117,
             overview = "In space no one can hear you scream.",
             posterUrl = "https://example.com/alien.jpg",
-            tmdbId = 348,
             genreIds = new[] { ScienceFiction, Horror, Horror },
         }, Ct);
 
@@ -27,7 +26,7 @@ public sealed class MoviesTests(ApiFactory factory) : ApiTestBase(factory)
         Assert.Equal("Alien", movie.Title);
         Assert.Equal(new DateOnly(1979, 5, 25), movie.ReleaseDate);
         Assert.Equal(117, movie.RuntimeMinutes);
-        Assert.Equal(348, movie.TmdbId);
+        Assert.Null(movie.TmdbId); // added manually
         Assert.Equal(["Horror", "Science Fiction"], movie.Genres.Select(genre => genre.Name));
         Assert.Null(movie.LatestRating);
         Assert.Equal(0, movie.WatchCount);
@@ -70,7 +69,6 @@ public sealed class MoviesTests(ApiFactory factory) : ApiTestBase(factory)
     [Theory]
     [InlineData("runtimeMinutes", 0)]
     [InlineData("runtimeMinutes", 1501)]
-    [InlineData("tmdbId", 0)]
     public async Task Create_rejects_out_of_range_numbers(string property, int value)
     {
         var body = new Dictionary<string, object> { ["title"] = "Alien", ["genreIds"] = Array.Empty<int>(), [property] = value };
@@ -91,14 +89,12 @@ public sealed class MoviesTests(ApiFactory factory) : ApiTestBase(factory)
     }
 
     [Fact]
-    public async Task Create_rejects_a_duplicate_tmdb_id()
+    public async Task Create_rejects_a_tmdb_id()
     {
-        await CreateMovieAsync(tmdbId: 348);
+        // TMDB movies are imported with their data from TMDB, not created with made-up data.
+        var response = await Client.PostAsJsonAsync("/api/movies", new { title = "Alien", tmdbId = 348, genreIds = Array.Empty<int>() }, Ct);
 
-        var response = await Client.PostAsJsonAsync("/api/movies", new { title = "Alien (copy)", tmdbId = 348, genreIds = Array.Empty<int>() }, Ct);
-
-        var problem = await ReadProblemAsync(response, HttpStatusCode.Conflict);
-        Assert.Equal("Duplicate TMDB ID", problem.Title);
+        await ReadValidationProblemAsync(response);
     }
 
     [Fact]
@@ -135,6 +131,33 @@ public sealed class MoviesTests(ApiFactory factory) : ApiTestBase(factory)
         Assert.Equal(3, result.WatchCount);
         Assert.Equal(new DateOnly(2026, 10, 20), result.LastWatchedOn);
         Assert.True(result.OnWatchlist);
+    }
+
+    [Fact]
+    public async Task List_contains_the_users_manual_logged_and_watchlisted_movies()
+    {
+        await CreateMovieAsync("Home Video");
+        var logged = await ImportTmdbMovieAsync(FakeTmdbClient.Alien.TmdbId);
+        await CreateDiaryEntryAsync(logged.Id);
+        var watchlisted = await ImportTmdbMovieAsync(FakeTmdbClient.Aliens.TmdbId);
+        await Client.PutAsync($"/api/watchlist/{watchlisted.Id}", content: null, Ct);
+        await CreateMovieAsync("Bob's Home Video", client: Bob);
+
+        var result = await GetAsync<PagedResponse<MovieSummaryResponse>>("/api/movies");
+
+        Assert.Equal(["Alien", "Aliens", "Home Video"], result.Items.Select(movie => movie.Title));
+        Assert.Equal(3, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task List_does_not_contain_imported_movies_the_user_has_not_used()
+    {
+        // E.g. picked in the diary form, but the form was cancelled. Or imported by another user.
+        await ImportTmdbMovieAsync();
+
+        var result = await GetAsync<PagedResponse<MovieSummaryResponse>>("/api/movies");
+
+        Assert.Empty(result.Items);
     }
 
     [Fact]
@@ -253,12 +276,11 @@ public sealed class MoviesTests(ApiFactory factory) : ApiTestBase(factory)
     [Fact]
     public async Task Update_replaces_the_movie()
     {
-        var movie = await CreateMovieAsync(tmdbId: 348);
+        var movie = await CreateMovieAsync();
 
         var response = await Client.PutAsJsonAsync($"/api/movies/{movie.Id}", new
         {
             title = "Aliens",
-            tmdbId = 348, // unchanged: not a conflict with itself
             genreIds = new[] { Drama },
         }, Ct);
 
@@ -272,14 +294,16 @@ public sealed class MoviesTests(ApiFactory factory) : ApiTestBase(factory)
     }
 
     [Fact]
-    public async Task Update_rejects_the_tmdb_id_of_another_movie()
+    public async Task A_tmdb_movie_cannot_be_updated_or_deleted()
     {
-        await CreateMovieAsync("Alien", tmdbId: 348);
-        var other = await CreateMovieAsync("Aliens", tmdbId: 679);
+        var movie = await ImportTmdbMovieAsync();
 
-        var response = await Client.PutAsJsonAsync($"/api/movies/{other.Id}", new { title = "Aliens", tmdbId = 348, genreIds = Array.Empty<int>() }, Ct);
+        var put = await Client.PutAsJsonAsync($"/api/movies/{movie.Id}", new { title = "My Alien", genreIds = Array.Empty<int>() }, Ct);
+        var delete = await Client.DeleteAsync($"/api/movies/{movie.Id}", Ct);
 
-        await ReadProblemAsync(response, HttpStatusCode.Conflict);
+        Assert.Equal("Movie is read-only", (await ReadProblemAsync(put, HttpStatusCode.Forbidden)).Title);
+        await ReadProblemAsync(delete, HttpStatusCode.Forbidden);
+        Assert.Equal("Alien", (await GetAsync<MovieResponse>($"/api/movies/{movie.Id}")).Title);
     }
 
     [Fact]

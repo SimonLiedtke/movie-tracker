@@ -10,6 +10,7 @@
       <label class="label" for="movie">Movie *</label>
       <app-movie-picker
         inputId="movie"
+        afterManualAdd="diary"
         [(selected)]="movie"
         [invalid]="movieTouched() && !movie()"
       />

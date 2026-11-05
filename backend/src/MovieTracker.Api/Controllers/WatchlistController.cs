@@ -67,7 +67,7 @@ public sealed class WatchlistController(MovieTrackerDbContext db, TimeProvider t
             return await FindResponseAsync(movieId, cancellationToken);
         }
 
-        if (!await db.Movies.AnyAsync(movie => movie.Id == movieId, cancellationToken))
+        if (!await db.Movies.VisibleTo(User.GetUserId()).AnyAsync(movie => movie.Id == movieId, cancellationToken))
         {
             return NotFound();
         }

@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MovieTracker.Infrastructure.Persistence;
+using MovieTracker.Infrastructure.Tmdb;
 using Testcontainers.PostgreSql;
 
 [assembly: AssemblyFixture(typeof(MovieTracker.Api.Tests.Infrastructure.ApiFactory))]
@@ -27,6 +28,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     public TestClock Clock { get; } = new(StartTime);
 
+    public FakeTmdbClient Tmdb { get; } = new();
+
     public async ValueTask InitializeAsync()
     {
         await _postgres.StartAsync();
@@ -46,6 +49,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     public async Task ResetAsync()
     {
         Clock.Set(StartTime);
+        Tmdb.Reset();
 
         await using var scope = Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<MovieTrackerDbContext>();
@@ -65,6 +69,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.ConfigureTestServices(services =>
         {
             services.AddSingleton<TimeProvider>(Clock);
+            services.AddSingleton<ITmdbClient>(Tmdb);
 
             // Requests are authenticated by TestAuthHandler instead of the session cookie.
             services.AddAuthentication().AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, null);

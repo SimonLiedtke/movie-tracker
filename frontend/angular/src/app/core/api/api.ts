@@ -10,6 +10,7 @@ import {
   Movie,
   MovieQuery,
   MovieRequest,
+  MovieSearchResponse,
   MovieSummary,
   PagedResponse,
   PageQuery,
@@ -35,16 +36,28 @@ export class GenresApi {
 export class MoviesApi {
   private readonly http = inject(HttpClient);
 
+  /** The user's movies: added manually, logged or on the watchlist. */
   list(query: MovieQuery = {}): Observable<PagedResponse<MovieSummary>> {
     return this.http.get<PagedResponse<MovieSummary>>(`${BASE}/movies`, {
       params: toHttpParams(query),
     });
   }
 
+  /** Finds movies to log or watchlist: the user's manual movies and TMDB's results. */
+  search(query: string): Observable<MovieSearchResponse> {
+    return this.http.get<MovieSearchResponse>(`${BASE}/movies/search`, { params: { query } });
+  }
+
+  /** Makes a TMDB movie available for diary and watchlist. Returns the existing movie if it was imported before. */
+  importFromTmdb(tmdbId: number): Observable<Movie> {
+    return this.http.post<Movie>(`${BASE}/movies/tmdb/${tmdbId}`, null);
+  }
+
   get(id: string): Observable<Movie> {
     return this.http.get<Movie>(`${BASE}/movies/${id}`);
   }
 
+  /** Adds a movie manually. Only the signed-in user sees it. */
   create(request: MovieRequest): Observable<Movie> {
     return this.http.post<Movie>(`${BASE}/movies`, request);
   }

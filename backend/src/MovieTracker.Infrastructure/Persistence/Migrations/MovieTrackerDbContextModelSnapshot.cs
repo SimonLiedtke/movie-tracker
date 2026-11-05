@@ -215,6 +215,10 @@ namespace MovieTracker.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(5000)")
                         .HasColumnName("overview");
 
+                    b.Property<Guid?>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
                     b.Property<string>("PosterUrl")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)")
@@ -241,6 +245,9 @@ namespace MovieTracker.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_movies");
 
+                    b.HasIndex("OwnerId")
+                        .HasDatabaseName("ix_movies_owner_id");
+
                     b.HasIndex("TmdbId")
                         .IsUnique()
                         .HasDatabaseName("ix_movies_tmdb_id");
@@ -248,6 +255,8 @@ namespace MovieTracker.Infrastructure.Persistence.Migrations
                     b.ToTable("movies", null, t =>
                         {
                             t.HasCheckConstraint("ck_movies_runtime_minutes_positive", "runtime_minutes > 0");
+
+                            t.HasCheckConstraint("ck_movies_tmdb_or_owner", "(tmdb_id IS NULL) <> (owner_id IS NULL)");
                         });
                 });
 
@@ -361,6 +370,15 @@ namespace MovieTracker.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_diary_entries_users_user_id");
 
                     b.Navigation("Movie");
+                });
+
+            modelBuilder.Entity("MovieTracker.Domain.Movies.Movie", b =>
+                {
+                    b.HasOne("MovieTracker.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_movies_users_owner_id");
                 });
 
             modelBuilder.Entity("MovieTracker.Domain.Watchlist.WatchlistItem", b =>

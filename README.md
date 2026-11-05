@@ -32,8 +32,8 @@ is available at http://localhost:5080/openapi/v1.json.
 
 ## Signing in with Google
 
-Users sign in with their Google account. Every user has their own diary and watchlist; the movie
-catalog is shared. Sign-in runs on the backend (OAuth "backend for frontend"): the API handles the
+Users sign in with their Google account. Every user has their own diary, watchlist and manually
+added movies; movies from TMDB are shared. Sign-in runs on the backend (OAuth "backend for frontend"): the API handles the
 Google redirect and keeps the session in an HttpOnly cookie, so the frontend never handles tokens.
 
 One-time setup for local development:
@@ -51,6 +51,29 @@ One-time setup for local development:
    ```
 
 Without these settings the API still starts, but signing in answers with 503.
+
+## Movie search with TMDB
+
+Movies are found through [TMDB](https://www.themoviedb.org/) (The Movie Database). Picking a search
+result saves the movie in the database, shared by all users and read-only. Movies that TMDB does not
+know can be added manually; those are private to the user who added them and can be edited.
+
+The backend calls TMDB, so the access token never reaches the browser. One-time setup:
+
+1. Create a free account on TMDB and request an API key under
+   [Settings -> API](https://www.themoviedb.org/settings/api).
+2. Store the **API Read Access Token** (the long one, not the API key) as a user secret:
+
+   ```bash
+   cd backend
+   dotnet user-secrets set "Tmdb:AccessToken" "<read access token>" --project src/MovieTracker.Api
+   ```
+
+Optionally, `Tmdb:Language` sets the language of titles and overviews (default `en-US`, e.g. `de-DE`).
+
+Without a token the app still works: the search then only finds your manually added movies.
+TMDB's [terms](https://www.themoviedb.org/api-terms-of-use) require the attribution shown in the
+footer of the frontend.
 
 ## Running the tests
 

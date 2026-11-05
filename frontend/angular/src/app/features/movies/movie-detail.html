@@ -72,9 +72,16 @@
               [href]="'https://www.themoviedb.org/movie/' + movie.tmdbId"
               target="_blank"
               rel="noopener"
+              title="Details from TMDB"
             >
               <span class="tag is-dark">TMDB</span><span class="tag">{{ movie.tmdbId }}</span>
             </a>
+          </div>
+        } @else {
+          <div class="control">
+            <span class="tag is-warning is-light" title="Only you can see this movie"
+              >Added manually</span
+            >
           </div>
         }
       </div>
@@ -96,14 +103,16 @@
         >
           {{ movie.onWatchlist ? 'Remove from watchlist' : 'Add to watchlist' }}
         </button>
-        <a class="button" [routerLink]="['/movies', movie.id, 'edit']">Edit</a>
-        <button
-          class="button is-danger is-outlined"
-          [disabled]="busy()"
-          (click)="deleteMovie(movie)"
-        >
-          Delete
-        </button>
+        @if (movie.tmdbId === null) {
+          <a class="button" [routerLink]="['/movies', movie.id, 'edit']">Edit</a>
+          <button
+            class="button is-danger is-outlined"
+            [disabled]="busy()"
+            (click)="deleteMovie(movie)"
+          >
+            Delete
+          </button>
+        }
       </div>
     </div>
   </div>
@@ -156,7 +165,7 @@
   }
 } @else if (notFound()) {
   <div class="notification is-warning is-light">
-    This movie does not exist (anymore). <a routerLink="/movies">Back to all movies</a>
+    This movie does not exist (anymore). <a routerLink="/movies">Back to your movies</a>
   </div>
 } @else if (loading()) {
   <progress class="progress is-small is-primary" max="100"></progress>

@@ -32,6 +32,7 @@ export interface Movie extends MovieSummary {
   originalTitle: string | null;
   runtimeMinutes: number | null;
   overview: string | null;
+  /** Set for movies from TMDB (shared, read-only). Null for movies the user added manually (private, editable). */
   tmdbId: number | null;
   lastWatchedOn: string | null;
   createdAt: string;
@@ -44,8 +45,26 @@ export interface MovieRequest {
   runtimeMinutes: number | null;
   overview: string | null;
   posterUrl: string | null;
-  tmdbId: number | null;
   genreIds: number[];
+}
+
+/**
+ * A search hit: one of the user's manually added movies (movieId set, tmdbId null)
+ * or a TMDB movie (tmdbId set; movieId only if it was imported before).
+ */
+export interface MovieSearchResult {
+  movieId: string | null;
+  tmdbId: number | null;
+  title: string;
+  originalTitle: string | null;
+  releaseDate: string | null;
+  posterUrl: string | null;
+}
+
+export interface MovieSearchResponse {
+  items: MovieSearchResult[];
+  /** False if the server has no TMDB access or TMDB is down: the items are then only manual movies. */
+  tmdbAvailable: boolean;
 }
 
 export type MovieSort =

@@ -97,7 +97,7 @@ public sealed class DiaryEntriesController(MovieTrackerDbContext db, TimeProvide
             return ValidationProblem(ModelState);
         }
 
-        if (!await db.Movies.AnyAsync(movie => movie.Id == request.MovieId, cancellationToken))
+        if (!await db.Movies.VisibleTo(User.GetUserId()).AnyAsync(movie => movie.Id == request.MovieId, cancellationToken))
         {
             return UnknownMovie(request.MovieId!.Value);
         }
@@ -130,7 +130,7 @@ public sealed class DiaryEntriesController(MovieTrackerDbContext db, TimeProvide
             return ValidationProblem(ModelState);
         }
 
-        if (!await db.Movies.AnyAsync(movie => movie.Id == request.MovieId, cancellationToken))
+        if (!await db.Movies.VisibleTo(User.GetUserId()).AnyAsync(movie => movie.Id == request.MovieId, cancellationToken))
         {
             return UnknownMovie(request.MovieId!.Value);
         }

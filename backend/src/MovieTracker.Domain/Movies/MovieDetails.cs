@@ -1,7 +1,7 @@
 namespace MovieTracker.Domain.Movies;
 
 /// <summary>
-/// The editable data of a movie. Used both for creating and for replacing a movie.
+/// The descriptive data of a movie, typed in by a user or loaded from TMDB.
 /// </summary>
 public sealed record MovieDetails(
     string Title,
@@ -9,5 +9,4 @@ public sealed record MovieDetails(
     DateOnly? ReleaseDate,
     int? RuntimeMinutes,
     string? Overview,
-    string? PosterUrl,
-    int? TmdbId);
+    string? PosterUrl);

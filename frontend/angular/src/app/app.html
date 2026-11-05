@@ -26,7 +26,7 @@
 
       <div class="navbar-menu" [class.is-active]="menuOpen()">
         <div class="navbar-start" (click)="menuOpen.set(false)">
-          <a class="navbar-item" routerLink="/movies" routerLinkActive="is-selected">Movies</a>
+          <a class="navbar-item" routerLink="/movies" routerLinkActive="is-selected">My movies</a>
           <a class="navbar-item" routerLink="/diary" routerLinkActive="is-selected">Diary</a>
           <a class="navbar-item" routerLink="/watchlist" routerLinkActive="is-selected"
             >Watchlist</a
@@ -64,3 +64,14 @@
     <router-outlet />
   </div>
 </main>
+
+<footer class="footer py-5">
+  <div class="content has-text-centered is-size-7 has-text-grey">
+    <!-- Required by TMDB's terms of use: https://www.themoviedb.org/api-terms-of-use -->
+    <p>
+      Movie data and posters from
+      <a href="https://www.themoviedb.org/" target="_blank" rel="noopener">TMDB</a>. This product
+      uses the TMDB API but is not endorsed or certified by TMDB.
+    </p>
+  </div>
+</footer>

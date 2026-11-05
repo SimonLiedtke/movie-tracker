@@ -50,20 +50,26 @@ public abstract class ApiTestBase(ApiFactory factory) : IAsyncLifetime
     protected async Task<MovieResponse> CreateMovieAsync(
         string title = "Alien",
         string? releaseDate = "1979-05-25",
-        int? tmdbId = null,
         string? originalTitle = null,
-        int[]? genreIds = null)
+        int[]? genreIds = null,
+        HttpClient? client = null)
     {
-        var response = await Client.PostAsJsonAsync("/api/movies", new
+        var response = await (client ?? Client).PostAsJsonAsync("/api/movies", new
         {
             title,
             originalTitle,
             releaseDate,
             runtimeMinutes = 117,
-            tmdbId,
             genreIds = genreIds ?? [Horror, ScienceFiction],
         }, Ct);
         return await ReadAsync<MovieResponse>(response, HttpStatusCode.Created);
+    }
+
+    /// <summary>Imports a movie that <see cref="FakeTmdbClient"/> knows, e.g. <see cref="FakeTmdbClient.Alien"/>.</summary>
+    protected async Task<MovieResponse> ImportTmdbMovieAsync(int tmdbId = 348, HttpClient? client = null)
+    {
+        var response = await (client ?? Client).PostAsync($"/api/movies/tmdb/{tmdbId}", content: null, Ct);
+        return await ReadAsync<MovieResponse>(response, response.StatusCode == HttpStatusCode.OK ? HttpStatusCode.OK : HttpStatusCode.Created);
     }
 
     protected async Task<DiaryEntryResponse> CreateDiaryEntryAsync(

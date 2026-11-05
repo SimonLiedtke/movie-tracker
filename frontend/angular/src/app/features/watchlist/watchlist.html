@@ -1,5 +1,16 @@
 <h1 class="title">Watchlist</h1>
 
+<div class="field">
+  <label class="label" for="add">Add a movie</label>
+  <app-movie-picker
+    inputId="add"
+    placeholder="Search a movie to watch later"
+    afterManualAdd="watchlist"
+    [keepSelection]="false"
+    (picked)="add($event)"
+  />
+</div>
+
 <app-error-notification [error]="error()" (dismiss)="error.set(null)" />
 
 @if (result(); as result) {
@@ -79,9 +90,7 @@
       </div>
     </article>
   } @empty {
-    <div class="notification">
-      Your watchlist is empty. Add movies from their <a routerLink="/movies">movie page</a>.
-    </div>
+    <div class="notification">Your watchlist is empty. Search a movie above to add it.</div>
   }
 
   <app-pagination

@@ -3,7 +3,14 @@ info:
   title: Movie Tracker API
   version: 0.1.0
   description: |
-    Personal movie tracker (stage 1: movies, genres, diary, watchlist).
+    Personal movie tracker: movies, genres, diary, watchlist.
+
+    Movies are one of two kinds:
+    - From TMDB (`tmdbId` set): imported with `POST /api/movies/tmdb/{tmdbId}`, shared by all users, read-only.
+    - Added manually (`tmdbId` null): private to the user who added it, who can edit and delete it.
+      Other users get 404 for it, as if it did not exist.
+
+    Diary entries and watchlist items belong to the signed-in user.
 
     Conventions:
     - Errors are returned as ProblemDetails (RFC 9457) with `application/problem+json`.
@@ -13,12 +20,14 @@ servers:
   - url: http://localhost:5080
     description: Local development
 
-# No authentication yet (will be added later)
-security: []
+# Signing in happens with Google via /api/auth/login (not part of this document), which sets the session cookie.
+# Requests that change data must also send the header `X-CSRF: 1`.
+security:
+  - session: []
 
 tags:
   - name: Movies
-    description: Movie catalog
+    description: Movies from TMDB and manually added movies
   - name: Genres
     description: Genre master data
   - name: Diary
@@ -31,7 +40,10 @@ paths:
     get:
       tags: [Movies]
       operationId: listMovies
-      summary: Search and list movies
+      summary: List the user's movies
+      description: |
+        The movies the user has added manually, logged in the diary or put on the watchlist.
+        To find other movies, use `/api/movies/search`.
       parameters:
         - name: search
           in: query
@@ -63,7 +75,8 @@ paths:
     post:
       tags: [Movies]
       operationId: createMovie
-      summary: Create a movie
+      summary: Add a movie manually
+      description: For movies that TMDB does not know. Only the signed-in user sees the movie.
       requestBody:
         required: true
         content:
@@ -80,8 +93,68 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Movie' }
         '400': { $ref: '#/components/responses/ValidationError' }
-        '409':
-          description: A movie with this tmdbId already exists.
+
+  /api/movies/search:
+    get:
+      tags: [Movies]
+      operationId: searchMovies
+      summary: Find movies to log or watchlist
+      description: |
+        The user's manually added movies first (at most 10), then the first page of TMDB's results.
+        If TMDB is not configured or not reachable, only manual movies are returned and `tmdbAvailable` is false.
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 200 }
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MovieSearchResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+
+  /api/movies/tmdb/{tmdbId}:
+    parameters:
+      - name: tmdbId
+        in: path
+        required: true
+        schema: { type: integer, format: int32, minimum: 1 }
+    post:
+      tags: [Movies]
+      operationId: importTmdbMovie
+      summary: Import a movie from TMDB (idempotent)
+      description: |
+        Makes a TMDB movie available for diary and watchlist.
+        Returns the existing movie if it was imported before (also by another user).
+      responses:
+        '200':
+          description: The movie was imported before
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Movie' }
+        '201':
+          description: Movie imported
+          headers:
+            Location:
+              description: URL of the new movie
+              schema: { type: string, format: uri }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Movie' }
+        '404':
+          description: TMDB has no movie with this ID.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '502':
+          description: TMDB could not be reached or answered with an error.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '503':
+          description: The server has no TMDB access token.
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
@@ -103,7 +176,7 @@ paths:
     put:
       tags: [Movies]
       operationId: updateMovie
-      summary: Replace a movie
+      summary: Replace a manually added movie
       requestBody:
         required: true
         content:
@@ -116,22 +189,19 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Movie' }
         '400': { $ref: '#/components/responses/ValidationError' }
+        '403': { $ref: '#/components/responses/ReadOnlyMovie' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409':
-          description: Another movie with this tmdbId already exists.
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/ProblemDetails' }
     delete:
       tags: [Movies]
       operationId: deleteMovie
-      summary: Delete a movie
+      summary: Delete a manually added movie
       description: |
         Fails with 409 as long as diary entries exist for this movie,
         so the viewing history is not lost by accident.
         A watchlist entry is deleted along with the movie.
       responses:
         '204': { description: Deleted }
+        '403': { $ref: '#/components/responses/ReadOnlyMovie' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
           description: Movie still has diary entries.
@@ -337,7 +407,18 @@ components:
       in: query
       schema: { type: integer, format: int32, minimum: 1, maximum: 100, default: 20 }
 
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: movie_tracker_session
+
   responses:
+    ReadOnlyMovie:
+      description: Movies from TMDB cannot be edited or deleted.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
     NotFound:
       description: Resource not found
       content:
@@ -401,7 +482,11 @@ components:
             originalTitle: { type: string, nullable: true }
             runtimeMinutes: { type: integer, format: int32, minimum: 1, nullable: true }
             overview: { type: string, nullable: true }
-            tmdbId: { type: integer, format: int32, nullable: true }
+            tmdbId:
+              type: integer
+              format: int32
+              nullable: true
+              description: Set for movies from TMDB. Null for manually added movies.
             lastWatchedOn: { type: string, format: date, nullable: true }
             createdAt: { type: string, format: date-time }
 
@@ -416,11 +501,35 @@ components:
         runtimeMinutes: { type: integer, format: int32, minimum: 1, maximum: 1500, nullable: true }
         overview: { type: string, maxLength: 5000, nullable: true }
         posterUrl: { type: string, format: uri, maxLength: 2000, nullable: true }
-        tmdbId: { type: integer, format: int32, minimum: 1, nullable: true }
         genreIds:
           type: array
           uniqueItems: true
           items: { type: integer, format: int32 }
+
+    MovieSearchResult:
+      type: object
+      description: |
+        One of the user's manually added movies (`movieId` set, `tmdbId` null) or a TMDB movie
+        (`tmdbId` set; `movieId` only if it was imported before, otherwise import it first).
+      required: [title]
+      properties:
+        movieId: { type: string, format: uuid, nullable: true }
+        tmdbId: { type: integer, format: int32, nullable: true }
+        title: { type: string }
+        originalTitle: { type: string, nullable: true }
+        releaseDate: { type: string, format: date, nullable: true }
+        posterUrl: { type: string, format: uri, nullable: true }
+
+    MovieSearchResponse:
+      type: object
+      required: [items, tmdbAvailable]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/MovieSearchResult' }
+        tmdbAvailable:
+          type: boolean
+          description: False if TMDB is not configured or could not be reached.
 
     DiaryEntry:
       type: object

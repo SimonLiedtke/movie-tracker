@@ -4,13 +4,16 @@ using Microsoft.EntityFrameworkCore;
 using MovieTracker.Api.Auth;
 using MovieTracker.Infrastructure;
 using MovieTracker.Infrastructure.Persistence;
+using MovieTracker.Infrastructure.Tmdb;
 
 var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("MovieTracker")
     ?? throw new InvalidOperationException("Connection string 'MovieTracker' is not configured.");
 
-builder.Services.AddInfrastructure(connectionString);
+var tmdbOptions = builder.Configuration.GetSection(TmdbOptions.SectionName).Get<TmdbOptions>() ?? new TmdbOptions();
+
+builder.Services.AddInfrastructure(connectionString, tmdbOptions);
 builder.Services.AddMovieTrackerAuthentication(builder.Configuration);
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddProblemDetails();

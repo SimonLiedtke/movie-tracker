@@ -1,17 +1,23 @@
-<div class="level is-mobile">
-  <div class="level-left">
-    <h1 class="title level-item">Movies</h1>
-  </div>
-  <div class="level-right">
-    <a class="button is-primary level-item" routerLink="/movies/new">Add movie</a>
-  </div>
+<h1 class="title">My movies</h1>
+<p class="subtitle is-6 has-text-grey">
+  The movies you have logged, put on your watchlist or added manually.
+</p>
+
+<div class="field">
+  <label class="label" for="find">Find any movie</label>
+  <app-movie-picker
+    inputId="find"
+    placeholder="Search TMDB and your own movies"
+    [keepSelection]="false"
+    (picked)="openMovie($event)"
+  />
 </div>
 
 <div class="box">
   <div class="columns is-multiline">
     <div class="column is-12-tablet is-5-desktop">
       <div class="field">
-        <label class="label" for="search">Search</label>
+        <label class="label" for="search">Search my movies</label>
         <div class="control">
           <input
             id="search"
@@ -120,7 +126,7 @@
       @if (query().search || query().genreId || query().year) {
         <button class="button is-small is-ghost" (click)="clearFilters()">Clear filters</button>
       } @else {
-        <a routerLink="/movies/new">Add your first movie</a>.
+        Find a movie above, then log a viewing or put it on your watchlist.
       }
     </div>
   }

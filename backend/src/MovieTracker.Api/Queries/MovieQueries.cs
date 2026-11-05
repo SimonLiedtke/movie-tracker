@@ -7,13 +7,24 @@ using MovieTracker.Infrastructure.Persistence;
 namespace MovieTracker.Api.Queries;
 
 /// <summary>
-/// Projections from movies to response rows. Movies are shared, but the statistics (rating, watch count,
-/// watchlist) are those of the given user only. Rating is a value-converted type that EF Core
+/// Filters and projections for movies. TMDB movies are shared, manually added movies are private to their
+/// owner, and the statistics (rating, watch count, watchlist) are those of the given user only. Rating is a value-converted type that EF Core
 /// cannot dereference in SQL, so the queries project into rows first and map to responses in memory.
 /// </summary>
 internal static class MovieQueries
 {
     private const string LikeEscapeCharacter = @"\";
+
+    /// <summary>Movies from TMDB and the user's own manually added movies. Other users' movies do not exist for them.</summary>
+    public static IQueryable<Movie> VisibleTo(this IQueryable<Movie> movies, Guid userId) =>
+        movies.Where(movie => movie.OwnerId == null || movie.OwnerId == userId);
+
+    /// <summary>"My movies": added manually by the user, or in their diary or on their watchlist.</summary>
+    public static IQueryable<Movie> InLibraryOf(this IQueryable<Movie> movies, MovieTrackerDbContext db, Guid userId) =>
+        movies.Where(movie =>
+            movie.OwnerId == userId ||
+            db.DiaryEntries.Any(entry => entry.MovieId == movie.Id && entry.UserId == userId) ||
+            db.WatchlistItems.Any(item => item.MovieId == movie.Id && item.UserId == userId));
 
     public static IQueryable<Movie> Search(this IQueryable<Movie> movies, string? search)
     {

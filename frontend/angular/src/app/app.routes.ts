@@ -5,12 +5,12 @@ import { authGuard, guestGuard } from './core/auth/auth.guard';
 const protectedRoutes: Routes = [
   {
     path: 'movies',
-    title: 'Movies · Movie Tracker',
+    title: 'My movies · Movie Tracker',
     loadComponent: () => import('./features/movies/movie-list').then((m) => m.MovieList),
   },
   {
     path: 'movies/new',
-    title: 'Add movie · Movie Tracker',
+    title: 'Add a movie manually · Movie Tracker',
     loadComponent: () => import('./features/movies/movie-form').then((m) => m.MovieForm),
   },
   {

@@ -5,13 +5,13 @@ using MovieTracker.Api.Tests.Infrastructure;
 
 namespace MovieTracker.Api.Tests;
 
-/// <summary>Users share the movie catalog, but not their diaries and watchlists.</summary>
+/// <summary>Users share movies from TMDB, but not their manually added movies, diaries and watchlists.</summary>
 public sealed class UserIsolationTests(ApiFactory factory) : ApiTestBase(factory)
 {
     [Fact]
     public async Task Other_users_cannot_read_change_or_delete_a_diary_entry()
     {
-        var movie = await CreateMovieAsync();
+        var movie = await ImportTmdbMovieAsync();
         var entry = await CreateDiaryEntryAsync(movie.Id, review: "Alice's review");
         var url = $"/api/diary-entries/{entry.Id}";
 
@@ -29,7 +29,7 @@ public sealed class UserIsolationTests(ApiFactory factory) : ApiTestBase(factory
     [Fact]
     public async Task Diaries_only_list_the_users_own_entries()
     {
-        var movie = await CreateMovieAsync();
+        var movie = await ImportTmdbMovieAsync();
         await CreateDiaryEntryAsync(movie.Id, review: "Alice's review");
         var bobsEntry = await ReadAsync<DiaryEntryResponse>(
             await Bob.PostAsJsonAsync("/api/diary-entries", new { movieId = movie.Id, watchedOn = "2026-10-15", review = "Bob's review" }, Ct),
@@ -49,7 +49,7 @@ public sealed class UserIsolationTests(ApiFactory factory) : ApiTestBase(factory
     [Fact]
     public async Task Movie_statistics_are_those_of_the_signed_in_user()
     {
-        var movie = await CreateMovieAsync();
+        var movie = await ImportTmdbMovieAsync();
         await CreateDiaryEntryAsync(movie.Id, rating: 10);
         await Client.PutAsJsonAsync($"/api/watchlist/{movie.Id}", new { }, Ct);
 
@@ -57,8 +57,8 @@ public sealed class UserIsolationTests(ApiFactory factory) : ApiTestBase(factory
         var list = await ReadAsync<PagedResponse<MovieSummaryResponse>>(await Bob.GetAsync("/api/movies", Ct), HttpStatusCode.OK);
 
         Assert.Equal((null, 0, false, null), (detail.LatestRating, detail.WatchCount, detail.OnWatchlist, detail.LastWatchedOn));
-        var summary = Assert.Single(list.Items);
-        Assert.Equal((null, 0, false), (summary.LatestRating, summary.WatchCount, summary.OnWatchlist));
+        // Not one of Bob's movies: he has not logged or watchlisted it.
+        Assert.Empty(list.Items);
         var own = await GetAsync<MovieResponse>($"/api/movies/{movie.Id}");
         Assert.Equal((10, 1, true), (own.LatestRating, own.WatchCount, own.OnWatchlist));
     }
@@ -66,7 +66,7 @@ public sealed class UserIsolationTests(ApiFactory factory) : ApiTestBase(factory
     [Fact]
     public async Task Every_user_has_their_own_watchlist()
     {
-        var movie = await CreateMovieAsync();
+        var movie = await ImportTmdbMovieAsync();
         await Client.PutAsJsonAsync($"/api/watchlist/{movie.Id}", new { note = "Alice's note" }, Ct);
 
         var bobsEmptyWatchlist = await ReadAsync<PagedResponse<WatchlistItemResponse>>(await Bob.GetAsync("/api/watchlist", Ct), HttpStatusCode.OK);
@@ -82,27 +82,41 @@ public sealed class UserIsolationTests(ApiFactory factory) : ApiTestBase(factory
     }
 
     [Fact]
-    public async Task A_movie_in_another_users_diary_cannot_be_deleted()
+    public async Task Other_users_cannot_see_change_or_delete_a_manually_added_movie()
     {
-        var movie = await CreateMovieAsync();
-        await Bob.PostAsJsonAsync("/api/diary-entries", new { movieId = movie.Id, watchedOn = "2026-10-15" }, Ct);
+        var movie = await CreateMovieAsync("Home Video");
+        var url = $"/api/movies/{movie.Id}";
 
-        var response = await Client.DeleteAsync($"/api/movies/{movie.Id}", Ct);
+        var get = await Bob.GetAsync(url, Ct);
+        var entries = await Bob.GetAsync($"{url}/diary-entries", Ct);
+        var put = await Bob.PutAsJsonAsync(url, new { title = "Bob was here", genreIds = Array.Empty<int>() }, Ct);
+        var delete = await Bob.DeleteAsync(url, Ct);
+        var bobsList = await ReadAsync<PagedResponse<MovieSummaryResponse>>(await Bob.GetAsync("/api/movies", Ct), HttpStatusCode.OK);
 
-        var problem = await ReadProblemAsync(response, HttpStatusCode.Conflict);
-        Assert.DoesNotContain("bob", problem.Detail ?? "", StringComparison.OrdinalIgnoreCase);
+        await ReadProblemAsync(get, HttpStatusCode.NotFound);
+        await ReadProblemAsync(entries, HttpStatusCode.NotFound);
+        await ReadProblemAsync(put, HttpStatusCode.NotFound);
+        await ReadProblemAsync(delete, HttpStatusCode.NotFound);
+        Assert.Empty(bobsList.Items);
+        Assert.Equal("Home Video", (await GetAsync<MovieResponse>(url)).Title);
     }
 
     [Fact]
-    public async Task Deleting_a_movie_removes_it_from_all_watchlists()
+    public async Task Other_users_cannot_log_or_watchlist_a_manually_added_movie()
     {
-        var movie = await CreateMovieAsync();
-        await Client.PutAsJsonAsync($"/api/watchlist/{movie.Id}", new { }, Ct);
-        await Bob.PutAsJsonAsync($"/api/watchlist/{movie.Id}", new { }, Ct);
+        var movie = await CreateMovieAsync("Home Video");
+        var bobsMovie = await ImportTmdbMovieAsync(client: Bob);
+        var bobsEntry = await ReadAsync<DiaryEntryResponse>(
+            await Bob.PostAsJsonAsync("/api/diary-entries", new { movieId = bobsMovie.Id, watchedOn = "2026-10-15" }, Ct),
+            HttpStatusCode.Created);
 
-        Assert.Equal(HttpStatusCode.NoContent, (await Client.DeleteAsync($"/api/movies/{movie.Id}", Ct)).StatusCode);
+        var create = await Bob.PostAsJsonAsync("/api/diary-entries", new { movieId = movie.Id, watchedOn = "2026-10-15" }, Ct);
+        var update = await Bob.PutAsJsonAsync($"/api/diary-entries/{bobsEntry.Id}", new { movieId = movie.Id, watchedOn = "2026-10-15" }, Ct);
+        var watchlist = await Bob.PutAsync($"/api/watchlist/{movie.Id}", content: null, Ct);
 
-        var bobsWatchlist = await ReadAsync<PagedResponse<WatchlistItemResponse>>(await Bob.GetAsync("/api/watchlist", Ct), HttpStatusCode.OK);
-        Assert.Empty(bobsWatchlist.Items);
+        // Same answers as for a movie that does not exist.
+        await ReadProblemAsync(create, HttpStatusCode.UnprocessableEntity);
+        await ReadProblemAsync(update, HttpStatusCode.UnprocessableEntity);
+        await ReadProblemAsync(watchlist, HttpStatusCode.NotFound);
     }
 }

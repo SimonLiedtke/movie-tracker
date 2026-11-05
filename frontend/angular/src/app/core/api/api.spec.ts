@@ -25,6 +25,22 @@ describe('API services', () => {
     request.flush({ items: [], page: 2, pageSize: 20, totalCount: 0 });
   });
 
+  it('searches movies', () => {
+    TestBed.inject(MoviesApi).search('the thing').subscribe();
+
+    const request = http.expectOne((r) => r.url === '/api/movies/search');
+    expect(request.request.params.get('query')).toBe('the thing');
+    request.flush({ items: [], tmdbAvailable: true });
+  });
+
+  it('imports a movie from TMDB', () => {
+    TestBed.inject(MoviesApi).importFromTmdb(348).subscribe();
+
+    const request = http.expectOne('/api/movies/tmdb/348');
+    expect(request.request.method).toBe('POST');
+    request.flush({});
+  });
+
   it('puts a movie on the watchlist with a note', () => {
     TestBed.inject(WatchlistApi).put('42', "Director's cut").subscribe();
 

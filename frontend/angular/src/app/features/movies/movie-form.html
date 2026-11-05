@@ -1,4 +1,9 @@
-<h1 class="title">{{ id() ? 'Edit movie' : 'Add movie' }}</h1>
+<h1 class="title">{{ id() ? 'Edit movie' : 'Add a movie manually' }}</h1>
+@if (!id()) {
+  <p class="subtitle is-6 has-text-grey">
+    For movies that TMDB does not know. Only you can see the movies you add here.
+  </p>
+}
 
 <app-error-notification [error]="error()" (dismiss)="error.set(null)" />
 
@@ -69,24 +74,6 @@
           }
         </div>
       </div>
-      <div class="column">
-        <div class="field">
-          <label class="label" for="tmdbId">TMDB ID</label>
-          <div class="control">
-            <input
-              id="tmdbId"
-              class="input"
-              type="number"
-              min="1"
-              formControlName="tmdbId"
-              [class.is-danger]="isInvalid('tmdbId')"
-            />
-          </div>
-          @if (isInvalid('tmdbId')) {
-            <p class="help is-danger">Must be a positive number.</p>
-          }
-        </div>
-      </div>
     </div>
 
     <div class="field">
@@ -145,7 +132,7 @@
         <button type="submit" class="button is-primary" [class.is-loading]="saving()">Save</button>
       </div>
       <div class="control">
-        <a class="button is-light" [routerLink]="id() ? ['/movies', id()] : ['/movies']">Cancel</a>
+        <a class="button is-light" [routerLink]="cancelLink()">Cancel</a>
       </div>
     </div>
   </form>
