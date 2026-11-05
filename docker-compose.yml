@@ -1,3 +1,10 @@
+# The whole app: PostgreSQL, API and frontend.
+#
+#   docker compose up --build      everything, at http://localhost:8080
+#   docker compose up -d postgres  only the database, for development with dotnet run and ng serve
+#
+# Secrets (Google sign-in, TMDB) are read from a .env file next to this one, see .env.example.
+
 services:
   postgres:
     image: postgres:17-alpine
@@ -5,8 +12,9 @@ services:
     environment:
       POSTGRES_DB: movie_tracker
       POSTGRES_USER: movie_tracker
-      POSTGRES_PASSWORD: movie_tracker
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-movie_tracker}
     ports:
+      # For local development and tools like psql. The other services use the internal network.
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
@@ -15,6 +23,40 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    container_name: movie-tracker-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      # Trust the X-Forwarded-* headers set by nginx in the frontend container.
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      ConnectionStrings__MovieTracker: Host=postgres;Port=5432;Database=movie_tracker;Username=movie_tracker;Password=${POSTGRES_PASSWORD:-movie_tracker};GSS Encryption Mode=Disable
+      Database__MigrateOnStartup: "true"
+      Authentication__Google__ClientId: ${GOOGLE_CLIENT_ID:-}
+      Authentication__Google__ClientSecret: ${GOOGLE_CLIENT_SECRET:-}
+      Tmdb__AccessToken: ${TMDB_ACCESS_TOKEN:-}
+      Tmdb__Language: ${TMDB_LANGUAGE:-en-US}
+      # Without this, every SQL statement is logged.
+      Logging__LogLevel__Microsoft.EntityFrameworkCore: Warning
+    volumes:
+      - data-protection-keys:/home/app/.aspnet/DataProtection-Keys
+    # No published port: the API is reached through the frontend at /api.
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend/angular
+    container_name: movie-tracker-frontend
+    depends_on:
+      - backend
+    ports:
+      - "${APP_PORT:-8080}:80"
+    restart: unless-stopped
 
 volumes:
   postgres-data:
+  data-protection-keys:

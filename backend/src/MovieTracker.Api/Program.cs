@@ -39,8 +39,12 @@ if (app.Environment.IsDevelopment())
 {
     // Generated from the code at /openapi/v1.json. Later compared against api/openapi.yaml in CI.
     app.MapOpenApi().AllowAnonymous();
+}
 
-    // Convenient for local development only. Production deployments apply migrations separately.
+// Always in development; elsewhere only if enabled (e.g. by docker-compose.yml), so real deployments
+// can apply migrations separately.
+if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
+{
     await using var scope = app.Services.CreateAsyncScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<MovieTrackerDbContext>();
     await dbContext.Database.MigrateAsync();

@@ -11,13 +11,31 @@ API-driven backend in C# with PostgreSQL, multiple frontends (Angular, Vue, Reac
 | `backend/`  | ASP.NET Core API, domain model, EF Core persistence      |
 | `frontend/` | Frontends, e.g. `frontend/angular/` (Angular + Bulma)    |
 
-## Getting started
+## Running everything with Docker
+
+`docker-compose.yml` runs the whole app: PostgreSQL, the API and the Angular frontend (served by
+nginx, which also forwards `/api` to the API). Only Docker is required.
+
+```bash
+cp .env.example .env    # then fill in the Google and TMDB credentials, see below
+docker compose up -d --build
+```
+
+The app is then available at http://localhost:8080. For Google sign-in, add
+`http://localhost:8080/api/auth/callback/google` as an additional authorized redirect URI of the
+OAuth client (see [Signing in with Google](#signing-in-with-google)). The API applies the database
+migrations when it starts. Data and the keys of the session cookies are kept in Docker volumes, so
+`docker compose down` does not lose them (`docker compose down -v` does).
+
+After changing the code, run `docker compose up -d --build` again.
+
+## Development
 
 Requirements: .NET 10 SDK, Docker.
 
 ```bash
-# Start PostgreSQL
-docker compose up -d
+# Start only PostgreSQL
+docker compose up -d postgres
 
 # Restore the local dotnet-ef tool
 cd backend
