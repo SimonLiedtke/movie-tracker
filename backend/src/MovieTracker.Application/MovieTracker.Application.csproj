@@ -4,4 +4,8 @@
     <ProjectReference Include="..\MovieTracker.Domain\MovieTracker.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
 </Project>
