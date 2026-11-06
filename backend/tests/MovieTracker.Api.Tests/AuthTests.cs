@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using MovieTracker.Api.Auth;
 using MovieTracker.Api.Contracts;
 using MovieTracker.Api.Tests.Infrastructure;
+using MovieTracker.Application.Users;
 
 namespace MovieTracker.Api.Tests;
 
@@ -137,7 +138,7 @@ public sealed class AuthTests(ApiFactory factory) : ApiTestBase(factory)
     public async Task Signing_in_again_updates_the_profile_of_the_same_user()
     {
         await using var scope = Factory.Services.CreateAsyncScope();
-        var accounts = scope.ServiceProvider.GetRequiredService<UserAccounts>();
+        var accounts = scope.ServiceProvider.GetRequiredService<UserAccountService>();
 
         var first = await accounts.SignInAsync("google-42", "ada@example.com", "Ada", null, Ct);
         var second = await accounts.SignInAsync("google-42", "countess@example.com", "Countess", "https://example.com/c.png", Ct);

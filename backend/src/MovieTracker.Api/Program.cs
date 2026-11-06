@@ -1,11 +1,10 @@
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
-using Microsoft.EntityFrameworkCore;
 using MovieTracker.Api.Auth;
 using MovieTracker.Api.Imports;
+using MovieTracker.Application;
 using MovieTracker.Infrastructure;
-using MovieTracker.Infrastructure.Persistence;
 using MovieTracker.Infrastructure.Tmdb;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,6 +15,7 @@ var connectionString = builder.Configuration.GetConnectionString("MovieTracker")
 var tmdbOptions = builder.Configuration.GetSection(TmdbOptions.SectionName).Get<TmdbOptions>() ?? new TmdbOptions();
 
 builder.Services.AddInfrastructure(connectionString, tmdbOptions);
+builder.Services.AddApplication();
 builder.Services.AddMovieTrackerAuthentication(builder.Configuration);
 builder.Services.AddLetterboxdImport();
 builder.Services.AddSingleton(TimeProvider.System);
@@ -65,9 +65,7 @@ if (app.Environment.IsDevelopment())
 // can apply migrations separately.
 if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 {
-    await using var scope = app.Services.CreateAsyncScope();
-    var dbContext = scope.ServiceProvider.GetRequiredService<MovieTrackerDbContext>();
-    await dbContext.Database.MigrateAsync();
+    await app.Services.MigrateDatabaseAsync();
 }
 
 app.MapControllers();

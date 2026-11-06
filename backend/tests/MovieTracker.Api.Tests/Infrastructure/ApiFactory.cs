@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MovieTracker.Infrastructure.Persistence;
-using MovieTracker.Infrastructure.Tmdb;
+using MovieTracker.Application.Tmdb;
 using Testcontainers.PostgreSql;
 
 [assembly: AssemblyFixture(typeof(MovieTracker.Api.Tests.Infrastructure.ApiFactory))]

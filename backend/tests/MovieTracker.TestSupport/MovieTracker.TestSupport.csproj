@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Helpers shared by the test projects. Unlike them, this is a plain library: no test runner, no xunit. -->
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Remove="xunit.v3" />
+    <Using Remove="Xunit" />
+  </ItemGroup>
+
+</Project>

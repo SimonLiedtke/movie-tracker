@@ -6,8 +6,8 @@ using MovieTracker.Api.Contracts;
 using MovieTracker.Api.Tests.Infrastructure;
 using MovieTracker.Domain.Movies;
 using MovieTracker.Infrastructure.Persistence;
-using MovieTracker.Infrastructure.Tmdb;
-using static MovieTracker.Api.Tests.Infrastructure.LetterboxdZip;
+using MovieTracker.Application.Tmdb;
+using static MovieTracker.TestSupport.LetterboxdZip;
 
 namespace MovieTracker.Api.Tests;
 

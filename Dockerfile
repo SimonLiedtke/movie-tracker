@@ -14,6 +14,7 @@ WORKDIR /src
 # Restore first, so the packages stay cached as long as no project file changes.
 COPY backend/global.json backend/Directory.Build.props backend/Directory.Packages.props ./
 COPY backend/src/MovieTracker.Domain/MovieTracker.Domain.csproj src/MovieTracker.Domain/
+COPY backend/src/MovieTracker.Application/MovieTracker.Application.csproj src/MovieTracker.Application/
 COPY backend/src/MovieTracker.Infrastructure/MovieTracker.Infrastructure.csproj src/MovieTracker.Infrastructure/
 COPY backend/src/MovieTracker.Api/MovieTracker.Api.csproj src/MovieTracker.Api/
 RUN dotnet restore src/MovieTracker.Api/MovieTracker.Api.csproj

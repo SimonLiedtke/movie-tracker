@@ -1,11 +1,12 @@
 using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using MovieTracker.Application.Letterboxd;
 using MovieTracker.Domain.Diary;
 using MovieTracker.Domain.Movies;
 using MovieTracker.Domain.Watchlist;
 using MovieTracker.Infrastructure.Persistence;
-using MovieTracker.Infrastructure.Tmdb;
+using MovieTracker.Application.Tmdb;
 using Npgsql;
 
 namespace MovieTracker.Infrastructure.Letterboxd;
@@ -24,7 +25,7 @@ public sealed class LetterboxdImporter(
     MovieTrackerDbContext db,
     ITmdbClient tmdb,
     TimeProvider timeProvider,
-    ILogger<LetterboxdImporter> logger)
+    ILogger<LetterboxdImporter> logger) : ILetterboxdImporter
 {
     /// <summary>
     /// A few films at once make a big import fast. Every film takes one to three requests, so this stays below
@@ -38,7 +39,6 @@ public sealed class LetterboxdImporter(
 
     private const int MaxSaveAttempts = 3;
 
-    /// <param name="progress">Filled while the import runs, so the caller can show how far it is.</param>
     public async Task<LetterboxdImportResult> ImportAsync(
         Guid userId, LetterboxdExport export, LetterboxdImportProgress progress, CancellationToken cancellationToken)
     {

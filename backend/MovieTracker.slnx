@@ -1,11 +1,14 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/MovieTracker.Api/MovieTracker.Api.csproj" />
+    <Project Path="src/MovieTracker.Application/MovieTracker.Application.csproj" />
     <Project Path="src/MovieTracker.Domain/MovieTracker.Domain.csproj" />
     <Project Path="src/MovieTracker.Infrastructure/MovieTracker.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/MovieTracker.Api.Tests/MovieTracker.Api.Tests.csproj" />
+    <Project Path="tests/MovieTracker.Application.Tests/MovieTracker.Application.Tests.csproj" />
     <Project Path="tests/MovieTracker.Domain.Tests/MovieTracker.Domain.Tests.csproj" />
+    <Project Path="tests/MovieTracker.TestSupport/MovieTracker.TestSupport.csproj" />
   </Folder>
 </Solution>

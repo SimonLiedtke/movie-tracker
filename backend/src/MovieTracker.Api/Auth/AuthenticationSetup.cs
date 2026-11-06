@@ -3,8 +3,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.DataProtection;
-using MovieTracker.Infrastructure.Persistence;
+using MovieTracker.Application.Users;
 
 namespace MovieTracker.Api.Auth;
 
@@ -20,12 +19,6 @@ public static class AuthenticationSetup
     public static IServiceCollection AddMovieTrackerAuthentication(
         this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddScoped<UserAccounts>();
-
-        // The keys that encrypt the session cookie live in the database, so users stay signed in when the
-        // app is redeployed or runs on a host without a persistent disk (e.g. Render).
-        services.AddDataProtection().PersistKeysToDbContext<MovieTrackerDbContext>();
-
         var authentication = services
             .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
             .AddCookie(options =>
@@ -91,7 +84,7 @@ public static class AuthenticationSetup
         var email = identity.FindFirst(ClaimTypes.Email)?.Value
             ?? throw new InvalidOperationException("Google did not return an email address.");
 
-        var accounts = context.HttpContext.RequestServices.GetRequiredService<UserAccounts>();
+        var accounts = context.HttpContext.RequestServices.GetRequiredService<UserAccountService>();
         var user = await accounts.SignInAsync(
             subject,
             email,

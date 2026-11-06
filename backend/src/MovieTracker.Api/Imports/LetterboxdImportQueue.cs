@@ -1,5 +1,5 @@
 using System.Threading.Channels;
-using MovieTracker.Infrastructure.Letterboxd;
+using MovieTracker.Application.Letterboxd;
 
 namespace MovieTracker.Api.Imports;
 

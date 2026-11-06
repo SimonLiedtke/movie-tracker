@@ -4,16 +4,17 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MovieTracker.Api.Auth;
+using MovieTracker.Application.Users;
 
 namespace MovieTracker.Api.Tests.Infrastructure;
 
 /// <summary>
 /// Replaces the Google sign-in in tests: a request is signed in as the user named in the
-/// <see cref="UserHeader"/> header. The user is created through the same <see cref="UserAccounts"/>
+/// <see cref="UserHeader"/> header. The user is created through the same <see cref="UserAccountService"/>
 /// as a real Google sign-in, so the claims match production.
 /// </summary>
 public sealed class TestAuthHandler(
-    IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder, UserAccounts accounts)
+    IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder, UserAccountService accounts)
     : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
 {
     public const string SchemeName = "Test";

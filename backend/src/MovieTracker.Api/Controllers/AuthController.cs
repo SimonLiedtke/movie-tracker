@@ -4,17 +4,16 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using MovieTracker.Api.Auth;
 using MovieTracker.Api.Contracts;
-using MovieTracker.Infrastructure.Persistence;
+using MovieTracker.Application.Users;
 
 namespace MovieTracker.Api.Controllers;
 
 [ApiController]
 [Route("api/auth")]
 [Tags("Auth")]
-public sealed class AuthController(MovieTrackerDbContext db, IAuthenticationSchemeProvider schemes) : ControllerBase
+public sealed class AuthController(UserAccountService accounts, IAuthenticationSchemeProvider schemes) : ControllerBase
 {
     /// <summary>
     /// Starts the Google sign-in. The browser navigates here (it is not an XHR endpoint); after signing in,
@@ -54,12 +53,7 @@ public sealed class AuthController(MovieTrackerDbContext db, IAuthenticationSche
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, MediaTypeNames.Application.ProblemJson)]
     public async Task<ActionResult<UserResponse>> GetCurrentUser(CancellationToken cancellationToken)
     {
-        var userId = User.GetUserId();
-        var user = await db.Users
-            .AsNoTracking()
-            .Where(u => u.Id == userId)
-            .Select(u => new UserResponse(u.Id, u.Email, u.Name, u.PictureUrl))
-            .SingleOrDefaultAsync(cancellationToken);
+        var user = await accounts.FindAsync(User.GetUserId(), cancellationToken);
 
         if (user is null)
         {
@@ -68,6 +62,6 @@ public sealed class AuthController(MovieTrackerDbContext db, IAuthenticationSche
             return Unauthorized();
         }
 
-        return user;
+        return new UserResponse(user.Id, user.Email, user.Name, user.PictureUrl);
     }
 }

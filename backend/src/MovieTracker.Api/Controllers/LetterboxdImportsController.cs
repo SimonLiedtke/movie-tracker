@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using MovieTracker.Api.Auth;
 using MovieTracker.Api.Contracts;
 using MovieTracker.Api.Imports;
-using MovieTracker.Infrastructure.Letterboxd;
+using MovieTracker.Application.Letterboxd;
 
 namespace MovieTracker.Api.Controllers;
 
