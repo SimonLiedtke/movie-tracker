@@ -1,4 +1,5 @@
 using MovieTracker.Application;
+using MovieTracker.Application.Diary;
 using MovieTracker.Application.Movies;
 using MovieTracker.Domain.Movies;
 
@@ -12,6 +13,18 @@ internal static class Mappings
         new(result.Items.Select(map).ToList(), result.Page, result.PageSize, result.TotalCount);
 
     public static GenreResponse ToResponse(this Genre genre) => new(genre.Id, genre.Name);
+
+    public static MovieRefResponse ToResponse(this MovieRef movie) => new(movie.Id, movie.Title, movie.ReleaseDate, movie.PosterUrl);
+
+    public static DiaryEntryResponse ToResponse(this DiaryEntryView entry) => new(
+        entry.Id,
+        entry.Movie.ToResponse(),
+        entry.WatchedOn,
+        entry.Rating?.HalfStars,
+        entry.Review,
+        entry.IsRewatch,
+        entry.Liked,
+        entry.CreatedAt);
 
     public static MovieSummaryResponse ToResponse(this MovieSummary movie) => new(
         movie.Id,

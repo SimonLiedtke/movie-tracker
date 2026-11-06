@@ -1,12 +1,10 @@
 using System.ComponentModel.DataAnnotations;
 using System.Net.Mime;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using MovieTracker.Api.Auth;
 using MovieTracker.Api.Contracts;
-using MovieTracker.Api.Queries;
+using MovieTracker.Application.Diary;
 using MovieTracker.Application.Movies;
-using MovieTracker.Infrastructure.Persistence;
 
 namespace MovieTracker.Api.Controllers;
 
@@ -17,8 +15,7 @@ namespace MovieTracker.Api.Controllers;
 [ApiController]
 [Route("api/movies")]
 [Tags("Movies")]
-// The database context is still needed for ListMovieDiaryEntries, until the diary uses the Application layer too.
-public sealed class MoviesController(MovieService movies, MovieTrackerDbContext db) : ControllerBase
+public sealed class MoviesController(MovieService movies, DiaryService diary) : ControllerBase
 {
     /// <summary>The user's movies: added manually, logged in the diary or on the watchlist.</summary>
     [HttpGet(Name = "listMovies")]
@@ -169,26 +166,20 @@ public sealed class MoviesController(MovieService movies, MovieTrackerDbContext 
         };
     }
 
+    /// <summary>The signed-in user's viewings of the movie, newest first.</summary>
     [HttpGet("{movieId:guid}/diary-entries", Name = "listMovieDiaryEntries")]
     [ProducesResponseType<List<DiaryEntryResponse>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, MediaTypeNames.Application.ProblemJson)]
     public async Task<ActionResult<List<DiaryEntryResponse>>> ListMovieDiaryEntries(
         Guid movieId, CancellationToken cancellationToken)
     {
-        if (!await db.Movies.VisibleTo(User.GetUserId()).AnyAsync(movie => movie.Id == movieId, cancellationToken))
+        var entries = await diary.ListForMovieAsync(User.GetUserId(), movieId, cancellationToken);
+        if (entries is null)
         {
             return NotFound();
         }
 
-        var userId = User.GetUserId();
-        var rows = await db.DiaryEntries
-            .AsNoTracking()
-            .Where(entry => entry.MovieId == movieId && entry.UserId == userId)
-            .OrderByNewest()
-            .SelectRows()
-            .ToListAsync(cancellationToken);
-
-        return rows.Select(row => row.ToResponse()).ToList();
+        return entries.Select(entry => entry.ToResponse()).ToList();
     }
 
     private ActionResult UnknownGenres(SaveMovieResult result)

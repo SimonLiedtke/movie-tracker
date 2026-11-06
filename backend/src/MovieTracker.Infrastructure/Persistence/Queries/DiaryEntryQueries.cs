@@ -1,7 +1,8 @@
-using MovieTracker.Api.Contracts;
+using MovieTracker.Application.Diary;
+using MovieTracker.Application.Movies;
 using MovieTracker.Domain.Diary;
 
-namespace MovieTracker.Api.Queries;
+namespace MovieTracker.Infrastructure.Persistence.Queries;
 
 internal static class DiaryEntryQueries
 {
@@ -14,7 +15,7 @@ internal static class DiaryEntryQueries
     public static IQueryable<DiaryEntryRow> SelectRows(this IQueryable<DiaryEntry> entries) =>
         entries.Select(entry => new DiaryEntryRow(
             entry.Id,
-            new MovieRefResponse(entry.Movie.Id, entry.Movie.Title, entry.Movie.ReleaseDate, entry.Movie.PosterUrl),
+            new MovieRef(entry.Movie.Id, entry.Movie.Title, entry.Movie.ReleaseDate, entry.Movie.PosterUrl),
             entry.WatchedOn,
             entry.Rating,
             entry.Review,
@@ -23,9 +24,10 @@ internal static class DiaryEntryQueries
             entry.CreatedAt));
 }
 
+/// <summary>Rating is a value-converted type that EF Core cannot dereference in SQL, so the queries project into rows first.</summary>
 internal sealed record DiaryEntryRow(
     Guid Id,
-    MovieRefResponse Movie,
+    MovieRef Movie,
     DateOnly WatchedOn,
     Rating? Rating,
     string? Review,
@@ -33,6 +35,5 @@ internal sealed record DiaryEntryRow(
     bool Liked,
     DateTimeOffset CreatedAt)
 {
-    public DiaryEntryResponse ToResponse() => new(
-        Id, Movie, WatchedOn, Rating?.HalfStars, Review, IsRewatch, Liked, CreatedAt);
+    public DiaryEntryView ToModel() => new(Id, Movie, WatchedOn, Rating, Review, IsRewatch, Liked, CreatedAt);
 }
