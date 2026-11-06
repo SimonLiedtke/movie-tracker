@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using MovieTracker.Infrastructure.Letterboxd;
 using MovieTracker.Infrastructure.Persistence;
 using MovieTracker.Infrastructure.Tmdb;
 
@@ -19,6 +20,8 @@ public static class DependencyInjection
 
         services.AddSingleton(tmdbOptions);
         services.AddHttpClient<ITmdbClient, TmdbClient>();
+
+        services.AddScoped<LetterboxdImporter>();
 
         return services;
     }

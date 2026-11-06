@@ -1,16 +1,14 @@
 using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
-using MovieTracker.Api.Contracts;
-using MovieTracker.Api.Queries;
+using Microsoft.Extensions.Logging;
 using MovieTracker.Domain.Diary;
 using MovieTracker.Domain.Movies;
 using MovieTracker.Domain.Watchlist;
-using MovieTracker.Infrastructure.Letterboxd;
 using MovieTracker.Infrastructure.Persistence;
 using MovieTracker.Infrastructure.Tmdb;
 using Npgsql;
 
-namespace MovieTracker.Api.Imports;
+namespace MovieTracker.Infrastructure.Letterboxd;
 
 /// <summary>
 /// Imports a Letterboxd export for one user. The export only names the films, so each one is first mapped to a movie:
@@ -22,7 +20,7 @@ namespace MovieTracker.Api.Imports;
 /// If TMDB fails for a film, the film is left out instead of creating a manual movie that would never be replaced by the
 /// real one. Importing the same export again is safe: viewings and watchlist items that exist are skipped.
 /// </summary>
-internal sealed class LetterboxdImporter(
+public sealed class LetterboxdImporter(
     MovieTrackerDbContext db,
     ITmdbClient tmdb,
     TimeProvider timeProvider,
@@ -40,52 +38,51 @@ internal sealed class LetterboxdImporter(
 
     private const int MaxSaveAttempts = 3;
 
-    public async Task<ImportResultResponse> ImportAsync(LetterboxdImportJob job, CancellationToken cancellationToken)
+    /// <param name="progress">Filled while the import runs, so the caller can show how far it is.</param>
+    public async Task<LetterboxdImportResult> ImportAsync(
+        Guid userId, LetterboxdExport export, LetterboxdImportProgress progress, CancellationToken cancellationToken)
     {
-        var export = job.Export;
+        ArgumentNullException.ThrowIfNull(export);
+        ArgumentNullException.ThrowIfNull(progress);
+
         var films = export.Diary.Select(entry => entry.Film)
             .Concat(export.Watchlist.Select(item => item.Film))
             .Distinct()
             .ToList();
-        job.SetFilmsTotal(films.Count);
+        progress.Start(films.Count);
 
-        var movies = await ResolveMoviesAsync(job, films, cancellationToken);
+        var movies = await ResolveMoviesAsync(userId, progress, films, cancellationToken);
 
         var now = timeProvider.GetUtcNow();
-        var diary = await AddDiaryEntriesAsync(job.UserId, export.Diary, movies.MovieIds, now, cancellationToken);
-        var watchlist = await AddWatchlistItemsAsync(job.UserId, export.Watchlist, movies.MovieIds, cancellationToken);
+        var diary = await AddDiaryEntriesAsync(userId, export.Diary, movies.MovieIds, now, cancellationToken);
+        var watchlist = await AddWatchlistItemsAsync(userId, export.Watchlist, movies.MovieIds, cancellationToken);
         // One SaveChanges is one transaction: either the whole diary and watchlist is imported or nothing.
         await db.SaveChangesAsync(cancellationToken);
 
-        logger.LogInformation(
-            "Letterboxd import {JobId}: {DiaryImported} viewings and {WatchlistImported} watchlist items imported, "
-            + "{ManualMovies} manual movies added, {FailedFilms} films failed",
-            job.Id, diary.Imported, watchlist.Imported, movies.ManualFilms.Count, movies.FailedFilms.Count);
-
-        return new ImportResultResponse(
+        return new LetterboxdImportResult(
             diary.Imported,
             diary.Skipped,
             watchlist.Imported,
             watchlist.Skipped,
-            movies.ManualFilms.Select(ToResponse).ToList(),
-            movies.FailedFilms.Select(ToResponse).ToList(),
+            movies.ManualFilms,
+            movies.FailedFilms,
             export.Warnings);
     }
 
     private async Task<ResolvedMovies> ResolveMoviesAsync(
-        LetterboxdImportJob job, IReadOnlyList<LetterboxdFilm> films, CancellationToken cancellationToken)
+        Guid userId, LetterboxdImportProgress progress, IReadOnlyList<LetterboxdFilm> films, CancellationToken cancellationToken)
     {
         var movieIds = new Dictionary<LetterboxdFilm, Guid>();
 
         // 1. Movies that exist already, which saves the TMDB requests (and makes a repeated import fast).
         var unknownFilms = new List<LetterboxdFilm>();
-        var knownMovies = await FindKnownMoviesAsync(job.UserId, films, cancellationToken);
+        var knownMovies = await FindKnownMoviesAsync(userId, films, cancellationToken);
         foreach (var film in films)
         {
             if (FindKnownMovie(film, knownMovies) is { } movieId)
             {
                 movieIds[film] = movieId;
-                job.FilmProcessed();
+                progress.FilmProcessed();
             }
             else
             {
@@ -105,14 +102,14 @@ internal sealed class LetterboxdImporter(
                 async (film, token) =>
                 {
                     lookups[film] = await LookUpOnTmdbAsync(film, tmdbMovieIds, token);
-                    job.FilmProcessed();
+                    progress.FilmProcessed();
                 });
         }
         else
         {
             foreach (var _ in unknownFilms)
             {
-                job.FilmProcessed();
+                progress.FilmProcessed();
             }
         }
 
@@ -144,7 +141,7 @@ internal sealed class LetterboxdImporter(
             }
         }
 
-        var saved = await SaveMoviesAsync(job.UserId, tmdbMoviesToSave.Values.ToList(), manualFilms, cancellationToken);
+        var saved = await SaveMoviesAsync(userId, tmdbMoviesToSave.Values.ToList(), manualFilms, cancellationToken);
         foreach (var (film, tmdbId) in filmsByTmdbId)
         {
             movieIds[film] = saved.TmdbMovieIds[tmdbId];
@@ -166,7 +163,8 @@ internal sealed class LetterboxdImporter(
         // Exact names here; FilmMatcher then compares loosely (case, accents, punctuation) among the candidates.
         return await db.Movies
             .AsNoTracking()
-            .VisibleTo(userId)
+            // Shared TMDB movies and the user's own manual movies (the same rule as Movie.IsVisibleTo).
+            .Where(movie => movie.OwnerId == null || movie.OwnerId == userId)
             .Where(movie => names.Contains(movie.Title) || (movie.OriginalTitle != null && names.Contains(movie.OriginalTitle)))
             .Select(movie => new KnownMovie(movie.Id, movie.Title, movie.OriginalTitle, movie.ReleaseDate, movie.OwnerId != null))
             .ToListAsync(cancellationToken);
@@ -391,8 +389,6 @@ internal sealed class LetterboxdImporter(
 
         return new Counts(imported, skipped);
     }
-
-    private static ImportFilmResponse ToResponse(LetterboxdFilm film) => new(film.Name, film.Year);
 
     private sealed record KnownMovie(Guid Id, string Title, string? OriginalTitle, DateOnly? ReleaseDate, bool IsManual);
 

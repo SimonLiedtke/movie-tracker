@@ -4,14 +4,12 @@ using MovieTracker.Infrastructure.Letterboxd;
 namespace MovieTracker.Api.Imports;
 
 /// <summary>
-/// One Letterboxd import. Created by the upload, filled with progress by <see cref="LetterboxdImporter"/> on the
-/// background worker and read by the polling client, hence the lock.
+/// One Letterboxd import. Created by the upload, worked on by <see cref="LetterboxdImporter"/> on the background
+/// worker and read by the polling client, hence the lock.
 /// </summary>
 public sealed class LetterboxdImportJob(Guid userId, LetterboxdExport export)
 {
     private readonly Lock _lock = new();
-    private int _filmsTotal;
-    private int _filmsProcessed;
     private ImportStatus _status = ImportStatus.Running;
     private ImportResultResponse? _result;
     private string? _error;
@@ -22,6 +20,9 @@ public sealed class LetterboxdImportJob(Guid userId, LetterboxdExport export)
     public Guid UserId { get; } = userId;
 
     public LetterboxdExport Export { get; } = export;
+
+    /// <summary>Filled by the importer while it runs.</summary>
+    public LetterboxdImportProgress Progress { get; } = new();
 
     public bool IsRunning
     {
@@ -45,27 +46,11 @@ public sealed class LetterboxdImportJob(Guid userId, LetterboxdExport export)
         }
     }
 
-    public void SetFilmsTotal(int total)
+    public void Complete(LetterboxdImportResult result, DateTimeOffset now)
     {
         lock (_lock)
         {
-            _filmsTotal = total;
-        }
-    }
-
-    public void FilmProcessed()
-    {
-        lock (_lock)
-        {
-            _filmsProcessed++;
-        }
-    }
-
-    public void Complete(ImportResultResponse result, DateTimeOffset now)
-    {
-        lock (_lock)
-        {
-            _result = result;
+            _result = ToResponse(result);
             _status = ImportStatus.Completed;
             _finishedAt = now;
         }
@@ -85,7 +70,18 @@ public sealed class LetterboxdImportJob(Guid userId, LetterboxdExport export)
     {
         lock (_lock)
         {
-            return new ImportJobResponse(Id, _status, _filmsTotal, _filmsProcessed, _result, _error);
+            return new ImportJobResponse(Id, _status, Progress.FilmsTotal, Progress.FilmsProcessed, _result, _error);
         }
     }
+
+    private static ImportResultResponse ToResponse(LetterboxdImportResult result) => new(
+        result.DiaryEntriesImported,
+        result.DiaryEntriesSkipped,
+        result.WatchlistItemsImported,
+        result.WatchlistItemsSkipped,
+        result.ManualFilms.Select(ToResponse).ToList(),
+        result.FailedFilms.Select(ToResponse).ToList(),
+        result.Warnings);
+
+    private static ImportFilmResponse ToResponse(LetterboxdFilm film) => new(film.Name, film.Year);
 }

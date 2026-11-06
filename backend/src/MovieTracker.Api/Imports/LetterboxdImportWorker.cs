@@ -1,3 +1,5 @@
+using MovieTracker.Infrastructure.Letterboxd;
+
 namespace MovieTracker.Api.Imports;
 
 /// <summary>
@@ -18,7 +20,15 @@ internal sealed class LetterboxdImportWorker(
             {
                 await using var scope = scopeFactory.CreateAsyncScope();
                 var importer = scope.ServiceProvider.GetRequiredService<LetterboxdImporter>();
-                var result = await importer.ImportAsync(job, stoppingToken);
+                var result = await importer.ImportAsync(job.UserId, job.Export, job.Progress, stoppingToken);
+                logger.LogInformation(
+                    "Letterboxd import {JobId}: {DiaryImported} viewings and {WatchlistImported} watchlist items imported, "
+                    + "{ManualMovies} manual movies added, {FailedFilms} films failed",
+                    job.Id,
+                    result.DiaryEntriesImported,
+                    result.WatchlistItemsImported,
+                    result.ManualFilms.Count,
+                    result.FailedFilms.Count);
                 job.Complete(result, timeProvider.GetUtcNow());
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
