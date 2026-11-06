@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
 using Microsoft.EntityFrameworkCore;
 using MovieTracker.Api.Auth;
+using MovieTracker.Api.Imports;
 using MovieTracker.Infrastructure;
 using MovieTracker.Infrastructure.Persistence;
 using MovieTracker.Infrastructure.Tmdb;
@@ -16,6 +17,7 @@ var tmdbOptions = builder.Configuration.GetSection(TmdbOptions.SectionName).Get<
 
 builder.Services.AddInfrastructure(connectionString, tmdbOptions);
 builder.Services.AddMovieTrackerAuthentication(builder.Configuration);
+builder.Services.AddLetterboxdImport();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
