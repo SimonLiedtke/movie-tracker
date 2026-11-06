@@ -3,7 +3,7 @@ using System.Text;
 using MovieTracker.Application.Letterboxd;
 using static MovieTracker.TestSupport.LetterboxdZip;
 
-namespace MovieTracker.Api.Tests;
+namespace MovieTracker.Application.Tests;
 
 public sealed class LetterboxdExportReaderTests
 {

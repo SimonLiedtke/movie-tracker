@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\MovieTracker.Application\MovieTracker.Application.csproj" />
+    <ProjectReference Include="..\MovieTracker.TestSupport\MovieTracker.TestSupport.csproj" />
   </ItemGroup>
 
 </Project>

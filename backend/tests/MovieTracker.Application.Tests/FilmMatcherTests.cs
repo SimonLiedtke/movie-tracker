@@ -1,7 +1,7 @@
 using MovieTracker.Application.Letterboxd;
 using MovieTracker.Application.Tmdb;
 
-namespace MovieTracker.Api.Tests;
+namespace MovieTracker.Application.Tests;
 
 public sealed class FilmMatcherTests
 {
