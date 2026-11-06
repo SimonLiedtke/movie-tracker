@@ -1,0 +1,32 @@
+# Render Blueprint: the app as one web service (Dockerfile in this folder).
+# The PostgreSQL database is created separately in the Render dashboard; see README.md, "Deploying to Render".
+services:
+  - type: web
+    name: movie-tracker
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    # Must be the region of the database, so the app can use its internal address.
+    region: frankfurt
+    healthCheckPath: /
+    envVars:
+      - key: PORT
+        value: "8080"
+      # Render terminates HTTPS in front of the app; trust its X-Forwarded-* headers, so the app knows the
+      # original https:// URL (Google redirect URI, secure cookies).
+      - key: ASPNETCORE_FORWARDEDHEADERS_ENABLED
+        value: "true"
+      - key: Database__MigrateOnStartup
+        value: "true"
+      # The database's "Internal Database URL" (postgresql://…) or a connection string in Npgsql's format.
+      - key: ConnectionStrings__MovieTracker
+        sync: false
+      - key: Authentication__Google__ClientId
+        sync: false
+      - key: Authentication__Google__ClientSecret
+        sync: false
+      - key: Tmdb__AccessToken
+        sync: false
+      - key: Tmdb__Language
+        value: en-US

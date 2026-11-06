@@ -13,8 +13,9 @@ API-driven backend in C# with PostgreSQL, multiple frontends (Angular, Vue, Reac
 
 ## Running everything with Docker
 
-`docker-compose.yml` runs the whole app: PostgreSQL, the API and the Angular frontend (served by
-nginx, which also forwards `/api` to the API). Only Docker is required.
+The `Dockerfile` in the repository root builds the whole app into one image: the API, which also
+serves the built Angular app. `docker-compose.yml` runs it together with PostgreSQL. Only Docker is
+required.
 
 ```bash
 cp .env.example .env    # then fill in the Google and TMDB credentials, see below
@@ -24,10 +25,32 @@ docker compose up -d --build
 The app is then available at http://localhost:8080. For Google sign-in, add
 `http://localhost:8080/api/auth/callback/google` as an additional authorized redirect URI of the
 OAuth client (see [Signing in with Google](#signing-in-with-google)). The API applies the database
-migrations when it starts. Data and the keys of the session cookies are kept in Docker volumes, so
-`docker compose down` does not lose them (`docker compose down -v` does).
+migrations when it starts. The data, including the keys of the session cookies, is kept in the
+`postgres-data` volume, so `docker compose down` does not lose it (`docker compose down -v` does).
 
 After changing the code, run `docker compose up -d --build` again.
+
+## Deploying to Render
+
+The app runs on [Render](https://render.com) as one web service built from the `Dockerfile`, next to
+a Render PostgreSQL database. `render.yaml` describes the web service.
+
+1. Create the PostgreSQL database in the Render dashboard (if not done yet) and note its region.
+2. Create the web service, either:
+   - as Blueprint: **New -> Blueprint**, select this repository. Adjust `region` in `render.yaml`
+     first if the database is not in Frankfurt. Or
+   - by hand: **New -> Web Service**, select this repository, **Language: Docker**, same region as
+     the database, and add the environment variables from `render.yaml`.
+3. Fill in the secret environment variables:
+   - `ConnectionStrings__MovieTracker`: the database's **Internal Database URL**
+     (`postgresql://…`, under **Connect -> Internal**).
+   - `Authentication__Google__ClientId` and `Authentication__Google__ClientSecret`.
+   - `Tmdb__AccessToken` (optional).
+4. Add `https://<service name>.onrender.com/api/auth/callback/google` as authorized redirect URI of
+   the Google OAuth client.
+
+Every push to the connected branch deploys again; the migrations run when the app starts. The keys
+of the session cookies are stored in the database, so users stay signed in across deploys.
 
 ## Development
 

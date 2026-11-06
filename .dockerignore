@@ -1,0 +1,15 @@
+# Keep the build context small: only the sources the Dockerfile copies matter.
+.git/
+.github/
+.claude/
+.env
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/.angular/
+**/.idea/
+**/.vscode/
+**/.junie/
+backend/tests/
+api/
