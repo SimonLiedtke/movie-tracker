@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MovieTracker.Application;
@@ -27,6 +28,10 @@ public static class DependencyInjection
             .UseNpgsql(PostgresConnectionString.Normalize(connectionString))
             .UseSnakeCaseNamingConvention());
 
+        // The keys that encrypt the session cookie live in the database, so users stay signed in when the
+        // app is redeployed or runs on a host without a persistent disk (e.g. Render).
+        services.AddDataProtection().PersistKeysToDbContext<MovieTrackerDbContext>();
+
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<IDiaryRepository, DiaryRepository>();
         services.AddScoped<IGenreRepository, GenreRepository>();
@@ -40,5 +45,13 @@ public static class DependencyInjection
         services.AddScoped<ILetterboxdImporter, LetterboxdImporter>();
 
         return services;
+    }
+
+    /// <summary>Brings the database up to date with the latest migration.</summary>
+    public static async Task MigrateDatabaseAsync(this IServiceProvider services)
+    {
+        await using var scope = services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MovieTrackerDbContext>();
+        await db.Database.MigrateAsync();
     }
 }
