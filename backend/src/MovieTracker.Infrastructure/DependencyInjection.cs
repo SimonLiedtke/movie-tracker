@@ -14,7 +14,7 @@ public static class DependencyInjection
         ArgumentNullException.ThrowIfNull(tmdbOptions);
 
         services.AddDbContext<MovieTrackerDbContext>(options => options
-            .UseNpgsql(connectionString)
+            .UseNpgsql(PostgresConnectionString.Normalize(connectionString))
             .UseSnakeCaseNamingConvention());
 
         services.AddSingleton(tmdbOptions);

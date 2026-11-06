@@ -40,7 +40,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         // ResetAsync truncates tables: make sure that never happens to the local development database.
         await using var scope = Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<MovieTrackerDbContext>();
-        if (db.Database.GetConnectionString() != _postgres.GetConnectionString())
+        if (db.Database.GetConnectionString() != PostgresConnectionString.Normalize(_postgres.GetConnectionString()))
         {
             throw new InvalidOperationException("The API under test is not connected to the test container.");
         }
