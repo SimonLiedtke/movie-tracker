@@ -8,8 +8,22 @@ API-driven backend in C# with PostgreSQL, multiple frontends (Angular, Vue, Reac
 | Folder      | Content                                                  |
 |-------------|----------------------------------------------------------|
 | `api/`      | OpenAPI specification -- the contract for all components |
-| `backend/`  | ASP.NET Core API, domain model, EF Core persistence      |
+| `backend/`  | ASP.NET Core API, use cases, domain model, EF Core persistence |
 | `frontend/` | Frontends, e.g. `frontend/angular/` (Angular + Bulma)    |
+
+## Backend layers
+
+```
+backend/src/
+  MovieTracker.Domain          entities and their rules; depends on nothing
+  MovieTracker.Application     use cases (services), the ports they need (repositories, TMDB) and read models
+  MovieTracker.Infrastructure  PostgreSQL via EF Core, the TMDB client, the Letterboxd importer; implements the ports
+  MovieTracker.Api             HTTP: controllers map requests and results, authentication, the background import worker
+```
+
+Dependencies point inwards (Api -> Application -> Domain, Infrastructure -> Application -> Domain). Only the
+Infrastructure project accesses the database; controllers call use cases and never see EF Core or the database
+context. `ArchitectureTests` in `MovieTracker.Api.Tests` fail if a layer reaches into another.
 
 ## Running everything with Docker
 
