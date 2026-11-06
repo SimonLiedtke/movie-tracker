@@ -1,7 +1,7 @@
 using System.IO.Compression;
 using System.Text;
 
-namespace MovieTracker.Api.Tests.Infrastructure;
+namespace MovieTracker.TestSupport;
 
 /// <summary>Builds Letterboxd export archives for tests, in the format of the real export (CRLF line breaks, header rows).</summary>
 public static class LetterboxdZip
