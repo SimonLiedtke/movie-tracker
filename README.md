@@ -161,9 +161,12 @@ dotnet test
 ```
 
 - `tests/MovieTracker.Domain.Tests`: unit tests of the domain model.
+- `tests/MovieTracker.Application.Tests`: unit tests of the use cases and the Letterboxd export parsing, against in-memory
+  fakes of the ports they need. They run in seconds and need no Docker.
 - `tests/MovieTracker.Api.Tests`: integration tests of all endpoints. They start the API in memory against a
   throwaway PostgreSQL container ([Testcontainers](https://dotnet.testcontainers.org/)), so Docker must be running.
   The local development database is not touched.
+- `tests/MovieTracker.TestSupport`: helpers shared by the test projects (a plain library, no tests).
 
 ## Adding a migration
 
