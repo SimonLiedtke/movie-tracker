@@ -1,6 +1,6 @@
 using MovieTracker.Domain.Movies;
 
-namespace MovieTracker.Infrastructure.Tmdb;
+namespace MovieTracker.Application.Tmdb;
 
 /// <summary>Read access to The Movie Database (TMDB).</summary>
 public interface ITmdbClient

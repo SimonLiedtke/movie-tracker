@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using MovieTracker.Application.Tmdb;
 using MovieTracker.Infrastructure.Letterboxd;
 using MovieTracker.Infrastructure.Persistence;
 using MovieTracker.Infrastructure.Tmdb;

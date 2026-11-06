@@ -1,5 +1,5 @@
 using MovieTracker.Infrastructure.Letterboxd;
-using MovieTracker.Infrastructure.Tmdb;
+using MovieTracker.Application.Tmdb;
 
 namespace MovieTracker.Api.Tests;
 

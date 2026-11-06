@@ -1,6 +1,6 @@
 using System.Globalization;
 using System.Text;
-using MovieTracker.Infrastructure.Tmdb;
+using MovieTracker.Application.Tmdb;
 
 namespace MovieTracker.Infrastructure.Letterboxd;
 

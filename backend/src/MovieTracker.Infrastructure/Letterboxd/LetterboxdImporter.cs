@@ -5,7 +5,7 @@ using MovieTracker.Domain.Diary;
 using MovieTracker.Domain.Movies;
 using MovieTracker.Domain.Watchlist;
 using MovieTracker.Infrastructure.Persistence;
-using MovieTracker.Infrastructure.Tmdb;
+using MovieTracker.Application.Tmdb;
 using Npgsql;
 
 namespace MovieTracker.Infrastructure.Letterboxd;

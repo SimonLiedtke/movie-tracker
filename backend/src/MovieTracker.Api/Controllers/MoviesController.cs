@@ -7,7 +7,7 @@ using MovieTracker.Api.Contracts;
 using MovieTracker.Api.Queries;
 using MovieTracker.Domain.Movies;
 using MovieTracker.Infrastructure.Persistence;
-using MovieTracker.Infrastructure.Tmdb;
+using MovieTracker.Application.Tmdb;
 using Npgsql;
 
 namespace MovieTracker.Api.Controllers;
