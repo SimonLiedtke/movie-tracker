@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
 using Microsoft.EntityFrameworkCore;
 using MovieTracker.Api.Auth;
@@ -31,6 +32,23 @@ var app = builder.Build();
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+
+// The built Angular app, if present in wwwroot (the Dockerfile in the repository root puts it there).
+// In development, ng serve serves the frontend instead.
+var hashedFileName = new Regex(@"-[A-Z0-9]{8}\.(js|css)$", RegexOptions.Compiled);
+var frontendFiles = new StaticFileOptions
+{
+    OnPrepareResponse = context =>
+    {
+        // Angular puts a content hash into the names of its scripts and styles (main-ABCD1234.js), so those
+        // never change under the same URL. Everything else (index.html, favicon.ico) is revalidated.
+        context.Context.Response.Headers.CacheControl = hashedFileName.IsMatch(context.File.Name)
+            ? "public, max-age=31536000, immutable"
+            : "no-cache";
+    },
+};
+app.UseStaticFiles(frontendFiles);
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<CsrfHeaderMiddleware>();
@@ -51,5 +69,10 @@ if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("Databas
 }
 
 app.MapControllers();
+
+// Angular routes like /diary/123 are not files: answer them with index.html, the router takes over.
+app.MapFallbackToFile("index.html", frontendFiles).AllowAnonymous();
+// More specific than the fallback above, so unknown API URLs get a 404 instead of the Angular app.
+app.MapFallback("/api/{**path}", () => Results.NotFound());
 
 app.Run();
