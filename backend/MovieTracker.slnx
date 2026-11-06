@@ -7,6 +7,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/MovieTracker.Api.Tests/MovieTracker.Api.Tests.csproj" />
+    <Project Path="tests/MovieTracker.Application.Tests/MovieTracker.Application.Tests.csproj" />
     <Project Path="tests/MovieTracker.Domain.Tests/MovieTracker.Domain.Tests.csproj" />
   </Folder>
 </Solution>
