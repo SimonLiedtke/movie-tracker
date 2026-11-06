@@ -34,6 +34,8 @@ tags:
     description: Diary of viewings including ratings and reviews
   - name: Watchlist
     description: Movies to watch later
+  - name: Import
+    description: Import of the diary and watchlist from other services
 
 paths:
   /api/movies:
@@ -391,6 +393,84 @@ paths:
         '204': { description: Removed }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /api/imports/letterboxd:
+    post:
+      tags: [Import]
+      operationId: startLetterboxdImport
+      summary: Import the diary and watchlist from a Letterboxd export
+      description: |
+        Upload the ZIP archive from Letterboxd (Settings -> Data -> Export Your Data), as it is, without unpacking it.
+        Only `diary.csv`, `reviews.csv`, `likes/films.csv` and `watchlist.csv` in its root are read; nothing of the
+        upload is stored.
+
+        The export names films without TMDB IDs, so each film is mapped to a movie: first a movie the user can use
+        already (same title and release year, give or take one year), then the match on TMDB (title and year), then,
+        if TMDB does not know the film, a manual movie. A film is left out if TMDB fails for it
+        (`failedFilms` of the result).
+        Viewings are imported with date, rating, rewatch flag and review; `liked` is set for all viewings of a film that
+        Letterboxd marks as liked. Watchlist items get the date they were added on Letterboxd.
+
+        This takes a while for a big diary, so the import runs in the background: the response is 202 with the
+        job, whose progress `GET /api/imports/letterboxd/{importId}` returns. Importing the same export again is safe:
+        viewings (same movie, same day) and watchlist items that exist are skipped.
+        Imports are kept in memory, so they are gone after a server restart. Uploading the file again picks up where the import
+        left off.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: The ZIP archive from Letterboxd, at most 10 MB.
+      responses:
+        '202':
+          description: The import has been started
+          headers:
+            Location:
+              description: URL of the import
+              schema: { type: string, format: uri }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportJob' }
+        '400':
+          description: |
+            The file is missing, larger than 10 MB, or not a ZIP archive with a Letterboxd export.
+            The reason is in `errors`.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ValidationProblemDetails' }
+        '409':
+          description: The user has an import that has not finished.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /api/imports/letterboxd/{importId}:
+    parameters:
+      - name: importId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Import]
+      operationId: getLetterboxdImport
+      summary: Get the progress or the result of an import
+      description: |
+        Poll this while `status` is `running`. Other users' imports, and imports from before a server restart,
+        are answered with 404.
+      responses:
+        '200':
+          description: The import
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportJob' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
 components:
   parameters:
     MovieId:
@@ -645,3 +725,73 @@ components:
               additionalProperties:
                 type: array
                 items: { type: string }
+
+    ImportJob:
+      type: object
+      required: [id, status, filmsTotal, filmsProcessed]
+      properties:
+        id: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [running, completed, failed]
+          description: '`running` also covers waiting for another import to finish.'
+        filmsTotal:
+          type: integer
+          format: int32
+          description: The number of different films in the diary and the watchlist. 0 until the import has started.
+        filmsProcessed:
+          type: integer
+          format: int32
+          description: How many of the films have been looked up so far.
+        result:
+          description: Set once the import has completed.
+          allOf:
+            - $ref: '#/components/schemas/ImportResult'
+          nullable: true
+        error:
+          type: string
+          nullable: true
+          description: Set if the import has failed.
+
+    ImportResult:
+      type: object
+      required:
+        - diaryEntriesImported
+        - diaryEntriesSkipped
+        - watchlistItemsImported
+        - watchlistItemsSkipped
+        - manualMovies
+        - failedFilms
+        - warnings
+      properties:
+        diaryEntriesImported: { type: integer, format: int32 }
+        diaryEntriesSkipped:
+          type: integer
+          format: int32
+          description: Viewings that were in the diary already (same movie, same day), e.g. from an earlier import.
+        watchlistItemsImported: { type: integer, format: int32 }
+        watchlistItemsSkipped:
+          type: integer
+          format: int32
+          description: Films that were on the watchlist already.
+        manualMovies:
+          type: array
+          description: Films that TMDB does not know (or the server has no TMDB access), added as manual movies.
+          items: { $ref: '#/components/schemas/ImportFilm' }
+        failedFilms:
+          type: array
+          description: |
+            Films that could not be looked up because TMDB failed. They were not imported,
+            importing again retries them.
+          items: { $ref: '#/components/schemas/ImportFilm' }
+        warnings:
+          type: array
+          description: Rows of the export that were skipped, and why. Shortened if there are many.
+          items: { type: string }
+
+    ImportFilm:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        year: { type: integer, format: int32, nullable: true }
