@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using MovieTracker.Application;
 using MovieTracker.Application.Genres;
 using MovieTracker.Application.Letterboxd;
 using MovieTracker.Application.Tmdb;
+using MovieTracker.Application.Users;
 using MovieTracker.Infrastructure.Letterboxd;
 using MovieTracker.Infrastructure.Persistence;
 using MovieTracker.Infrastructure.Persistence.Repositories;
@@ -22,7 +24,9 @@ public static class DependencyInjection
             .UseNpgsql(PostgresConnectionString.Normalize(connectionString))
             .UseSnakeCaseNamingConvention());
 
+        services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<IGenreRepository, GenreRepository>();
+        services.AddScoped<IUserRepository, UserRepository>();
 
         services.AddSingleton(tmdbOptions);
         services.AddHttpClient<ITmdbClient, TmdbClient>();
