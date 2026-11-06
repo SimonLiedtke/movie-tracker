@@ -1,4 +1,4 @@
-using MovieTracker.Infrastructure.Letterboxd;
+using MovieTracker.Application.Letterboxd;
 using MovieTracker.Application.Tmdb;
 
 namespace MovieTracker.Api.Tests;

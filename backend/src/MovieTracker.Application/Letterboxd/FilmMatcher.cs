@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Text;
 using MovieTracker.Application.Tmdb;
 
-namespace MovieTracker.Infrastructure.Letterboxd;
+namespace MovieTracker.Application.Letterboxd;
 
 /// <summary>
 /// Decides whether a movie is the film a Letterboxd export means. The export only has the name and the release year,

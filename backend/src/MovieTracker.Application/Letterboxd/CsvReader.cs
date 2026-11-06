@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace MovieTracker.Infrastructure.Letterboxd;
+namespace MovieTracker.Application.Letterboxd;
 
 /// <summary>One CSV row, addressed by the column names of the header row.</summary>
 internal sealed class CsvRecord(IReadOnlyDictionary<string, string> values)

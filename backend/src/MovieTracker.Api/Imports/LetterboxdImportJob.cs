@@ -1,10 +1,10 @@
 using MovieTracker.Api.Contracts;
-using MovieTracker.Infrastructure.Letterboxd;
+using MovieTracker.Application.Letterboxd;
 
 namespace MovieTracker.Api.Imports;
 
 /// <summary>
-/// One Letterboxd import. Created by the upload, worked on by <see cref="LetterboxdImporter"/> on the background
+/// One Letterboxd import. Created by the upload, worked on by <see cref="ILetterboxdImporter"/> on the background
 /// worker and read by the polling client, hence the lock.
 /// </summary>
 public sealed class LetterboxdImportJob(Guid userId, LetterboxdExport export)

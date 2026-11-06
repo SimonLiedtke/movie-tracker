@@ -1,4 +1,4 @@
-namespace MovieTracker.Infrastructure.Letterboxd;
+namespace MovieTracker.Application.Letterboxd;
 
 /// <summary>
 /// A film as Letterboxd names it. The export has no TMDB IDs, so name and year are all there is to find the film again.

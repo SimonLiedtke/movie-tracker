@@ -1,4 +1,4 @@
-using MovieTracker.Infrastructure.Letterboxd;
+using MovieTracker.Application.Letterboxd;
 
 namespace MovieTracker.Api.Imports;
 
@@ -19,7 +19,7 @@ internal sealed class LetterboxdImportWorker(
             try
             {
                 await using var scope = scopeFactory.CreateAsyncScope();
-                var importer = scope.ServiceProvider.GetRequiredService<LetterboxdImporter>();
+                var importer = scope.ServiceProvider.GetRequiredService<ILetterboxdImporter>();
                 var result = await importer.ImportAsync(job.UserId, job.Export, job.Progress, stoppingToken);
                 logger.LogInformation(
                     "Letterboxd import {JobId}: {DiaryImported} viewings and {WatchlistImported} watchlist items imported, "

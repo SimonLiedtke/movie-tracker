@@ -1,4 +1,4 @@
-namespace MovieTracker.Infrastructure.Letterboxd;
+namespace MovieTracker.Application.Letterboxd;
 
 /// <param name="DiaryEntriesSkipped">Viewings that were in the diary already (same movie, same day).</param>
 /// <param name="WatchlistItemsSkipped">Films that were on the watchlist already.</param>

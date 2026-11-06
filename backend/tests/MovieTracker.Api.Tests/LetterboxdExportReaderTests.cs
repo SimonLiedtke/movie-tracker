@@ -1,7 +1,7 @@
 using System.IO.Compression;
 using System.Text;
 using MovieTracker.Api.Tests.Infrastructure;
-using MovieTracker.Infrastructure.Letterboxd;
+using MovieTracker.Application.Letterboxd;
 using static MovieTracker.Api.Tests.Infrastructure.LetterboxdZip;
 
 namespace MovieTracker.Api.Tests;

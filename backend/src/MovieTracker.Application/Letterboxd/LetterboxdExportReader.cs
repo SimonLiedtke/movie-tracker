@@ -2,7 +2,7 @@ using System.Globalization;
 using System.IO.Compression;
 using System.Text;
 
-namespace MovieTracker.Infrastructure.Letterboxd;
+namespace MovieTracker.Application.Letterboxd;
 
 /// <summary>
 /// Reads the ZIP archive from Letterboxd (Settings -> Data -> Export Your Data). Only these files are used,

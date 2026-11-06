@@ -1,4 +1,4 @@
-namespace MovieTracker.Infrastructure.Letterboxd;
+namespace MovieTracker.Application.Letterboxd;
 
 /// <summary>
 /// How far an import has come. The caller creates it and hands it to <see cref="LetterboxdImporter"/>, which fills it from
@@ -16,7 +16,9 @@ public sealed class LetterboxdImportProgress
     /// <summary>How many of the films have been looked up so far.</summary>
     public int FilmsProcessed => Volatile.Read(ref _filmsProcessed);
 
-    internal void Start(int filmsTotal) => Volatile.Write(ref _filmsTotal, filmsTotal);
+    /// <summary>Called by the importer once it knows how many films there are.</summary>
+    public void Start(int filmsTotal) => Volatile.Write(ref _filmsTotal, filmsTotal);
 
-    internal void FilmProcessed() => Interlocked.Increment(ref _filmsProcessed);
+    /// <summary>Called by the importer after each film, possibly from several threads at once.</summary>
+    public void FilmProcessed() => Interlocked.Increment(ref _filmsProcessed);
 }
