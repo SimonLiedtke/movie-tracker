@@ -125,3 +125,36 @@ export interface User {
   name: string;
   pictureUrl: string | null;
 }
+
+export type ImportStatus = 'running' | 'completed' | 'failed';
+
+/** A film as Letterboxd names it. */
+export interface ImportFilm {
+  name: string;
+  year: number | null;
+}
+
+export interface ImportResult {
+  diaryEntriesImported: number;
+  /** Viewings that were in the diary already (same movie, same day). */
+  diaryEntriesSkipped: number;
+  watchlistItemsImported: number;
+  /** Films that were on the watchlist already. */
+  watchlistItemsSkipped: number;
+  /** Films TMDB does not know (or the server has no TMDB access): added as manual movies. */
+  manualMovies: ImportFilm[];
+  /** Films that could not be looked up because TMDB failed. Not imported; importing again retries them. */
+  failedFilms: ImportFilm[];
+  /** Rows of the export that were skipped, and why. */
+  warnings: string[];
+}
+
+export interface ImportJob {
+  id: string;
+  status: ImportStatus;
+  /** The number of different films in the diary and the watchlist; 0 until the import has started. */
+  filmsTotal: number;
+  filmsProcessed: number;
+  result: ImportResult | null;
+  error: string | null;
+}

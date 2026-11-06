@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { MoviesApi, WatchlistApi } from './api';
+import { LetterboxdImportApi, MoviesApi, WatchlistApi } from './api';
 
 describe('API services', () => {
   let http: HttpTestingController;
@@ -47,6 +47,26 @@ describe('API services', () => {
     const request = http.expectOne('/api/watchlist/42');
     expect(request.request.method).toBe('PUT');
     expect(request.request.body).toEqual({ note: "Director's cut" });
+    request.flush({});
+  });
+
+  it('uploads a Letterboxd export as a file in a multipart form', () => {
+    const file = new File(['zip'], 'export.zip', { type: 'application/zip' });
+    TestBed.inject(LetterboxdImportApi).start(file).subscribe();
+
+    const request = http.expectOne('/api/imports/letterboxd');
+    expect(request.request.method).toBe('POST');
+    const body = request.request.body as FormData;
+    expect(body.get('file')).toBeInstanceOf(File);
+    expect((body.get('file') as File).name).toBe('export.zip');
+    request.flush({});
+  });
+
+  it('asks for the progress of an import', () => {
+    TestBed.inject(LetterboxdImportApi).get('abc').subscribe();
+
+    const request = http.expectOne('/api/imports/letterboxd/abc');
+    expect(request.request.method).toBe('GET');
     request.flush({});
   });
 });
