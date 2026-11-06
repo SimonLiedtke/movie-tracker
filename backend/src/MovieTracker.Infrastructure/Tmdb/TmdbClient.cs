@@ -12,6 +12,9 @@ internal sealed class TmdbClient : ITmdbClient
 {
     private const string PosterBaseUrl = "https://image.tmdb.org/t/p/w500";
 
+    /// <summary>The language in which <see cref="FindMoviesAsync"/> compares titles: Letterboxd names films in English.</summary>
+    private const string MatchingLanguage = "en-US";
+
     // Same limits as the database columns.
     private const int MaxTitleLength = 300;
     private const int MaxOverviewLength = 5000;
@@ -33,9 +36,21 @@ internal sealed class TmdbClient : ITmdbClient
 
     public bool IsConfigured => _options.IsConfigured;
 
-    public async Task<IReadOnlyList<TmdbSearchResult>> SearchMoviesAsync(string query, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<TmdbSearchResult>> SearchMoviesAsync(string query, CancellationToken cancellationToken) =>
+        SearchAsync(query, year: null, _options.Language, cancellationToken);
+
+    public Task<IReadOnlyList<TmdbSearchResult>> FindMoviesAsync(string title, int? year, CancellationToken cancellationToken) =>
+        SearchAsync(title, year, MatchingLanguage, cancellationToken);
+
+    private async Task<IReadOnlyList<TmdbSearchResult>> SearchAsync(
+        string query, int? year, string language, CancellationToken cancellationToken)
     {
-        var url = $"search/movie?query={Uri.EscapeDataString(query)}&include_adult=false&page=1&language={Uri.EscapeDataString(_options.Language)}";
+        var url = $"search/movie?query={Uri.EscapeDataString(query)}&include_adult=false&page=1&language={Uri.EscapeDataString(language)}";
+        if (year is not null)
+        {
+            url += $"&year={year.Value.ToString(CultureInfo.InvariantCulture)}";
+        }
+
         var page = await GetAsync<SearchPage>(url, cancellationToken)
             ?? throw new TmdbUnavailableException("TMDB returned an empty search response.");
 

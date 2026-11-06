@@ -7,6 +7,7 @@ import {
   DiaryEntryRequest,
   DiaryQuery,
   Genre,
+  ImportJob,
   Movie,
   MovieQuery,
   MovieRequest,
@@ -119,5 +120,22 @@ export class WatchlistApi {
 
   remove(movieId: string): Observable<void> {
     return this.http.delete<void>(`${BASE}/watchlist/${movieId}`);
+  }
+}
+
+@Injectable({ providedIn: 'root' })
+export class LetterboxdImportApi {
+  private readonly http = inject(HttpClient);
+
+  /** Uploads the ZIP archive of a Letterboxd export. The import runs on the server in the background. */
+  start(file: File): Observable<ImportJob> {
+    const body = new FormData();
+    body.append('file', file);
+    return this.http.post<ImportJob>(`${BASE}/imports/letterboxd`, body);
+  }
+
+  /** The progress of an import, or its result. 404 if the server does not know the import (any more). */
+  get(id: string): Observable<ImportJob> {
+    return this.http.get<ImportJob>(`${BASE}/imports/letterboxd/${id}`);
   }
 }

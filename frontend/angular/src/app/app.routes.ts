@@ -43,6 +43,12 @@ const protectedRoutes: Routes = [
     title: 'Watchlist · Movie Tracker',
     loadComponent: () => import('./features/watchlist/watchlist').then((m) => m.Watchlist),
   },
+  {
+    path: 'import',
+    title: 'Import from Letterboxd · Movie Tracker',
+    loadComponent: () =>
+      import('./features/import/letterboxd-import').then((m) => m.LetterboxdImport),
+  },
 ];
 
 export const routes: Routes = [

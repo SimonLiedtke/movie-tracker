@@ -12,6 +12,14 @@ public interface ITmdbClient
     /// <exception cref="TmdbUnavailableException">TMDB could not be reached or answered with an error.</exception>
     Task<IReadOnlyList<TmdbSearchResult>> SearchMoviesAsync(string query, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Searches by title, optionally only movies released in the given year. Unlike <see cref="SearchMoviesAsync"/>, the titles
+    /// are always TMDB's English ones, whatever language is configured: this is for finding the movie that another source
+    /// (e.g. Letterboxd) means by comparing titles, not for showing results.
+    /// </summary>
+    /// <exception cref="TmdbUnavailableException">TMDB could not be reached or answered with an error.</exception>
+    Task<IReadOnlyList<TmdbSearchResult>> FindMoviesAsync(string title, int? year, CancellationToken cancellationToken);
+
     /// <summary>Returns null if TMDB does not know the ID.</summary>
     /// <exception cref="TmdbUnavailableException">TMDB could not be reached or answered with an error.</exception>
     Task<TmdbMovie?> GetMovieAsync(int tmdbId, CancellationToken cancellationToken);

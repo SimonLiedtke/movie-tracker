@@ -116,6 +116,29 @@ Without a token the app still works: the search then only finds your manually ad
 TMDB's [terms](https://www.themoviedb.org/api-terms-of-use) require the attribution shown in the
 footer of the frontend.
 
+## Importing from Letterboxd
+
+The **Import** page of the frontend (`/import`) brings the diary and watchlist over from
+[Letterboxd](https://letterboxd.com/). On Letterboxd, open **Settings -> Data -> Export your data**, then
+upload the ZIP archive as it is, without unpacking it.
+
+- What is imported: the viewings of `diary.csv` (date, rating, rewatch), their reviews (`reviews.csv`), likes
+  (`likes/films.csv`; Letterboxd likes films, so all viewings of a liked film are liked here) and `watchlist.csv`
+  (with the date the film was added). Nothing else in the archive, e.g. the profile, is read, and the upload
+  is not stored.
+- The export contains no TMDB IDs, so each film is mapped to a movie by title and release year (one year off
+  is accepted): first to a movie you can use already, then to the match on TMDB, which is
+  saved like any movie from the movie search. A film that TMDB does not know becomes a manual movie (private to you,
+  dated to the first day of its year). Without a TMDB access token, all films become manual movies. If TMDB fails
+  for a film, it is left out and reported, and not turned into a manual movie.
+- It takes a while for a big diary (a few TMDB requests per film), so the import runs in the background and
+  the page shows its progress. Imports are kept in memory only; after a server restart, upload the file again.
+- Importing the same export again is safe: viewings (same movie, same day) and watchlist items that exist
+  are skipped, and movies that are known are not looked up on TMDB again. This is also how you retry the
+  films that were left out, or import a newer export.
+- The API is `POST /api/imports/letterboxd` (multipart upload, answers 202) and
+  `GET /api/imports/letterboxd/{importId}`, see `api/openapi.yaml`.
+
 ## Running the tests
 
 ```bash

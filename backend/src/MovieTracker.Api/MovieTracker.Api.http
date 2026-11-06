@@ -98,3 +98,22 @@ Content-Type: application/json
 GET {{baseUrl}}/api/watchlist
 Cookie: movie_tracker_session={{session}}
 X-CSRF: 1
+
+### Import a Letterboxd export (multipart upload: put the ZIP next to this file or adjust the path)
+# @name startImport
+POST {{baseUrl}}/api/imports/letterboxd
+Cookie: movie_tracker_session={{session}}
+X-CSRF: 1
+Content-Type: multipart/form-data; boundary=----movietracker
+
+------movietracker
+Content-Disposition: form-data; name="file"; filename="letterboxd-export.zip"
+Content-Type: application/zip
+
+< ./letterboxd-export.zip
+------movietracker--
+
+### Progress and result of the import (repeat until "status" is no longer "running")
+GET {{baseUrl}}/api/imports/letterboxd/{{startImport.response.body.$.id}}
+Cookie: movie_tracker_session={{session}}
+X-CSRF: 1
