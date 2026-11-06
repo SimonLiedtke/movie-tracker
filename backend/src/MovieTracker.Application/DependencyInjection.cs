@@ -3,6 +3,7 @@ using MovieTracker.Application.Diary;
 using MovieTracker.Application.Genres;
 using MovieTracker.Application.Movies;
 using MovieTracker.Application.Users;
+using MovieTracker.Application.Watchlist;
 
 namespace MovieTracker.Application;
 
@@ -15,6 +16,7 @@ public static class DependencyInjection
         services.AddScoped<GenreService>();
         services.AddScoped<MovieService>();
         services.AddScoped<UserAccountService>();
+        services.AddScoped<WatchlistService>();
         return services;
     }
 }

@@ -1,6 +1,7 @@
 using MovieTracker.Application;
 using MovieTracker.Application.Diary;
 using MovieTracker.Application.Movies;
+using MovieTracker.Application.Watchlist;
 using MovieTracker.Domain.Movies;
 
 namespace MovieTracker.Api.Contracts;
@@ -25,6 +26,8 @@ internal static class Mappings
         entry.IsRewatch,
         entry.Liked,
         entry.CreatedAt);
+
+    public static WatchlistItemResponse ToResponse(this WatchlistItemView item) => new(item.Movie.ToResponse(), item.AddedAt, item.Note);
 
     public static MovieSummaryResponse ToResponse(this MovieSummary movie) => new(
         movie.Id,

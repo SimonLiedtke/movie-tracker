@@ -7,6 +7,7 @@ using MovieTracker.Application.Letterboxd;
 using MovieTracker.Application.Movies;
 using MovieTracker.Application.Tmdb;
 using MovieTracker.Application.Users;
+using MovieTracker.Application.Watchlist;
 using MovieTracker.Infrastructure.Letterboxd;
 using MovieTracker.Infrastructure.Persistence;
 using MovieTracker.Infrastructure.Persistence.Repositories;
@@ -31,6 +32,7 @@ public static class DependencyInjection
         services.AddScoped<IGenreRepository, GenreRepository>();
         services.AddScoped<IMovieRepository, MovieRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IWatchlistRepository, WatchlistRepository>();
 
         services.AddSingleton(tmdbOptions);
         services.AddHttpClient<ITmdbClient, TmdbClient>();
