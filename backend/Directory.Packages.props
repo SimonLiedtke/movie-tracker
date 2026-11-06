@@ -19,6 +19,8 @@
   <ItemGroup Label="Transitive pins">
     <!-- GHSA-v5pm-xwqc-g5wc: Microsoft.AspNetCore.OpenApi pulls in 2.0.0 by default -->
     <PackageVersion Include="Microsoft.OpenApi" Version="2.7.5" />
+    <!-- GHSA-r955-8q5j-3h83: Microsoft.AspNetCore.DataProtection.EntityFrameworkCore pulls in a vulnerable version -->
+    <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.14" />
     <!-- Npgsql.EntityFrameworkCore.PostgreSQL pulls in an older EF Core than Microsoft.EntityFrameworkCore.Design,
          so Infrastructure and Api would otherwise be built against different EF Core versions. -->
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.10" />
