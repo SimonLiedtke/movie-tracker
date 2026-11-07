@@ -2,6 +2,7 @@
 
 Personal movie tracker (similar to Letterboxd, without the social features).
 API-driven backend in C# with PostgreSQL, multiple frontends (Angular, Vue, React, MAUI).
+There are an Angular and a Vue frontend so far; both do the same.
 
 ## Structure
 
@@ -9,7 +10,7 @@ API-driven backend in C# with PostgreSQL, multiple frontends (Angular, Vue, Reac
 |-------------|----------------------------------------------------------|
 | `api/`      | OpenAPI specification -- the contract for all components |
 | `backend/`  | ASP.NET Core API, use cases, domain model, EF Core persistence |
-| `frontend/` | Frontends, e.g. `frontend/angular/` (Angular + Bulma)    |
+| `frontend/` | Frontends: `frontend/angular/` (Angular + Bulma), `frontend/vue/` (Vue + Bulma) |
 
 ## Backend layers
 
@@ -96,7 +97,8 @@ One-time setup for local development:
 1. In the [Google Cloud console](https://console.cloud.google.com/apis/credentials), configure the
    OAuth consent screen (while it is in "Testing" mode, add your Google account as a test user).
 2. Create an OAuth client ID of type **Web application** with the authorized redirect URI
-   `http://localhost:4200/api/auth/callback/google` (the Angular dev server forwards `/api` to the backend).
+   `http://localhost:4200/api/auth/callback/google` (the Angular and the Vue dev server both use port 4200
+   and forward `/api` to the backend).
 3. Store the credentials as user secrets (they stay out of the repository):
 
    ```bash
@@ -185,3 +187,19 @@ cd frontend/angular
 npm install
 npm start   # http://localhost:4200, proxies /api to the backend
 ```
+
+## Vue frontend
+
+```bash
+cd frontend/vue
+npm install
+npm start   # http://localhost:4200, proxies /api to the backend
+npm test
+```
+
+It has the same features and pages as the Angular frontend; see [frontend/vue/README.md](frontend/vue/README.md).
+Run only one of the two dev servers at a time: both use port 4200, which the Google OAuth client allows.
+
+The Docker image (see `Dockerfile`) still serves the Angular app. To serve the Vue app instead, build
+`frontend/vue` in the Dockerfile's `frontend` stage (`npm ci && npm run build`) and copy its `dist` folder
+to `wwwroot`.
