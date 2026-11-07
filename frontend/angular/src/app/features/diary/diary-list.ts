@@ -1,11 +1,11 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, ParamMap, Router, RouterLink } from '@angular/router';
 import { Subject, catchError, map, of, startWith, switchMap, tap } from 'rxjs';
 import { DiaryApi } from '../../core/api/api';
 import { ApiError, toApiError } from '../../core/api/api-error';
 import { DiaryEntry, DiaryQuery, PagedResponse } from '../../core/api/models';
-import { yearOf } from '../../shared/dates';
+import { formatDate, formatDay, formatMonth, yearOf } from '../../shared/dates';
 import { ErrorNotification } from '../../shared/error-notification';
 import { Pagination } from '../../shared/pagination';
 import { Rating } from '../../shared/rating';
@@ -21,6 +21,13 @@ function parseQuery(params: ParamMap): DiaryQuery {
   };
 }
 
+interface MonthGroup {
+  /** "YYYY-MM" */
+  key: string;
+  label: string;
+  entries: DiaryEntry[];
+}
+
 @Component({
   selector: 'app-diary-list',
   imports: [RouterLink, Rating, Pagination, ErrorNotification],
@@ -32,10 +39,25 @@ export class DiaryList {
   private readonly diaryApi = inject(DiaryApi);
 
   protected readonly yearOf = yearOf;
+  protected readonly formatDay = formatDay;
   protected readonly query = toSignal(this.route.queryParamMap.pipe(map(parseQuery)), {
     requireSync: true,
   });
   protected readonly result = signal<PagedResponse<DiaryEntry> | null>(null);
+  /** The current page's entries grouped by month, in the order the API returned them. */
+  protected readonly groups = computed<MonthGroup[]>(() => {
+    const groups: MonthGroup[] = [];
+    for (const entry of this.result()?.items ?? []) {
+      const key = entry.watchedOn.slice(0, 7);
+      let group = groups.at(-1);
+      if (group?.key !== key) {
+        group = { key, label: formatMonth(entry.watchedOn), entries: [] };
+        groups.push(group);
+      }
+      group.entries.push(entry);
+    }
+    return groups;
+  });
   protected readonly loading = signal(true);
   protected readonly error = signal<ApiError | null>(null);
 
@@ -90,7 +112,11 @@ export class DiaryList {
   }
 
   protected deleteEntry(entry: DiaryEntry): void {
-    if (!confirm(`Delete the diary entry for "${entry.movie.title}" from ${entry.watchedOn}?`)) {
+    if (
+      !confirm(
+        `Delete the diary entry for "${entry.movie.title}" from ${formatDate(entry.watchedOn)}?`,
+      )
+    ) {
       return;
     }
     this.diaryApi.delete(entry.id).subscribe({
