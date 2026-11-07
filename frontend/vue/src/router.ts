@@ -4,6 +4,7 @@ import { createAuthGuard, createGuestGuard } from './core/auth/auth.guard';
 import {
   diaryEntryFormProps,
   diaryListProps,
+  letterboxdImportProps,
   loginProps,
   movieDetailProps,
   movieFormProps,
@@ -80,6 +81,13 @@ export function createAppRouter(auth: Auth, history: RouterHistory): Router {
       meta: { title: 'Watchlist · Movie Tracker' },
       component: () => import('./features/watchlist/Watchlist.vue'),
       props: watchlistProps,
+    },
+    {
+      path: '/import',
+      name: 'import',
+      meta: { title: 'Import from Letterboxd · Movie Tracker' },
+      component: () => import('./features/import/LetterboxdImport.vue'),
+      props: letterboxdImportProps,
     },
   ];
 

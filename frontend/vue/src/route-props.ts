@@ -48,3 +48,8 @@ export const diaryEntryFormProps = (route: RouteLocationNormalized) => ({
 export const watchlistProps = (route: RouteLocationNormalized) => ({
   page: queryString(route.query['page']),
 });
+
+/** The import to show (none: the upload form). */
+export const letterboxdImportProps = (route: RouteLocationNormalized) => ({
+  jobId: queryString(route.query['job']),
+});
