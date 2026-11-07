@@ -43,3 +43,8 @@ export const diaryEntryFormProps = (route: RouteLocationNormalized) => ({
   id: route.params['id'] as string | undefined,
   movieId: queryString(route.query['movieId']),
 });
+
+/** The page of the watchlist. */
+export const watchlistProps = (route: RouteLocationNormalized) => ({
+  page: queryString(route.query['page']),
+});

@@ -8,6 +8,7 @@ import {
   movieDetailProps,
   movieFormProps,
   movieListProps,
+  watchlistProps,
 } from './route-props';
 
 declare module 'vue-router' {
@@ -72,6 +73,13 @@ export function createAppRouter(auth: Auth, history: RouterHistory): Router {
       meta: { title: 'Edit diary entry · Movie Tracker' },
       component: () => import('./features/diary/DiaryEntryForm.vue'),
       props: diaryEntryFormProps,
+    },
+    {
+      path: '/watchlist',
+      name: 'watchlist',
+      meta: { title: 'Watchlist · Movie Tracker' },
+      component: () => import('./features/watchlist/Watchlist.vue'),
+      props: watchlistProps,
     },
   ];
 
