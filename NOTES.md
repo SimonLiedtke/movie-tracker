@@ -22,6 +22,4 @@
 * backend + frontends: fly.io (or also clever-cloud)
 
 ## out of scope for now, low prio
-* authentication
-* support of multiple users per instance, keep it simple
 * logging
