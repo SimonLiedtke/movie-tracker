@@ -23,3 +23,10 @@ export const movieListProps = (route: RouteLocationNormalized) => ({
 export const movieDetailProps = (route: RouteLocationNormalized) => ({
   id: route.params['id'] as string,
 });
+
+/** The movie to edit (none: add a movie), a title to start with, and where to continue after adding. */
+export const movieFormProps = (route: RouteLocationNormalized) => ({
+  id: route.params['id'] as string | undefined,
+  title: queryString(route.query['title']),
+  next: queryString(route.query['next']),
+});

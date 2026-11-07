@@ -38,10 +38,13 @@ export function provideServices(services: { api?: Api; auth?: Partial<Auth> }): 
  */
 export async function mountRoute(
   url: string,
-  route: RouteRecordRaw,
+  route: RouteRecordRaw | RouteRecordRaw[],
   services: Parameters<typeof provideServices>[0],
 ): Promise<{ page: VueWrapper; router: Router }> {
-  const router = createTestRouter([route, { path: '/:pathMatch(.*)*', component: EmptyPage }]);
+  const router = createTestRouter([
+    ...[route].flat(),
+    { path: '/:pathMatch(.*)*', component: EmptyPage },
+  ]);
   await router.push(url);
   const page = mount(
     { render: () => h(RouterView) },

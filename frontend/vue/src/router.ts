@@ -1,7 +1,7 @@
 import { createRouter, type RouteRecordRaw, type Router, type RouterHistory } from 'vue-router';
 import type { Auth } from './core/auth/auth';
 import { createAuthGuard, createGuestGuard } from './core/auth/auth.guard';
-import { loginProps, movieDetailProps, movieListProps } from './route-props';
+import { loginProps, movieDetailProps, movieFormProps, movieListProps } from './route-props';
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -25,11 +25,25 @@ export function createAppRouter(auth: Auth, history: RouterHistory): Router {
       props: movieListProps,
     },
     {
+      path: '/movies/new',
+      name: 'movie-new',
+      meta: { title: 'Add a movie manually · Movie Tracker' },
+      component: () => import('./features/movies/MovieForm.vue'),
+      props: movieFormProps,
+    },
+    {
       path: '/movies/:id',
       name: 'movie',
       meta: { title: 'Movie · Movie Tracker' },
       component: () => import('./features/movies/MovieDetail.vue'),
       props: movieDetailProps,
+    },
+    {
+      path: '/movies/:id/edit',
+      name: 'movie-edit',
+      meta: { title: 'Edit movie · Movie Tracker' },
+      component: () => import('./features/movies/MovieForm.vue'),
+      props: movieFormProps,
     },
   ];
 
