@@ -1,5 +1,12 @@
-import type { Plugin } from 'vue';
-import { createMemoryHistory, createRouter, type RouteRecordRaw, type Router } from 'vue-router';
+import { mount, type VueWrapper } from '@vue/test-utils';
+import { h, type Plugin } from 'vue';
+import {
+  RouterView,
+  createMemoryHistory,
+  createRouter,
+  type RouteRecordRaw,
+  type Router,
+} from 'vue-router';
 import { apiKey, type Api } from '../core/api/api';
 import { authKey, type Auth } from '../core/auth/auth';
 
@@ -23,4 +30,22 @@ export function provideServices(services: { api?: Api; auth?: Partial<Auth> }): 
       app.provide(authKey, services.auth as Auth);
     }
   };
+}
+
+/**
+ * Shows the page of a route the way the app does, in a router view, and goes to `url`. Every other
+ * path is an empty page.
+ */
+export async function mountRoute(
+  url: string,
+  route: RouteRecordRaw,
+  services: Parameters<typeof provideServices>[0],
+): Promise<{ page: VueWrapper; router: Router }> {
+  const router = createTestRouter([route, { path: '/:pathMatch(.*)*', component: EmptyPage }]);
+  await router.push(url);
+  const page = mount(
+    { render: () => h(RouterView) },
+    { global: { plugins: [router, provideServices(services)] } },
+  );
+  return { page, router };
 }
