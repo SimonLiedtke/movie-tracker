@@ -1,7 +1,10 @@
 <template>
   <main class="section">
     <div class="container">
-      <h1 class="title">🎬 Movie Tracker</h1>
+      <!-- A page stays while only its parameters change, and is replaced by another page. -->
+      <RouterView v-slot="{ Component, route }">
+        <component :is="Component" :key="route.name" />
+      </RouterView>
     </div>
   </main>
 </template>

@@ -1,5 +1,5 @@
-import { createApp } from 'vue';
-import App from './App.vue';
+import { createWebHistory } from 'vue-router';
+import { startApp } from './create-app';
 import './styles.scss';
 
-createApp(App).mount('#app');
+startApp(createWebHistory(), '#app').catch((err) => console.error(err));
