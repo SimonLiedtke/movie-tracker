@@ -1,7 +1,13 @@
 import { createRouter, type RouteRecordRaw, type Router, type RouterHistory } from 'vue-router';
 import type { Auth } from './core/auth/auth';
 import { createAuthGuard, createGuestGuard } from './core/auth/auth.guard';
-import { loginProps, movieDetailProps, movieFormProps, movieListProps } from './route-props';
+import {
+  diaryListProps,
+  loginProps,
+  movieDetailProps,
+  movieFormProps,
+  movieListProps,
+} from './route-props';
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -44,6 +50,13 @@ export function createAppRouter(auth: Auth, history: RouterHistory): Router {
       meta: { title: 'Edit movie · Movie Tracker' },
       component: () => import('./features/movies/MovieForm.vue'),
       props: movieFormProps,
+    },
+    {
+      path: '/diary',
+      name: 'diary',
+      meta: { title: 'Diary · Movie Tracker' },
+      component: () => import('./features/diary/DiaryList.vue'),
+      props: diaryListProps,
     },
   ];
 

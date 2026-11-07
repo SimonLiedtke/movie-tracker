@@ -30,3 +30,10 @@ export const movieFormProps = (route: RouteLocationNormalized) => ({
   title: queryString(route.query['title']),
   next: queryString(route.query['next']),
 });
+
+/** The period and page of the diary. */
+export const diaryListProps = (route: RouteLocationNormalized) => ({
+  from: queryString(route.query['from']),
+  to: queryString(route.query['to']),
+  page: queryString(route.query['page']),
+});
