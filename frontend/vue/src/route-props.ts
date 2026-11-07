@@ -37,3 +37,9 @@ export const diaryListProps = (route: RouteLocationNormalized) => ({
   to: queryString(route.query['to']),
   page: queryString(route.query['page']),
 });
+
+/** The diary entry to edit (none: log a viewing), and a movie to preselect. */
+export const diaryEntryFormProps = (route: RouteLocationNormalized) => ({
+  id: route.params['id'] as string | undefined,
+  movieId: queryString(route.query['movieId']),
+});

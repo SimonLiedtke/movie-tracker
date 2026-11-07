@@ -2,6 +2,7 @@ import { createRouter, type RouteRecordRaw, type Router, type RouterHistory } fr
 import type { Auth } from './core/auth/auth';
 import { createAuthGuard, createGuestGuard } from './core/auth/auth.guard';
 import {
+  diaryEntryFormProps,
   diaryListProps,
   loginProps,
   movieDetailProps,
@@ -57,6 +58,20 @@ export function createAppRouter(auth: Auth, history: RouterHistory): Router {
       meta: { title: 'Diary · Movie Tracker' },
       component: () => import('./features/diary/DiaryList.vue'),
       props: diaryListProps,
+    },
+    {
+      path: '/diary/new',
+      name: 'diary-new',
+      meta: { title: 'Log a viewing · Movie Tracker' },
+      component: () => import('./features/diary/DiaryEntryForm.vue'),
+      props: diaryEntryFormProps,
+    },
+    {
+      path: '/diary/:id/edit',
+      name: 'diary-edit',
+      meta: { title: 'Edit diary entry · Movie Tracker' },
+      component: () => import('./features/diary/DiaryEntryForm.vue'),
+      props: diaryEntryFormProps,
     },
   ];
 
