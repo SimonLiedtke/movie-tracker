@@ -1,7 +1,7 @@
 import { createRouter, type RouteRecordRaw, type Router, type RouterHistory } from 'vue-router';
 import type { Auth } from './core/auth/auth';
 import { createAuthGuard, createGuestGuard } from './core/auth/auth.guard';
-import { loginProps, movieListProps } from './route-props';
+import { loginProps, movieDetailProps, movieListProps } from './route-props';
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -23,6 +23,13 @@ export function createAppRouter(auth: Auth, history: RouterHistory): Router {
       meta: { title: 'My movies · Movie Tracker' },
       component: () => import('./features/movies/MovieList.vue'),
       props: movieListProps,
+    },
+    {
+      path: '/movies/:id',
+      name: 'movie',
+      meta: { title: 'Movie · Movie Tracker' },
+      component: () => import('./features/movies/MovieDetail.vue'),
+      props: movieDetailProps,
     },
   ];
 

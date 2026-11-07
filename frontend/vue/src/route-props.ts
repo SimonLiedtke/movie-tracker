@@ -18,3 +18,8 @@ export const movieListProps = (route: RouteLocationNormalized) => ({
   sort: queryString(route.query['sort']),
   page: queryString(route.query['page']),
 });
+
+/** The movie to show. */
+export const movieDetailProps = (route: RouteLocationNormalized) => ({
+  id: route.params['id'] as string,
+});
