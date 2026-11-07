@@ -1,4 +1,4 @@
-import { HttpError } from './http';
+import { isAxiosError } from 'axios';
 
 /** RFC 9457 problem details, as returned by the backend for errors. */
 interface ProblemDetails {
@@ -17,11 +17,12 @@ export interface ApiError {
 
 /** Turns any error from an API call into a message that can be shown to the user. */
 export function toApiError(error: unknown): ApiError {
-  if (!(error instanceof HttpError)) {
+  if (!isAxiosError(error)) {
     return { status: 0, message: 'An unexpected error occurred.', details: [] };
   }
 
-  if (error.status === 0) {
+  // No response: the request did not get through.
+  if (!error.response) {
     return {
       status: 0,
       message: 'The API cannot be reached. Is the backend running on http://localhost:5080?',
@@ -29,10 +30,10 @@ export function toApiError(error: unknown): ApiError {
     };
   }
 
-  const problem: ProblemDetails =
-    typeof error.error === 'object' && error.error !== null ? error.error : {};
+  const { status, data } = error.response;
+  const problem: ProblemDetails = typeof data === 'object' && data !== null ? data : {};
   const details = Object.values(problem.errors ?? {}).flat();
-  const message = problem.detail ?? problem.title ?? `Request failed (HTTP ${error.status}).`;
+  const message = problem.detail ?? problem.title ?? `Request failed (HTTP ${status}).`;
 
-  return { status: error.status, message, details };
+  return { status, message, details };
 }

@@ -1,9 +1,9 @@
 <script setup lang="ts">
+import { isAxiosError } from 'axios';
 import { onBeforeUnmount, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useApi } from '../../core/api/api';
 import { toApiError, type ApiError } from '../../core/api/api-error';
-import { HttpError } from '../../core/api/http';
 import type { ImportFilm, ImportJob } from '../../core/api/models';
 import ErrorNotification from '../../shared/ErrorNotification.vue';
 
@@ -61,7 +61,7 @@ function poll(id: string): () => void {
       if (stopped) {
         return;
       }
-      if (failure instanceof HttpError && failure.status === 404) {
+      if (isAxiosError(failure) && failure.response?.status === 404) {
         lost.value = true;
       } else {
         error.value = toApiError(failure);

@@ -1,3 +1,9 @@
+import axios, {
+  AxiosError,
+  type AxiosAdapter,
+  type AxiosResponse,
+  type InternalAxiosRequestConfig,
+} from 'axios';
 import { afterEach, beforeEach, vi } from 'vitest';
 
 export interface FlushInit {
@@ -8,21 +14,22 @@ export interface FlushInit {
 /** A request the app has sent and the test has not answered yet. */
 export class PendingRequest {
   readonly method: string;
-  readonly headers: Headers;
-  /** The body as it was passed to `fetch`: a JSON string, a `FormData` or `null`. */
+  readonly headers = new Headers();
+  /** The body as axios hands it to the adapter: a JSON string, a `FormData` or `null`. */
   readonly body: unknown;
   /** The URL with its query string. */
   readonly urlWithParams: string;
 
   constructor(
-    url: string,
-    init: RequestInit | undefined,
-    private readonly answer: (outcome: Response | Error) => void,
+    private readonly config: InternalAxiosRequestConfig,
+    private readonly answer: (outcome: AxiosResponse | AxiosError) => void,
   ) {
-    this.urlWithParams = url;
-    this.method = init?.method ?? 'GET';
-    this.headers = new Headers(init?.headers);
-    this.body = init?.body ?? null;
+    this.urlWithParams = axios.getUri(config);
+    this.method = (config.method ?? 'get').toUpperCase();
+    for (const [name, value] of Object.entries(config.headers.toJSON(true))) {
+      this.headers.set(name, String(value));
+    }
+    this.body = config.data ?? null;
   }
 
   /** The URL without the query string. */
@@ -42,47 +49,62 @@ export class PendingRequest {
   /** Answers with `body` as JSON (no body for `null`/`undefined`) and the given status (200). */
   flush(body?: unknown, { status = 200, statusText = '' }: FlushInit = {}): void {
     const hasBody = body !== undefined && body !== null;
+    // The raw text, like a real adapter: axios parses it after the adapter, and for failures too.
+    const response: AxiosResponse = {
+      data: hasBody ? JSON.stringify(body) : '',
+      status,
+      statusText,
+      headers: hasBody ? { 'content-type': 'application/json' } : {},
+      config: this.config,
+      request: {},
+    };
+    const accepted = this.config.validateStatus ? this.config.validateStatus(status) : true;
     this.answer(
-      new Response(hasBody ? JSON.stringify(body) : null, {
-        status,
-        statusText,
-        headers: hasBody ? { 'Content-Type': 'application/json' } : {},
-      }),
+      accepted
+        ? response
+        : new AxiosError(
+            `Request failed with status code ${status}`,
+            status >= 500 ? AxiosError.ERR_BAD_RESPONSE : AxiosError.ERR_BAD_REQUEST,
+            this.config,
+            {},
+            response,
+          ),
     );
   }
 
   /** The server cannot be reached. */
   networkError(): void {
-    this.answer(new TypeError('Failed to fetch'));
+    this.answer(new AxiosError('Network Error', AxiosError.ERR_NETWORK, this.config, {}));
   }
 }
 
 type Matcher = string | ((request: PendingRequest) => boolean);
 
 /**
- * Stands in for the network: replaces `fetch`, collects the requests, and lets the test answer them
- * (like Angular's HttpTestingController). Register it once per test file with `useFakeBackend()`.
+ * Stands in for the network: replaces axios' adapter, collects the requests, and lets the test answer
+ * them (like Angular's HttpTestingController). Register it once per test file with `useFakeBackend()`.
+ * It applies to the clients that are created after `install()`.
  */
 export class FakeBackend {
   private pending: PendingRequest[] = [];
+  private adapter: typeof axios.defaults.adapter;
 
   install(): void {
     this.pending = [];
-    vi.stubGlobal(
-      'fetch',
-      (input: RequestInfo | URL, init?: RequestInit) =>
-        new Promise<Response>((resolve, reject) => {
-          this.pending.push(
-            new PendingRequest(String(input), init, (outcome) =>
-              outcome instanceof Error ? reject(outcome) : resolve(outcome),
-            ),
-          );
-        }),
-    );
+    this.adapter = axios.defaults.adapter;
+    const fake: AxiosAdapter = (config) =>
+      new Promise((resolve, reject) => {
+        this.pending.push(
+          new PendingRequest(config, (outcome) =>
+            outcome instanceof Error ? reject(outcome) : resolve(outcome),
+          ),
+        );
+      });
+    axios.defaults.adapter = fake;
   }
 
   uninstall(): void {
-    vi.unstubAllGlobals();
+    axios.defaults.adapter = this.adapter;
   }
 
   /**

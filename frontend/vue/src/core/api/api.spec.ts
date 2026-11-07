@@ -85,7 +85,7 @@ describe('API clients', () => {
 
   it('asks for the genres again after a failure', async () => {
     const { genres } = api();
-    const failed = expect(genres.list()).rejects.toMatchObject({ status: 503 });
+    const failed = expect(genres.list()).rejects.toMatchObject({ response: { status: 503 } });
     backend.expectOne('/api/genres').flush(null, { status: 503, statusText: 'Unavailable' });
     await failed;
 

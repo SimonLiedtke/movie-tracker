@@ -66,7 +66,7 @@ describe('Auth', () => {
 
   it('goes to the sign-in page even if signing out failed', async () => {
     const logout = auth.logout();
-    const failed = expect(logout).rejects.toMatchObject({ status: 500 });
+    const failed = expect(logout).rejects.toMatchObject({ response: { status: 500 } });
     backend.expectOne('/api/auth/logout').flush(null, { status: 500, statusText: 'Error' });
     await failed;
 

@@ -1,17 +1,24 @@
 import { describe, expect, it } from 'vitest';
+import { AxiosError, type AxiosResponse } from 'axios';
 import { toApiError } from './api-error';
-import { HttpError } from './http';
+
+/** What axios throws when the server answers with an error status. */
+const failure = (status: number, data: unknown) =>
+  new AxiosError('Request failed', AxiosError.ERR_BAD_REQUEST, undefined, undefined, {
+    status,
+    data,
+  } as AxiosResponse);
 
 describe('toApiError', () => {
   it('explains that the backend is unreachable', () => {
-    const error = toApiError(new HttpError(0, '/api/movies', new TypeError('Failed to fetch')));
+    const error = toApiError(new AxiosError('Network Error', AxiosError.ERR_NETWORK));
     expect(error.status).toBe(0);
     expect(error.message).toContain('cannot be reached');
   });
 
   it('uses the detail of problem details', () => {
     const error = toApiError(
-      new HttpError(409, '/api/movies', {
+      failure(409, {
         title: 'Duplicate TMDB ID',
         detail: 'Another movie with TMDB ID 348 already exists.',
       }),
@@ -25,7 +32,7 @@ describe('toApiError', () => {
 
   it('lists validation errors', () => {
     const error = toApiError(
-      new HttpError(400, '/api/movies', {
+      failure(400, {
         title: 'One or more validation errors occurred.',
         errors: {
           title: ['The title field is required.'],
@@ -38,9 +45,7 @@ describe('toApiError', () => {
   });
 
   it('falls back to the status code', () => {
-    expect(toApiError(new HttpError(500, '/api/movies', 'boom')).message).toBe(
-      'Request failed (HTTP 500).',
-    );
+    expect(toApiError(failure(500, 'boom')).message).toBe('Request failed (HTTP 500).');
   });
 
   it('does not know what went wrong with anything else', () => {

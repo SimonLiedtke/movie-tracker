@@ -1,4 +1,5 @@
-import { HttpError, type HttpInterceptor } from '../api/http';
+import { isAxiosError } from 'axios';
+import type { Http } from '../api/http';
 
 export interface AuthInterceptorOptions {
   /** The session has expired. */
@@ -7,32 +8,38 @@ export interface AuthInterceptorOptions {
   currentUrl: () => string;
 }
 
+const isApi = (url: string | undefined) => !!url?.startsWith('/api/');
+
 /**
  * For API requests: sends the CSRF header the backend requires on state-changing requests, and
  * goes to the sign-in page when the session has expired.
  */
-export function createAuthInterceptor({
-  sessionEnded,
-  currentUrl,
-}: AuthInterceptorOptions): HttpInterceptor {
-  return async (request, next) => {
-    if (!request.url.startsWith('/api/')) {
-      return next(request);
-    }
-
-    const headers = new Headers(request.headers);
-    headers.set('X-CSRF', '1');
-    try {
-      return await next({ ...request, headers });
-    } catch (error) {
-      if (
-        error instanceof HttpError &&
-        error.status === 401 &&
-        !request.url.startsWith('/api/auth/')
-      ) {
-        sessionEnded(currentUrl());
+export function addAuthInterceptors(
+  http: Http,
+  { sessionEnded, currentUrl }: AuthInterceptorOptions,
+): void {
+  // Synchronous: it does not wait for anything, so axios need not wait a tick before it sends the request.
+  http.interceptors.request.use(
+    (config) => {
+      if (isApi(config.url)) {
+        config.headers.set('X-CSRF', '1');
       }
-      throw error;
+      return config;
+    },
+    null,
+    { synchronous: true },
+  );
+
+  http.interceptors.response.use(undefined, (error: unknown) => {
+    // The auth endpoints answer 401 for "not signed in": that is for the Auth service to handle.
+    if (
+      isAxiosError(error) &&
+      error.response?.status === 401 &&
+      isApi(error.config?.url) &&
+      !error.config?.url?.startsWith('/api/auth/')
+    ) {
+      sessionEnded(currentUrl());
     }
-  };
+    return Promise.reject(error);
+  });
 }

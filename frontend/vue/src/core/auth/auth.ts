@@ -1,6 +1,7 @@
+import { isAxiosError } from 'axios';
 import { computed, inject, ref, type InjectionKey } from 'vue';
 import type { RouteLocationRaw } from 'vue-router';
-import { HttpError, type Http } from '../api/http';
+import type { Http } from '../api/http';
 import type { User } from '../api/models';
 
 export interface AuthOptions {
@@ -19,9 +20,9 @@ export function createAuth({ http, navigate }: AuthOptions) {
   /** Asks the API for the signed-in user. Called once on app start. */
   async function load(): Promise<void> {
     try {
-      currentUser.value = await http.get<User>('/api/auth/me');
+      currentUser.value = (await http.get<User>('/api/auth/me')).data;
     } catch (error) {
-      if (!(error instanceof HttpError && error.status === 401)) {
+      if (!(isAxiosError(error) && error.response?.status === 401)) {
         console.error('Could not load the signed-in user', error);
       }
       currentUser.value = null;
@@ -35,7 +36,7 @@ export function createAuth({ http, navigate }: AuthOptions) {
 
   async function logout(): Promise<void> {
     try {
-      await http.post<void>('/api/auth/logout', null);
+      await http.post('/api/auth/logout');
     } finally {
       sessionEnded();
     }
