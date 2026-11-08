@@ -46,6 +46,8 @@ internal sealed class WatchlistRepository(MovieTrackerDbContext db) : IWatchlist
 
     public void Add(WatchlistItem item) => db.WatchlistItems.Add(item);
 
+    public void Remove(WatchlistItem item) => db.WatchlistItems.Remove(item);
+
     public async Task<bool> RemoveAsync(Guid userId, Guid movieId, CancellationToken cancellationToken) =>
         await OwnItems(userId).Where(item => item.MovieId == movieId).ExecuteDeleteAsync(cancellationToken) > 0;
 }

@@ -34,6 +34,34 @@ public sealed class DiaryEntriesTests(ApiFactory factory) : ApiTestBase(factory)
     }
 
     [Fact]
+    public async Task Create_takes_the_movie_off_the_watchlist()
+    {
+        var movie = await CreateMovieAsync();
+        var other = await CreateMovieAsync(title: "Aliens");
+        await Client.PutAsync($"/api/watchlist/{movie.Id}", content: null, Ct);
+        await Client.PutAsync($"/api/watchlist/{other.Id}", content: null, Ct);
+
+        await CreateDiaryEntryAsync(movie.Id);
+
+        var watchlist = await GetAsync<PagedResponse<WatchlistItemResponse>>("/api/watchlist");
+        Assert.Equal(other.Id, Assert.Single(watchlist.Items).Movie.Id);
+        Assert.False((await GetAsync<MovieResponse>($"/api/movies/{movie.Id}")).OnWatchlist);
+    }
+
+    [Fact]
+    public async Task Create_does_not_take_the_movie_off_the_watchlist_of_another_user()
+    {
+        var movie = await ImportTmdbMovieAsync();
+        await Bob.PutAsync($"/api/watchlist/{movie.Id}", content: null, Ct);
+
+        await CreateDiaryEntryAsync(movie.Id);
+
+        var response = await Bob.GetAsync("/api/watchlist", Ct);
+        var watchlist = await ReadAsync<PagedResponse<WatchlistItemResponse>>(response, HttpStatusCode.OK);
+        Assert.Single(watchlist.Items);
+    }
+
+    [Fact]
     public async Task Create_defaults_to_no_rating_and_no_flags()
     {
         var movie = await CreateMovieAsync();
