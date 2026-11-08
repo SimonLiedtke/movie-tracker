@@ -272,6 +272,9 @@ paths:
       tags: [Diary]
       operationId: createDiaryEntry
       summary: Log a viewing
+      description: |
+        The movie has been watched, so it is removed from the user's watchlist (if it is on it) in the same
+        operation. Changing a viewing later does not touch the watchlist.
       requestBody:
         required: true
         content:

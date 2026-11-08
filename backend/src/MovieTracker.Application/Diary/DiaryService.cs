@@ -1,10 +1,15 @@
 using MovieTracker.Application.Movies;
+using MovieTracker.Application.Watchlist;
 using MovieTracker.Domain.Diary;
 
 namespace MovieTracker.Application.Diary;
 
 public sealed class DiaryService(
-    IDiaryRepository diary, IMovieRepository movies, IUnitOfWork unitOfWork, TimeProvider timeProvider)
+    IDiaryRepository diary,
+    IWatchlistRepository watchlist,
+    IMovieRepository movies,
+    IUnitOfWork unitOfWork,
+    TimeProvider timeProvider)
 {
     public Task<PagedResult<DiaryEntryView>> ListAsync(
         Guid userId, DiaryFilter filter, int page, int pageSize, CancellationToken cancellationToken) =>
@@ -25,6 +30,10 @@ public sealed class DiaryService(
     public Task<DiaryEntryView?> GetAsync(Guid userId, Guid entryId, CancellationToken cancellationToken) =>
         diary.GetAsync(userId, entryId, cancellationToken);
 
+    /// <summary>
+    /// Logs the viewing. The movie has been watched, so it is taken off the user's watchlist, in the same save: either
+    /// the viewing is logged and the movie is off the watchlist, or nothing changes.
+    /// </summary>
     public async Task<SaveDiaryEntryResult> CreateAsync(
         Guid userId, DiaryEntryDetails details, CancellationToken cancellationToken)
     {
@@ -40,6 +49,11 @@ public sealed class DiaryService(
 
         var entry = new DiaryEntry(userId, details, timeProvider.GetUtcNow());
         diary.Add(entry);
+        if (await watchlist.FindAsync(userId, details.MovieId, cancellationToken) is { } watchlistItem)
+        {
+            watchlist.Remove(watchlistItem);
+        }
+
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new SaveDiaryEntryResult(SaveDiaryEntryStatus.Saved, await diary.GetAsync(userId, entry.Id, cancellationToken));

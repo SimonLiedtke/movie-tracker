@@ -33,6 +33,8 @@ public sealed class FakeWatchlistRepository(FakeMovieRepository movies) : IWatch
 
     public void Add(WatchlistItem item) => Items.Add(item);
 
+    public void Remove(WatchlistItem item) => Items.Remove(item);
+
     public Task<bool> RemoveAsync(Guid userId, Guid movieId, CancellationToken cancellationToken) =>
         Task.FromResult(Own(userId, movieId) is { } item && Items.Remove(item));
 

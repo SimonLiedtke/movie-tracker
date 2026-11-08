@@ -2,6 +2,7 @@ using MovieTracker.Application.Diary;
 using MovieTracker.Application.Tests.Fakes;
 using MovieTracker.Domain.Diary;
 using MovieTracker.Domain.Movies;
+using MovieTracker.Domain.Watchlist;
 
 namespace MovieTracker.Application.Tests;
 
@@ -14,6 +15,7 @@ public sealed class DiaryServiceTests
 
     private readonly FakeMovieRepository _movies = new();
     private readonly FakeDiaryRepository _diary;
+    private readonly FakeWatchlistRepository _watchlist;
     private readonly FakeUnitOfWork _unitOfWork = new();
     private readonly TestClock _clock = new(Start);
     private readonly DiaryService _service;
@@ -21,7 +23,8 @@ public sealed class DiaryServiceTests
     public DiaryServiceTests()
     {
         _diary = new FakeDiaryRepository(_movies);
-        _service = new DiaryService(_diary, _movies, _unitOfWork, _clock);
+        _watchlist = new FakeWatchlistRepository(_movies);
+        _service = new DiaryService(_diary, _watchlist, _movies, _unitOfWork, _clock);
     }
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -39,6 +42,9 @@ public sealed class DiaryServiceTests
         _movies.Movies.Add(movie);
         return movie;
     }
+
+    private void AddToWatchlist(Guid userId, Movie movie) =>
+        _watchlist.Items.Add(new WatchlistItem(userId, movie.Id, note: "Recommended", Start));
 
     private DiaryEntry AddEntry(Guid userId, Movie movie, string watchedOn = "2026-10-31", int? rating = 8)
     {
@@ -138,6 +144,81 @@ public sealed class DiaryServiceTests
         var result = await _service.CreateAsync(Alice, unknown, Ct);
 
         Assert.Equal(SaveDiaryEntryStatus.FutureDate, result.Status);
+    }
+
+    [Fact]
+    public async Task Create_takes_the_movie_off_the_watchlist()
+    {
+        var movie = AddTmdbMovie();
+        AddToWatchlist(Alice, movie);
+
+        var result = await _service.CreateAsync(Alice, Details(movie), Ct);
+
+        Assert.Equal(SaveDiaryEntryStatus.Saved, result.Status);
+        Assert.Single(_diary.Entries);
+        Assert.Empty(_watchlist.Items);
+        // One save for both changes, so that they succeed or fail together.
+        Assert.Equal(1, _unitOfWork.SaveCount);
+    }
+
+    [Fact]
+    public async Task Create_leaves_the_other_movies_on_the_watchlist()
+    {
+        var alien = AddTmdbMovie(348, "Alien");
+        var aliens = AddTmdbMovie(679, "Aliens");
+        AddToWatchlist(Alice, alien);
+        AddToWatchlist(Alice, aliens);
+
+        await _service.CreateAsync(Alice, Details(alien), Ct);
+
+        Assert.Equal(aliens.Id, Assert.Single(_watchlist.Items).MovieId);
+    }
+
+    [Fact]
+    public async Task Create_leaves_the_watchlists_of_other_users_alone()
+    {
+        var movie = AddTmdbMovie();
+        AddToWatchlist(Bob, movie);
+
+        await _service.CreateAsync(Alice, Details(movie), Ct);
+
+        Assert.Equal(Bob, Assert.Single(_watchlist.Items).UserId);
+    }
+
+    [Fact]
+    public async Task Create_works_for_a_movie_that_is_not_on_the_watchlist()
+    {
+        var movie = AddTmdbMovie();
+
+        var result = await _service.CreateAsync(Alice, Details(movie), Ct);
+
+        Assert.Equal(SaveDiaryEntryStatus.Saved, result.Status);
+        Assert.Empty(_watchlist.Items);
+    }
+
+    [Fact]
+    public async Task Create_keeps_the_movie_on_the_watchlist_when_it_rejects_the_viewing()
+    {
+        var movie = AddTmdbMovie();
+        AddToWatchlist(Alice, movie);
+
+        var result = await _service.CreateAsync(Alice, Details(movie, "2026-11-05"), Ct);
+
+        Assert.Equal(SaveDiaryEntryStatus.FutureDate, result.Status);
+        Assert.Single(_watchlist.Items);
+    }
+
+    [Fact]
+    public async Task Update_does_not_touch_the_watchlist()
+    {
+        var alien = AddTmdbMovie(348, "Alien");
+        var aliens = AddTmdbMovie(679, "Aliens");
+        var entry = AddEntry(Alice, alien);
+        AddToWatchlist(Alice, aliens);
+
+        await _service.UpdateAsync(Alice, entry.Id, Details(aliens), Ct);
+
+        Assert.Single(_watchlist.Items);
     }
 
     // --- Changing a viewing
