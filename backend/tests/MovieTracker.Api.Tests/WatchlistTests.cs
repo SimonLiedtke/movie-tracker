@@ -119,6 +119,19 @@ public sealed class WatchlistTests(ApiFactory factory) : ApiTestBase(factory)
     }
 
     [Fact]
+    public async Task List_and_put_include_the_genres_of_the_movie_alphabetically()
+    {
+        var movie = await CreateMovieAsync(genreIds: [ScienceFiction, Horror]);
+        var put = await Client.PutAsJsonAsync($"/api/watchlist/{movie.Id}", new { }, Ct);
+
+        var created = await ReadAsync<WatchlistItemResponse>(put, HttpStatusCode.Created);
+        var listed = (await GetAsync<PagedResponse<WatchlistItemResponse>>("/api/watchlist")).Items.Single();
+
+        Assert.Equal(["Horror", "Science Fiction"], created.Genres.Select(genre => genre.Name));
+        Assert.Equal(created.Genres, listed.Genres);
+    }
+
+    [Fact]
     public async Task List_with_one_genre_returns_the_movies_with_that_genre()
     {
         await PutGenreMoviesOnTheWatchlistAsync();

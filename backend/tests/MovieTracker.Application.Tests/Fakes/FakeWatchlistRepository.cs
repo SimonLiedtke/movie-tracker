@@ -56,6 +56,9 @@ public sealed class FakeWatchlistRepository(FakeMovieRepository movies) : IWatch
     {
         var movie = movies.Movies.Single(candidate => candidate.Id == item.MovieId);
         return new WatchlistItemView(
-            new MovieRef(movie.Id, movie.Title, movie.ReleaseDate, movie.PosterUrl), item.AddedAt, item.Note);
+            new MovieRef(movie.Id, movie.Title, movie.ReleaseDate, movie.PosterUrl),
+            item.AddedAt,
+            item.Note,
+            movie.Genres.OrderBy(genre => genre.Name).ToList());
     }
 }

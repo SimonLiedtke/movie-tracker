@@ -12,11 +12,13 @@ const item = (id: string, title: string, changes: Partial<WatchlistItem> = {}): 
   movie: { id, title, releaseDate: '1995-12-15', posterUrl: null },
   addedAt: '2026-11-05T21:30:00Z',
   note: null,
+  genres: [],
   ...changes,
 });
 
 const HEAT = item('m1', 'Heat', {
   note: 'Recommended by Alice.',
+  genres: [{ id: 18, name: 'Drama' }],
   movie: {
     id: 'm1',
     title: 'Heat',
@@ -25,6 +27,10 @@ const HEAT = item('m1', 'Heat', {
   },
 });
 const ALIEN = item('m2', 'Alien', {
+  genres: [
+    { id: 27, name: 'Horror' },
+    { id: 878, name: 'Science Fiction' },
+  ],
   movie: { id: 'm2', title: 'Alien', releaseDate: null, posterUrl: null },
 });
 
@@ -144,6 +150,58 @@ describe('Watchlist', () => {
     listRequest(3).flush(paged([ALIEN], { page: 3, totalCount: 45 }));
     await flushPromises();
     expect(page.findAll('article')).toHaveLength(1);
+  });
+
+  describe('genres of a movie', () => {
+    const tags = (article: Pick<VueWrapper, 'findAll'>) => article.findAll('.tags a.tag');
+
+    it('shows them as tags like the movie page, without tags for a movie that has no genres', async () => {
+      const { page } = await openWith([HEAT, ALIEN, item('m3', 'Unknown')]);
+
+      const articles = page.findAll('article');
+      expect(tags(articles[0]).map((t) => t.text())).toEqual(['Drama']);
+      expect(tags(articles[1]).map((t) => t.text())).toEqual(['Horror', 'Science Fiction']);
+      expect(articles[1].get('a.tag').classes()).toEqual(
+        expect.arrayContaining(['tag', 'is-link', 'is-light']),
+      );
+      expect(articles[2].find('.tags').exists()).toBe(false);
+    });
+
+    it('filters by the genre when clicked, leaving the match mode alone, from page 1', async () => {
+      const { page, router } = await openWith(
+        [ALIEN],
+        '/watchlist?genreId=18&genreMatch=all&page=2',
+        paged([ALIEN], { page: 2, totalCount: 21 }),
+        '&genreId=18&genreMatch=all',
+      );
+      const horror = tags(page.get('article')).find((t) => t.text() === 'Horror')!;
+      expect(horror.attributes('href')).toBe('/watchlist?genreId=27&genreMatch=all');
+
+      await horror.trigger('click');
+      await flushPromises();
+
+      expect(router.currentRoute.value.fullPath).toBe('/watchlist?genreId=27&genreMatch=all');
+      listRequest(1, '&genreId=27&genreMatch=all').flush(paged([ALIEN]));
+      await flushPromises();
+      expect(
+        page
+          .findAll('[aria-labelledby=genre-label] button[aria-pressed=true]')
+          .map((b) => b.text()),
+      ).toEqual(['Horror']);
+    });
+
+    it('shows the genres of the filter highlighted', async () => {
+      const { page } = await openWith(
+        [ALIEN],
+        '/watchlist?genreId=27',
+        paged([ALIEN]),
+        '&genreId=27&genreMatch=any',
+      );
+
+      const [horror, scienceFiction] = tags(page.get('article'));
+      expect(horror.classes()).not.toContain('is-light');
+      expect(scienceFiction.classes()).toContain('is-light');
+    });
   });
 
   describe('genre filter', () => {

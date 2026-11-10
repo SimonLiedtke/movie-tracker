@@ -16,9 +16,16 @@ const item = (id: string, title: string): WatchlistItem => ({
   movie: { id, title, releaseDate: '1979-05-25', posterUrl: null },
   addedAt: '2026-11-05T21:30:00Z',
   note: null,
+  genres: [],
 });
-const ALIEN = item('m1', 'Alien');
-const HEAT = item('m2', 'Heat');
+const ALIEN: WatchlistItem = {
+  ...item('m1', 'Alien'),
+  genres: [
+    { id: 27, name: 'Horror' },
+    { id: 878, name: 'Science Fiction' },
+  ],
+};
+const HEAT: WatchlistItem = { ...item('m2', 'Heat'), genres: [{ id: 18, name: 'Drama' }] };
 
 const paged = (
   items: WatchlistItem[],
@@ -55,7 +62,9 @@ describe('Watchlist genre filter', () => {
       .filter((b) => b.getAttribute('aria-pressed') === 'true')
       .map((b) => b.textContent!.trim());
   const titles = () =>
-    Array.from(page().querySelectorAll('article .media-content a')).map((a) => a.textContent);
+    Array.from(page().querySelectorAll('article .media-content p:first-child a')).map(
+      (a) => a.textContent,
+    );
 
   /** `filter` is the rest of the query string, e.g. `&genreId=27&genreMatch=any`. */
   const listRequest = (filter = '', pageNumber = 1) =>
@@ -231,6 +240,53 @@ describe('Watchlist genre filter', () => {
       '',
       paged([HEAT]),
     );
+  });
+
+  describe('genres of a movie', () => {
+    const tags = (article: Element) =>
+      Array.from(article.querySelectorAll<HTMLAnchorElement>('.tags a.tag'));
+
+    it('shows them as tags like the movie page, without tags for a movie that has no genres', async () => {
+      await open('/watchlist', '', paged([ALIEN, HEAT, item('m3', 'Unknown')]));
+
+      const articles = Array.from(page().querySelectorAll('article'));
+      expect(tags(articles[0]).map((t) => t.textContent!.trim())).toEqual([
+        'Horror',
+        'Science Fiction',
+      ]);
+      expect(tags(articles[1]).map((t) => t.textContent!.trim())).toEqual(['Drama']);
+      expect(tags(articles[0])[0].classList).toContain('is-light');
+      expect(articles[2].querySelector('.tags')).toBeNull();
+    });
+
+    it('filters by the genre when clicked, leaving the match mode alone, from page 1', async () => {
+      await open(
+        '/watchlist?genreId=18&genreMatch=all&page=2',
+        '&genreId=18&genreMatch=all',
+        paged([ALIEN], { page: 2, totalCount: 21 }),
+      );
+      const horror = tags(page().querySelector('article')!).find(
+        (t) => t.textContent!.trim() === 'Horror',
+      )!;
+      expect(horror.getAttribute('href')).toBe('/watchlist?genreId=27&genreMatch=all');
+
+      await click(
+        horror,
+        '/watchlist?genreId=27&genreMatch=all',
+        '&genreId=27&genreMatch=all',
+        paged([ALIEN]),
+      );
+
+      expect(selectedGenres()).toEqual(['Horror']);
+    });
+
+    it('shows the genres of the filter highlighted', async () => {
+      await open('/watchlist?genreId=27', '&genreId=27&genreMatch=any', paged([ALIEN]));
+
+      const [horror, scienceFiction] = tags(page().querySelector('article')!);
+      expect(horror.classList).not.toContain('is-light');
+      expect(scienceFiction.classList).toContain('is-light');
+    });
   });
 
   it('still shows the watchlist if the genres cannot be loaded', async () => {

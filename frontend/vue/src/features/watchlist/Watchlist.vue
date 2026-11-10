@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, type RouteLocationRaw } from 'vue-router';
 import { useApi } from '../../core/api/api';
 import { toApiError, type ApiError } from '../../core/api/api-error';
 import type {
@@ -107,6 +107,13 @@ function toggleGenre(genre: Genre): void {
 function setGenreMatch(match: GenreMatch): void {
   // "any" is the default, so it needs no parameter.
   updateFilter({ genreMatch: match === 'all' ? 'all' : undefined });
+}
+
+/** Where a genre tag leads: the watchlist filtered by this genre only, from page 1. */
+function genreFilterLink(genre: Genre): RouteLocationRaw {
+  return {
+    query: mergeQuery(router.currentRoute.value.query, { genreId: [genre.id], page: undefined }),
+  };
 }
 
 function clearFilter(): void {
@@ -263,6 +270,17 @@ async function remove(item: WatchlistItem): Promise<void> {
             >
           </p>
           <p class="is-size-7 has-text-grey">Added {{ item.addedAt.slice(0, 10) }}</p>
+          <div v-if="item.genres.length" class="tags mt-2 mb-0">
+            <RouterLink
+              v-for="genre in item.genres"
+              :key="genre.id"
+              class="tag is-link"
+              :class="{ 'is-light': !query.genreIds?.includes(genre.id) }"
+              :to="genreFilterLink(genre)"
+            >
+              {{ genre.name }}
+            </RouterLink>
+          </div>
 
           <form
             v-if="editing === item.movie.id"

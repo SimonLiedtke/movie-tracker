@@ -1,8 +1,10 @@
 using MovieTracker.Application.Movies;
+using MovieTracker.Domain.Movies;
 
 namespace MovieTracker.Application.Watchlist;
 
-public sealed record WatchlistItemView(MovieRef Movie, DateTimeOffset AddedAt, string? Note);
+/// <param name="Genres">The movie's genres, alphabetically.</param>
+public sealed record WatchlistItemView(MovieRef Movie, DateTimeOffset AddedAt, string? Note, IReadOnlyList<Genre> Genres);
 
 /// <summary>How the genres of a <see cref="WatchlistFilter"/> are combined.</summary>
 public enum GenreMatch

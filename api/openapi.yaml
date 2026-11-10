@@ -678,11 +678,15 @@ components:
 
     WatchlistItem:
       type: object
-      required: [movie, addedAt]
+      required: [movie, addedAt, genres]
       properties:
         movie: { $ref: '#/components/schemas/MovieRef' }
         addedAt: { type: string, format: date-time }
         note: { type: string, nullable: true }
+        genres:
+          type: array
+          description: The movie's genres, alphabetically
+          items: { $ref: '#/components/schemas/Genre' }
 
     WatchlistItemInput:
       type: object

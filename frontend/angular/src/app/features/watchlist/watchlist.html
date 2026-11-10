@@ -82,6 +82,21 @@
           }
         </p>
         <p class="is-size-7 has-text-grey">Added {{ item.addedAt.slice(0, 10) }}</p>
+        @if (item.genres.length) {
+          <div class="tags mt-2 mb-0">
+            @for (genre of item.genres; track genre.id) {
+              <a
+                class="tag is-link"
+                [class.is-light]="!isSelected(genre)"
+                [routerLink]="[]"
+                [queryParams]="{ genreId: [genre.id], page: null }"
+                queryParamsHandling="merge"
+              >
+                {{ genre.name }}
+              </a>
+            }
+          </div>
+        }
 
         @if (editing() === item.movie.id) {
           <form

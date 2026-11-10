@@ -112,6 +112,8 @@ export interface WatchlistItem {
   movie: MovieRef;
   addedAt: string;
   note: string | null;
+  /** The movie's genres, alphabetically. */
+  genres: Genre[];
 }
 
 export interface PageQuery {
