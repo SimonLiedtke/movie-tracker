@@ -214,6 +214,171 @@ describe('Watchlist', () => {
     });
   });
 
+  describe('release date filter', () => {
+    const input = (page: VueWrapper, id: 'released-from' | 'released-to') =>
+      page.get<HTMLInputElement>(`#${id}`);
+
+    /** Enters the date, and answers the request that follows. */
+    async function enter(
+      page: VueWrapper,
+      router: { currentRoute: { value: { fullPath: string } } },
+      id: 'released-from' | 'released-to',
+      value: string,
+      expected: { url: string; filter: string },
+      response: WatchlistPage,
+    ) {
+      await input(page, id).setValue(value);
+      await input(page, id).trigger('change');
+      await flushPromises();
+      expect(router.currentRoute.value.fullPath).toBe(expected.url);
+      listRequest(1, expected.filter).flush(response);
+      await flushPromises();
+    }
+
+    it('has no dates, and no filter, to begin with', async () => {
+      const { page } = await openWith([HEAT]);
+
+      expect(input(page, 'released-from').element.value).toBe('');
+      expect(input(page, 'released-to').element.value).toBe('');
+      expect(buttonOf(page, 'Clear filter')).toBeUndefined();
+    });
+
+    it('lists the movies released from a day on, and says so', async () => {
+      const { page, router } = await openWith([HEAT, ALIEN]);
+
+      await enter(
+        page,
+        router,
+        'released-from',
+        '1979-05-25',
+        { url: '/watchlist?releasedFrom=1979-05-25', filter: '&releasedFrom=1979-05-25' },
+        paged([ALIEN], { unfilteredCount: 52 }),
+      );
+
+      expect(text(page)).toContain('1 of 52 movies to watch released from May 25, 1979');
+      expect(input(page, 'released-to').attributes('min')).toBe('1979-05-25');
+      expect(buttonOf(page, 'Clear filter')).toBeDefined();
+    });
+
+    it('lists the movies released until a day, and in a period', async () => {
+      const { page, router } = await openWith([HEAT, ALIEN]);
+
+      await enter(
+        page,
+        router,
+        'released-to',
+        '1989-12-31',
+        { url: '/watchlist?releasedTo=1989-12-31', filter: '&releasedTo=1989-12-31' },
+        paged([ALIEN], { unfilteredCount: 52 }),
+      );
+      expect(text(page)).toContain('1 of 52 movies to watch released until December 31, 1989');
+      expect(input(page, 'released-from').attributes('max')).toBe('1989-12-31');
+
+      await enter(
+        page,
+        router,
+        'released-from',
+        '1979-01-01',
+        {
+          url: '/watchlist?releasedTo=1989-12-31&releasedFrom=1979-01-01',
+          filter: '&releasedFrom=1979-01-01&releasedTo=1989-12-31',
+        },
+        paged([ALIEN], { unfilteredCount: 52 }),
+      );
+      expect(text(page)).toContain(
+        '1 of 52 movies to watch released from January 1, 1979 to December 31, 1989',
+      );
+    });
+
+    it('removes a date that is emptied', async () => {
+      const { page, router } = await openWith(
+        [ALIEN],
+        '/watchlist?releasedFrom=1979-01-01',
+        paged([ALIEN]),
+        '&releasedFrom=1979-01-01',
+      );
+
+      await enter(
+        page,
+        router,
+        'released-from',
+        '',
+        { url: '/watchlist', filter: '' },
+        paged([HEAT, ALIEN]),
+      );
+
+      expect(buttonOf(page, 'Clear filter')).toBeUndefined();
+    });
+
+    it('shows the dates of the URL, and sends them with the genres and the page', async () => {
+      const { page, router } = await openWith(
+        [ALIEN],
+        '/watchlist?genreId=27&genreMatch=all&releasedFrom=1979-01-01&releasedTo=1989-12-31',
+        paged([ALIEN], { unfilteredCount: 9 }),
+        '&genreId=27&genreMatch=all&releasedFrom=1979-01-01&releasedTo=1989-12-31',
+      );
+
+      expect(input(page, 'released-from').element.value).toBe('1979-01-01');
+      expect(input(page, 'released-to').element.value).toBe('1989-12-31');
+      expect(text(page)).toContain(
+        '1 of 9 movies to watch with all of the selected genres, released from January 1, 1979 to December 31, 1989',
+      );
+      expect(router.currentRoute.value.fullPath).toContain('releasedFrom=1979-01-01');
+    });
+
+    it('keeps the dates when the genres change or the page, and starts at page 1', async () => {
+      const { page, router } = await openWith(
+        [HEAT],
+        '/watchlist?releasedFrom=1979-01-01',
+        paged([HEAT], { totalCount: 45 }),
+        '&releasedFrom=1979-01-01',
+      );
+
+      await page.findAll('.pagination-link')[2].trigger('click');
+      await flushPromises();
+      expect(router.currentRoute.value.fullPath).toBe('/watchlist?releasedFrom=1979-01-01&page=3');
+      listRequest(3, '&releasedFrom=1979-01-01').flush(paged([ALIEN], { page: 3, totalCount: 45 }));
+      await flushPromises();
+
+      await page.findAll('[aria-labelledby=genre-label] button')[0].trigger('click');
+      await flushPromises();
+      expect(router.currentRoute.value.fullPath).toBe(
+        '/watchlist?releasedFrom=1979-01-01&genreId=27',
+      );
+      listRequest(1, '&genreId=27&genreMatch=any&releasedFrom=1979-01-01').flush(paged([ALIEN]));
+    });
+
+    it('clears the dates together with the genres', async () => {
+      const { page, router } = await openWith(
+        [ALIEN],
+        '/watchlist?genreId=27&releasedFrom=1979-01-01&releasedTo=1989-12-31',
+        paged([ALIEN]),
+        '&genreId=27&genreMatch=any&releasedFrom=1979-01-01&releasedTo=1989-12-31',
+      );
+
+      await buttonOf(page, 'Clear filter').trigger('click');
+      await flushPromises();
+
+      expect(router.currentRoute.value.fullPath).toBe('/watchlist');
+      listRequest().flush(paged([HEAT, ALIEN]));
+      await flushPromises();
+      expect(input(page, 'released-from').element.value).toBe('');
+      expect(input(page, 'released-to').element.value).toBe('');
+    });
+
+    it('says when no movie was released in the period', async () => {
+      const { page } = await openWith(
+        [],
+        '/watchlist?releasedTo=1900-01-01',
+        paged([], { unfilteredCount: 3 }),
+        '&releasedTo=1900-01-01',
+      );
+
+      expect(text(page)).toContain('0 of 3 movies to watch released until January 1, 1900');
+      expect(text(page)).toContain('No movie on your watchlist matches the filter.');
+    });
+  });
+
   describe('genre filter', () => {
     const genreButtons = (page: VueWrapper) => page.findAll('[aria-labelledby=genre-label] button');
     const genreButton = (page: VueWrapper, name: string) =>
@@ -448,7 +613,7 @@ describe('Watchlist', () => {
         '&genreId=18&genreMatch=any',
       );
 
-      expect(text(page)).toContain('No movie on your watchlist matches the selected genres.');
+      expect(text(page)).toContain('No movie on your watchlist matches the filter.');
       expect(text(page)).not.toContain('Your watchlist is empty');
 
       await click(

@@ -12,7 +12,7 @@ import {
   WatchlistPage,
   WatchlistQuery,
 } from '../../core/api/models';
-import { yearOf } from '../../shared/dates';
+import { formatDate, yearOf } from '../../shared/dates';
 import { ErrorNotification } from '../../shared/error-notification';
 import { MoviePicker } from '../../shared/movie-picker';
 import { Pagination } from '../../shared/pagination';
@@ -30,6 +30,8 @@ function parseQuery(params: ParamMap): WatchlistQuery {
     // Whatever is not a genre ID (e.g. from a hand-edited URL) is left out.
     genreIds: [...new Set(params.getAll('genreId').map(Number).filter(Number.isInteger))],
     genreMatch: params.get('genreMatch') === 'all' ? 'all' : 'any',
+    releasedFrom: params.get('releasedFrom') || undefined,
+    releasedTo: params.get('releasedTo') || undefined,
     page: Number(params.get('page')) || 1,
     pageSize: PAGE_SIZE,
   };
@@ -57,7 +59,26 @@ export class Watchlist {
   protected readonly query = toSignal(this.route.queryParamMap.pipe(map(parseQuery)), {
     requireSync: true,
   });
-  protected readonly filtered = computed(() => (this.query().genreIds?.length ?? 0) > 0);
+  private readonly hasGenres = computed(() => (this.query().genreIds?.length ?? 0) > 0);
+  protected readonly filtered = computed(
+    () => this.hasGenres() || !!this.query().releasedFrom || !!this.query().releasedTo,
+  );
+  /** What the filter selects, e.g. "with any of the selected genres, released from May 25, 1979". */
+  protected readonly filterDescription = computed(() => {
+    const { genreMatch, releasedFrom, releasedTo } = this.query();
+    const parts: string[] = [];
+    if (this.hasGenres()) {
+      parts.push(`with ${genreMatch === 'all' ? 'all' : 'any'} of the selected genres`);
+    }
+    if (releasedFrom && releasedTo) {
+      parts.push(`released from ${formatDate(releasedFrom)} to ${formatDate(releasedTo)}`);
+    } else if (releasedFrom) {
+      parts.push(`released from ${formatDate(releasedFrom)}`);
+    } else if (releasedTo) {
+      parts.push(`released until ${formatDate(releasedTo)}`);
+    }
+    return parts.join(', ');
+  });
   protected readonly result = signal<WatchlistPage | null>(null);
   protected readonly loading = signal(true);
   protected readonly error = signal<ApiError | null>(null);
@@ -122,8 +143,17 @@ export class Watchlist {
     this.updateFilter({ genreMatch: match === 'all' ? 'all' : undefined });
   }
 
+  protected onReleaseDate(key: 'releasedFrom' | 'releasedTo', value: string): void {
+    this.updateFilter({ [key]: value || undefined });
+  }
+
   protected clearFilter(): void {
-    this.updateFilter({ genreId: undefined, genreMatch: undefined });
+    this.updateFilter({
+      genreId: undefined,
+      genreMatch: undefined,
+      releasedFrom: undefined,
+      releasedTo: undefined,
+    });
   }
 
   /** Changing the filter starts again at page 1. */

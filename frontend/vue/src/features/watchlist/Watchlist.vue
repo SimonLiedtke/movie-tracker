@@ -11,7 +11,7 @@ import type {
   WatchlistPage,
   WatchlistQuery,
 } from '../../core/api/models';
-import { yearOf } from '../../shared/dates';
+import { formatDate, yearOf } from '../../shared/dates';
 import ErrorNotification from '../../shared/ErrorNotification.vue';
 import MoviePicker from '../../shared/MoviePicker.vue';
 import Pagination from '../../shared/Pagination.vue';
@@ -29,6 +29,8 @@ const MATCH_OPTIONS: { value: GenreMatch; label: string }[] = [
 const props = defineProps<{
   genreId?: string[];
   genreMatch?: string;
+  releasedFrom?: string;
+  releasedTo?: string;
   page?: string;
 }>();
 
@@ -39,10 +41,32 @@ const query = computed<WatchlistQuery>(() => ({
   // Whatever is not a genre ID (e.g. from a hand-edited URL) is left out.
   genreIds: [...new Set((props.genreId ?? []).map(Number).filter(Number.isInteger))],
   genreMatch: props.genreMatch === 'all' ? 'all' : 'any',
+  releasedFrom: props.releasedFrom || undefined,
+  releasedTo: props.releasedTo || undefined,
   page: Number(props.page) || 1,
   pageSize: PAGE_SIZE,
 }));
-const filtered = computed(() => (query.value.genreIds?.length ?? 0) > 0);
+const hasGenres = computed(() => (query.value.genreIds?.length ?? 0) > 0);
+const filtered = computed(
+  () => hasGenres.value || !!query.value.releasedFrom || !!query.value.releasedTo,
+);
+
+/** What the filter selects, e.g. "with any of the selected genres, released from May 25, 1979". */
+const filterDescription = computed(() => {
+  const { genreMatch, releasedFrom, releasedTo } = query.value;
+  const parts: string[] = [];
+  if (hasGenres.value) {
+    parts.push(`with ${genreMatch === 'all' ? 'all' : 'any'} of the selected genres`);
+  }
+  if (releasedFrom && releasedTo) {
+    parts.push(`released from ${formatDate(releasedFrom)} to ${formatDate(releasedTo)}`);
+  } else if (releasedFrom) {
+    parts.push(`released from ${formatDate(releasedFrom)}`);
+  } else if (releasedTo) {
+    parts.push(`released until ${formatDate(releasedTo)}`);
+  }
+  return parts.join(', ');
+});
 
 const genres = ref<Genre[]>([]);
 api.genres.list().then(
@@ -116,8 +140,17 @@ function genreFilterLink(genre: Genre): RouteLocationRaw {
   };
 }
 
+function onReleaseDate(key: 'releasedFrom' | 'releasedTo', value: string): void {
+  updateFilter({ [key]: value || undefined });
+}
+
 function clearFilter(): void {
-  updateFilter({ genreId: [], genreMatch: undefined });
+  updateFilter({
+    genreId: [],
+    genreMatch: undefined,
+    releasedFrom: undefined,
+    releasedTo: undefined,
+  });
 }
 
 function updateFilter(changes: Parameters<typeof mergeQuery>[1]): void {
@@ -231,14 +264,45 @@ async function remove(item: WatchlistItem): Promise<void> {
           {{ option.label }}
         </button>
       </div>
-      <button
-        v-if="filtered"
-        type="button"
-        class="button is-small is-ghost ml-3"
-        @click="clearFilter"
-      >
-        Clear filter
-      </button>
+    </div>
+    <div class="columns is-mobile is-multiline is-align-items-flex-end mb-0">
+      <div class="column is-half-mobile is-3-tablet">
+        <div class="field">
+          <label class="label" for="released-from">Released from</label>
+          <div class="control">
+            <input
+              id="released-from"
+              class="input is-small"
+              type="date"
+              :value="query.releasedFrom ?? ''"
+              :max="query.releasedTo ?? ''"
+              @change="onReleaseDate('releasedFrom', ($event.target as HTMLInputElement).value)"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="column is-half-mobile is-3-tablet">
+        <div class="field">
+          <label class="label" for="released-to">Released until</label>
+          <div class="control">
+            <input
+              id="released-to"
+              class="input is-small"
+              type="date"
+              :value="query.releasedTo ?? ''"
+              :min="query.releasedFrom ?? ''"
+              @change="onReleaseDate('releasedTo', ($event.target as HTMLInputElement).value)"
+            />
+          </div>
+        </div>
+      </div>
+      <div v-if="filtered" class="column is-narrow">
+        <div class="field">
+          <button type="button" class="button is-small is-light" @click="clearFilter">
+            Clear filter
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -248,9 +312,7 @@ async function remove(item: WatchlistItem): Promise<void> {
     <p class="mb-4 has-text-grey">
       {{ result.totalCount }}<template v-if="filtered"> of {{ result.unfilteredCount }}</template>
       {{ result.unfilteredCount === 1 ? 'movie' : 'movies' }} to watch
-      <template v-if="filtered">
-        with {{ query.genreMatch === 'all' ? 'all' : 'any' }} of the selected genres</template
-      >
+      <template v-if="filtered"> {{ filterDescription }}</template>
       <span v-if="loading" class="ml-2">· loading…</span>
     </p>
 
@@ -329,7 +391,7 @@ async function remove(item: WatchlistItem): Promise<void> {
       </article>
     </template>
     <div v-else-if="filtered" class="notification">
-      No movie on your watchlist matches the selected genres.
+      No movie on your watchlist matches the filter.
       <button type="button" class="button is-small is-ghost" @click="clearFilter">
         Clear filter
       </button>

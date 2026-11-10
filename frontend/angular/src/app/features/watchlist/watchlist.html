@@ -44,10 +44,46 @@
         </button>
       }
     </div>
+  </div>
+  <div class="columns is-mobile is-multiline is-align-items-flex-end mb-0">
+    <div class="column is-half-mobile is-3-tablet">
+      <div class="field">
+        <label class="label" for="released-from">Released from</label>
+        <div class="control">
+          <input
+            id="released-from"
+            class="input is-small"
+            type="date"
+            [value]="query().releasedFrom ?? ''"
+            [max]="query().releasedTo ?? ''"
+            (change)="onReleaseDate('releasedFrom', $any($event.target).value)"
+          />
+        </div>
+      </div>
+    </div>
+    <div class="column is-half-mobile is-3-tablet">
+      <div class="field">
+        <label class="label" for="released-to">Released until</label>
+        <div class="control">
+          <input
+            id="released-to"
+            class="input is-small"
+            type="date"
+            [value]="query().releasedTo ?? ''"
+            [min]="query().releasedFrom ?? ''"
+            (change)="onReleaseDate('releasedTo', $any($event.target).value)"
+          />
+        </div>
+      </div>
+    </div>
     @if (filtered()) {
-      <button type="button" class="button is-small is-ghost ml-3" (click)="clearFilter()">
-        Clear filter
-      </button>
+      <div class="column is-narrow">
+        <div class="field">
+          <button type="button" class="button is-small is-light" (click)="clearFilter()">
+            Clear filter
+          </button>
+        </div>
+      </div>
     }
   </div>
 </div>
@@ -62,7 +98,7 @@
     }
     {{ result.unfilteredCount === 1 ? 'movie' : 'movies' }} to watch
     @if (filtered()) {
-      with {{ query().genreMatch === 'all' ? 'all' : 'any' }} of the selected genres
+      {{ filterDescription() }}
     }
     @if (loading()) {
       <span class="ml-2">· loading…</span>
@@ -155,7 +191,7 @@
   } @empty {
     @if (filtered()) {
       <div class="notification">
-        No movie on your watchlist matches the selected genres.
+        No movie on your watchlist matches the filter.
         <button type="button" class="button is-small is-ghost" (click)="clearFilter()">
           Clear filter
         </button>

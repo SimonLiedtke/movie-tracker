@@ -42,19 +42,30 @@ internal static class MovieQueries
             (movie.OriginalTitle != null && EF.Functions.ILike(movie.OriginalTitle, pattern, LikeEscapeCharacter)));
     }
 
-    /// <summary>Watchlist items of movies that have any or all of the filter's genres.</summary>
-    public static IQueryable<WatchlistItem> MatchingGenres(this IQueryable<WatchlistItem> items, WatchlistFilter filter)
+    /// <summary>Watchlist items that match the filter.</summary>
+    public static IQueryable<WatchlistItem> Matching(this IQueryable<WatchlistItem> items, WatchlistFilter filter)
     {
         var genreIds = filter.GenreIds.Distinct().ToList();
-        if (genreIds.Count == 0)
+        if (genreIds.Count > 0)
         {
-            return items;
+            items = filter.GenreMatch == GenreMatch.All
+                // Genres are assigned to a movie at most once, so counting the matches counts the distinct genres.
+                ? items.Where(item => item.Movie.Genres.Count(genre => genreIds.Contains(genre.Id)) == genreIds.Count)
+                : items.Where(item => item.Movie.Genres.Any(genre => genreIds.Contains(genre.Id)));
         }
 
-        return filter.GenreMatch == GenreMatch.All
-            // Genres are assigned to a movie at most once, so counting the matches counts the distinct genres.
-            ? items.Where(item => item.Movie.Genres.Count(genre => genreIds.Contains(genre.Id)) == genreIds.Count)
-            : items.Where(item => item.Movie.Genres.Any(genre => genreIds.Contains(genre.Id)));
+        // Comparing a missing release date is never true: such movies are left out if a bound is set.
+        if (filter.ReleasedFrom is { } from)
+        {
+            items = items.Where(item => item.Movie.ReleaseDate >= from);
+        }
+
+        if (filter.ReleasedTo is { } to)
+        {
+            items = items.Where(item => item.Movie.ReleaseDate <= to);
+        }
+
+        return items;
     }
 
     public static IQueryable<MovieSummaryRow> SelectSummaryRows(

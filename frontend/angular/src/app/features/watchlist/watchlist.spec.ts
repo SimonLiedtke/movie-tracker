@@ -268,7 +268,7 @@ describe('Watchlist genre filter', () => {
   it('says when no movie matches, and offers to clear the filter', async () => {
     await open('/watchlist?genreId=18', '&genreId=18&genreMatch=any', paged([]));
 
-    expect(text()).toContain('No movie on your watchlist matches the selected genres.');
+    expect(text()).toContain('No movie on your watchlist matches the filter.');
     expect(text()).not.toContain('Your watchlist is empty');
 
     await click(
@@ -277,6 +277,148 @@ describe('Watchlist genre filter', () => {
       '',
       paged([HEAT]),
     );
+  });
+
+  describe('release date filter', () => {
+    const input = (id: 'released-from' | 'released-to') =>
+      page().querySelector<HTMLInputElement>(`#${id}`)!;
+    const clearButton = () =>
+      Array.from(page().querySelectorAll<HTMLButtonElement>('button')).find(
+        (b) => b.textContent!.trim() === 'Clear filter',
+      );
+
+    /** Enters the date, and answers the request that follows. */
+    async function enter(
+      id: 'released-from' | 'released-to',
+      value: string,
+      expectedUrl: string,
+      filter: string,
+      response: WatchlistPage,
+    ) {
+      input(id).value = value;
+      input(id).dispatchEvent(new Event('change'));
+      await harness.fixture.whenStable();
+      expect(url()).toBe(expectedUrl);
+      listRequest(filter).flush(response);
+      await harness.fixture.whenStable();
+    }
+
+    it('has no dates, and no filter, to begin with', async () => {
+      await open();
+
+      expect(input('released-from').value).toBe('');
+      expect(input('released-to').value).toBe('');
+      expect(clearButton()).toBeUndefined();
+    });
+
+    it('lists the movies released from a day on, and says so', async () => {
+      await open();
+
+      await enter(
+        'released-from',
+        '1979-05-25',
+        '/watchlist?releasedFrom=1979-05-25',
+        '&releasedFrom=1979-05-25',
+        paged([ALIEN], { unfilteredCount: 52 }),
+      );
+
+      expect(text()).toContain('1 of 52 movies to watch released from May 25, 1979');
+      expect(input('released-to').min).toBe('1979-05-25');
+      expect(clearButton()).toBeDefined();
+    });
+
+    it('lists the movies released until a day, and in a period', async () => {
+      await open();
+
+      await enter(
+        'released-to',
+        '1989-12-31',
+        '/watchlist?releasedTo=1989-12-31',
+        '&releasedTo=1989-12-31',
+        paged([ALIEN], { unfilteredCount: 52 }),
+      );
+      expect(text()).toContain('1 of 52 movies to watch released until December 31, 1989');
+      expect(input('released-from').max).toBe('1989-12-31');
+
+      await enter(
+        'released-from',
+        '1979-01-01',
+        '/watchlist?releasedTo=1989-12-31&releasedFrom=1979-01-01',
+        '&releasedFrom=1979-01-01&releasedTo=1989-12-31',
+        paged([ALIEN], { unfilteredCount: 52 }),
+      );
+      expect(text()).toContain(
+        '1 of 52 movies to watch released from January 1, 1979 to December 31, 1989',
+      );
+    });
+
+    it('removes a date that is emptied', async () => {
+      await open('/watchlist?releasedFrom=1979-01-01', '&releasedFrom=1979-01-01', paged([ALIEN]));
+
+      await enter('released-from', '', '/watchlist', '', paged([ALIEN, HEAT]));
+
+      expect(clearButton()).toBeUndefined();
+    });
+
+    it('shows the dates of the URL together with the genres', async () => {
+      await open(
+        '/watchlist?genreId=27&genreMatch=all&releasedFrom=1979-01-01&releasedTo=1989-12-31',
+        '&genreId=27&genreMatch=all&releasedFrom=1979-01-01&releasedTo=1989-12-31',
+        paged([ALIEN], { unfilteredCount: 9 }),
+      );
+
+      expect(input('released-from').value).toBe('1979-01-01');
+      expect(input('released-to').value).toBe('1989-12-31');
+      expect(text()).toContain(
+        '1 of 9 movies to watch with all of the selected genres, released from January 1, 1979 to December 31, 1989',
+      );
+    });
+
+    it('keeps the dates when the page or the genres change', async () => {
+      await open(
+        '/watchlist?releasedFrom=1979-01-01',
+        '&releasedFrom=1979-01-01',
+        paged([HEAT], { totalCount: 45 }),
+      );
+
+      await click(
+        page().querySelectorAll<HTMLElement>('.pagination-link')[2],
+        '/watchlist?releasedFrom=1979-01-01&page=3',
+        '&releasedFrom=1979-01-01',
+        paged([ALIEN], { page: 3, totalCount: 45 }),
+        3,
+      );
+      await click(
+        buttonLabelled('genre-label', 'Horror'),
+        '/watchlist?releasedFrom=1979-01-01&genreId=27',
+        '&genreId=27&genreMatch=any&releasedFrom=1979-01-01',
+        paged([ALIEN]),
+      );
+    });
+
+    it('clears the dates together with the genres', async () => {
+      await open(
+        '/watchlist?genreId=27&releasedFrom=1979-01-01&releasedTo=1989-12-31',
+        '&genreId=27&genreMatch=any&releasedFrom=1979-01-01&releasedTo=1989-12-31',
+        paged([ALIEN]),
+      );
+
+      await click(clearButton()!, '/watchlist', '', paged([ALIEN, HEAT]));
+
+      expect(input('released-from').value).toBe('');
+      expect(input('released-to').value).toBe('');
+    });
+
+    it('says when no movie was released in the period', async () => {
+      await open(
+        '/watchlist?releasedTo=1900-01-01',
+        '&releasedTo=1900-01-01',
+        paged([], { unfilteredCount: 3 }),
+      );
+
+      expect(text()).toContain('0 of 3 movies to watch released until January 1, 1900');
+      expect(text()).toContain('No movie on your watchlist matches the filter.');
+    });
   });
 
   describe('genres of a movie', () => {

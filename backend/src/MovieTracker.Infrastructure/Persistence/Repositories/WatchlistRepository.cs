@@ -27,10 +27,10 @@ internal sealed class WatchlistRepository(MovieTrackerDbContext db) : IWatchlist
         Guid userId, WatchlistFilter filter, int page, int pageSize, CancellationToken cancellationToken)
     {
         var own = OwnItems(userId).AsNoTracking();
-        var items = own.MatchingGenres(filter);
+        var items = own.Matching(filter);
 
         var totalCount = await items.CountAsync(cancellationToken);
-        var unfilteredCount = filter.GenreIds.Count == 0 ? totalCount : await own.CountAsync(cancellationToken);
+        var unfilteredCount = filter.IsEmpty ? totalCount : await own.CountAsync(cancellationToken);
         var views = await items
             .OrderByDescending(item => item.AddedAt)
             .ThenBy(item => item.MovieId)

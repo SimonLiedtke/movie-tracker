@@ -226,6 +226,88 @@ public sealed class WatchlistTests(ApiFactory factory) : ApiTestBase(factory)
         Assert.Empty(result!.Items);
     }
 
+    /// <summary>Alien 1979-05-25 (horror), Heat 1995-12-15 (drama), Solaris 1972-03-20 (sci-fi), Unreleased: no date.</summary>
+    private async Task PutDatedMoviesOnTheWatchlistAsync()
+    {
+        foreach (var (title, releaseDate, genreId) in new (string, string?, int)[]
+        {
+            ("Alien", "1979-05-25", Horror),
+            ("Heat", "1995-12-15", Drama),
+            ("Solaris", "1972-03-20", ScienceFiction),
+            ("Unreleased", null, Horror),
+        })
+        {
+            var movie = await CreateMovieAsync(title, releaseDate, genreIds: [genreId]);
+            await Client.PutAsJsonAsync($"/api/watchlist/{movie.Id}", new { }, Ct);
+        }
+    }
+
+    [Fact]
+    public async Task List_with_releasedFrom_returns_the_movies_released_on_or_after_that_day()
+    {
+        await PutDatedMoviesOnTheWatchlistAsync();
+
+        Assert.Equal(["Alien", "Heat"], await ListTitlesAsync("?releasedFrom=1979-05-25"));
+        Assert.Equal(["Heat"], await ListTitlesAsync("?releasedFrom=1979-05-26"));
+    }
+
+    [Fact]
+    public async Task List_with_releasedTo_returns_the_movies_released_on_or_before_that_day()
+    {
+        await PutDatedMoviesOnTheWatchlistAsync();
+
+        Assert.Equal(["Alien", "Solaris"], await ListTitlesAsync("?releasedTo=1979-05-25"));
+        Assert.Equal(["Solaris"], await ListTitlesAsync("?releasedTo=1979-05-24"));
+    }
+
+    [Fact]
+    public async Task List_with_both_release_dates_returns_the_movies_released_in_the_period_and_not_those_without_a_date()
+    {
+        await PutDatedMoviesOnTheWatchlistAsync();
+
+        Assert.Equal(["Alien", "Solaris"], await ListTitlesAsync("?releasedFrom=1972-03-20&releasedTo=1979-05-25"));
+        Assert.Equal(["Heat"], await ListTitlesAsync("?releasedFrom=1995-12-15&releasedTo=1995-12-15"));
+        // Without a date filter, the movie without release date is listed.
+        Assert.Contains("Unreleased", await ListTitlesAsync(""));
+    }
+
+    [Fact]
+    public async Task List_combines_the_release_dates_with_the_genres()
+    {
+        await PutDatedMoviesOnTheWatchlistAsync();
+
+        Assert.Equal(["Alien"], await ListTitlesAsync($"?genreId={Horror}&releasedFrom=1970-01-01"));
+        Assert.Empty(await ListTitlesAsync($"?genreId={Drama}&releasedTo=1990-01-01"));
+    }
+
+    [Fact]
+    public async Task List_counts_all_items_as_unfiltered_when_only_the_release_date_filters()
+    {
+        await PutDatedMoviesOnTheWatchlistAsync();
+
+        var result = await GetAsync<WatchlistPageResponse>("/api/watchlist?releasedFrom=1990-01-01");
+
+        Assert.Equal((1, 4), (result.TotalCount, result.UnfilteredCount));
+    }
+
+    [Fact]
+    public async Task List_rejects_a_release_period_that_ends_before_it_starts()
+    {
+        var response = await Client.GetAsync("/api/watchlist?releasedFrom=1990-01-01&releasedTo=1980-01-01", Ct);
+
+        var problem = await ReadValidationProblemAsync(response);
+        Assert.Contains("releasedFrom", problem.Errors.Keys);
+    }
+
+    [Fact]
+    public async Task List_rejects_an_invalid_release_date()
+    {
+        var response = await Client.GetAsync("/api/watchlist?releasedFrom=yesterday", Ct);
+
+        var problem = await ReadValidationProblemAsync(response);
+        Assert.Contains("releasedFrom", problem.Errors.Keys);
+    }
+
     [Fact]
     public async Task List_rejects_an_unknown_genreMatch()
     {

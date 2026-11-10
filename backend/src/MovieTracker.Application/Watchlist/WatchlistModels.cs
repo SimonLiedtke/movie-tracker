@@ -23,12 +23,24 @@ public enum GenreMatch
 }
 
 /// <summary>
-/// Only items whose movie matches the genres. No genres: no restriction. Genres that no movie has are not an error;
-/// they match nothing with <see cref="GenreMatch.All"/> and are ignored with <see cref="GenreMatch.Any"/>.
+/// Only items that match every part of the filter; a part that is not set does not restrict.
 /// </summary>
-public sealed record WatchlistFilter(IReadOnlyList<int> GenreIds, GenreMatch GenreMatch)
+/// <param name="GenreIds">
+/// Movies with these genres, see <paramref name="GenreMatch"/>. Genres that no movie has are not an error; they match
+/// nothing with <see cref="GenreMatch.All"/> and are ignored with <see cref="GenreMatch.Any"/>.
+/// </param>
+/// <param name="ReleasedFrom">Movies released on or after this day. Movies without a release date do not match.</param>
+/// <param name="ReleasedTo">Movies released on or before this day. Movies without a release date do not match.</param>
+public sealed record WatchlistFilter(
+    IReadOnlyList<int> GenreIds,
+    GenreMatch GenreMatch,
+    DateOnly? ReleasedFrom = null,
+    DateOnly? ReleasedTo = null)
 {
     public static WatchlistFilter None { get; } = new([], GenreMatch.Any);
+
+    /// <summary>True if every item matches.</summary>
+    public bool IsEmpty => GenreIds.Count == 0 && ReleasedFrom is null && ReleasedTo is null;
 }
 
 public enum PutWatchlistItemStatus

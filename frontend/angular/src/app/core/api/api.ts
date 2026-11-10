@@ -108,13 +108,21 @@ export class DiaryApi {
 export class WatchlistApi {
   private readonly http = inject(HttpClient);
 
-  list({ genreIds, genreMatch, ...paging }: WatchlistQuery = {}): Observable<WatchlistPage> {
+  list({
+    genreIds,
+    genreMatch,
+    releasedFrom,
+    releasedTo,
+    ...paging
+  }: WatchlistQuery = {}): Observable<WatchlistPage> {
     const filtered = genreIds !== undefined && genreIds.length > 0;
     return this.http.get<WatchlistPage>(`${BASE}/watchlist`, {
       params: toHttpParams({
         ...paging,
         genreId: genreIds,
         genreMatch: filtered ? (genreMatch ?? 'any') : undefined,
+        releasedFrom,
+        releasedTo,
       }),
     });
   }

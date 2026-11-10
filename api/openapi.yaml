@@ -351,6 +351,8 @@ paths:
       summary: List the watchlist, most recently added first
       description: |
         With `genreId`, only movies that have any or all of these genres are listed (see `genreMatch`).
+        With `releasedFrom` and/or `releasedTo`, only movies released in this period are listed.
+        All filters apply together.
         `totalCount` counts the matching items only; `unfilteredCount` all items.
       parameters:
         - name: genreId
@@ -372,6 +374,16 @@ paths:
             type: string
             enum: [any, all]
             default: any
+        - name: releasedFrom
+          in: query
+          description: |
+            Only movies released on or after this day (inclusive).
+            Movies without a release date are left out when `releasedFrom` or `releasedTo` is set.
+          schema: { type: string, format: date }
+        - name: releasedTo
+          in: query
+          description: Only movies released on or before this day (inclusive). Must not be before `releasedFrom`.
+          schema: { type: string, format: date }
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PageSize'
       responses:

@@ -135,6 +135,10 @@ export interface WatchlistQuery extends PageQuery {
   genreIds?: number[];
   /** How `genreIds` are combined. Default: `any`. */
   genreMatch?: GenreMatch;
+  /** Only movies released on or after this day ("YYYY-MM-DD"); movies without release date are left out. */
+  releasedFrom?: string;
+  /** Only movies released on or before this day ("YYYY-MM-DD"); movies without release date are left out. */
+  releasedTo?: string;
 }
 
 export interface User {

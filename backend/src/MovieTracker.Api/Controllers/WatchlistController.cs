@@ -15,7 +15,8 @@ public sealed class WatchlistController(WatchlistService watchlist) : Controller
 {
     /// <summary>
     /// With <paramref name="genreId"/> (repeatable), only movies with any (<c>genreMatch=any</c>, the default)
-    /// or all (<c>genreMatch=all</c>) of these genres.
+    /// or all (<c>genreMatch=all</c>) of these genres. With <paramref name="releasedFrom"/> and
+    /// <paramref name="releasedTo"/>, only movies released in this period (both ends included).
     /// </summary>
     [HttpGet(Name = "listWatchlist")]
     [ProducesResponseType<WatchlistPageResponse>(StatusCodes.Status200OK)]
@@ -23,11 +24,20 @@ public sealed class WatchlistController(WatchlistService watchlist) : Controller
     public async Task<ActionResult<WatchlistPageResponse>> ListWatchlist(
         [FromQuery] int[]? genreId,
         [FromQuery, AllowedValues("any", "all")] string genreMatch = "any",
+        [FromQuery] DateOnly? releasedFrom = null,
+        [FromQuery] DateOnly? releasedTo = null,
         [FromQuery, Range(1, int.MaxValue)] int page = 1,
         [FromQuery, Range(1, 100)] int pageSize = 20,
         CancellationToken cancellationToken = default)
     {
-        var filter = new WatchlistFilter(genreId ?? [], genreMatch == "all" ? GenreMatch.All : GenreMatch.Any);
+        if (releasedFrom > releasedTo)
+        {
+            ModelState.AddModelError("releasedFrom", "'releasedFrom' must not be after 'releasedTo'.");
+            return ValidationProblem(ModelState);
+        }
+
+        var filter = new WatchlistFilter(
+            genreId ?? [], genreMatch == "all" ? GenreMatch.All : GenreMatch.Any, releasedFrom, releasedTo);
         var result = await watchlist.ListAsync(User.GetUserId(), filter, page, pageSize, cancellationToken);
         return result.ToResponse();
     }

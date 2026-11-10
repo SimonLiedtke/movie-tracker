@@ -57,6 +57,14 @@ describe('API services', () => {
       .flush({});
   });
 
+  it('lists the watchlist filtered by the release period', () => {
+    TestBed.inject(WatchlistApi)
+      .list({ releasedFrom: '1979-01-01', releasedTo: '1989-12-31', page: 1 })
+      .subscribe();
+
+    http.expectOne('/api/watchlist?page=1&releasedFrom=1979-01-01&releasedTo=1989-12-31').flush({});
+  });
+
   it('matches any genre by default, and sends no match mode without genres', () => {
     const api = TestBed.inject(WatchlistApi);
     api.list({ genreIds: [27] }).subscribe();

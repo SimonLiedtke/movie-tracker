@@ -19,7 +19,7 @@ public sealed class FakeWatchlistRepository(FakeMovieRepository movies) : IWatch
 
         var all = Items.Where(item => item.UserId == userId).ToList();
         var own = all
-            .Where(item => MatchesGenres(item, filter))
+            .Where(item => Matches(item, filter))
             .OrderByDescending(item => item.AddedAt)
             .ThenBy(item => item.MovieId)
             .ToList();
@@ -40,13 +40,17 @@ public sealed class FakeWatchlistRepository(FakeMovieRepository movies) : IWatch
     public Task<bool> RemoveAsync(Guid userId, Guid movieId, CancellationToken cancellationToken) =>
         Task.FromResult(Own(userId, movieId) is { } item && Items.Remove(item));
 
-    private bool MatchesGenres(WatchlistItem item, WatchlistFilter filter)
+    private bool Matches(WatchlistItem item, WatchlistFilter filter)
     {
+        var movie = movies.Movies.Single(candidate => candidate.Id == item.MovieId);
         var ids = filter.GenreIds.Distinct().ToList();
-        var movieGenreIds = movies.Movies.Single(movie => movie.Id == item.MovieId).Genres.Select(genre => genre.Id).ToList();
-        return ids.Count == 0 || (filter.GenreMatch == GenreMatch.All
+        var movieGenreIds = movie.Genres.Select(genre => genre.Id).ToList();
+        var genresMatch = ids.Count == 0 || (filter.GenreMatch == GenreMatch.All
             ? ids.All(movieGenreIds.Contains)
             : ids.Any(movieGenreIds.Contains));
+        var releasedFromMatches = filter.ReleasedFrom is null || movie.ReleaseDate >= filter.ReleasedFrom;
+        var releasedToMatches = filter.ReleasedTo is null || movie.ReleaseDate <= filter.ReleasedTo;
+        return genresMatch && releasedFromMatches && releasedToMatches;
     }
 
     private WatchlistItem? Own(Guid userId, Guid movieId) =>
