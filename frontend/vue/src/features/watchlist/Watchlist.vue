@@ -145,7 +145,7 @@ async function remove(item: WatchlistItem): Promise<void> {
     </p>
 
     <template v-if="result.items.length">
-      <article v-for="item in result.items" :key="item.movie.id" class="media box">
+      <article v-for="item in result.items" :key="item.movie.id" class="media media-wrap box">
         <figure class="media-left" style="width: 64px">
           <RouterLink :to="`/movies/${item.movie.id}`">
             <Poster :url="item.movie.posterUrl" :title="item.movie.title" />

@@ -22,3 +22,26 @@
 .is-nowrap {
   white-space: nowrap;
 }
+
+/*
+ * A list item with the poster on the left and the actions on the right. Bulma's .media-right
+ * never shrinks, so on a narrow screen the actions take (almost) the whole width and leave
+ * nothing for .media-content, which is then clipped (overflow-x: auto on mobile). Below the
+ * tablet breakpoint (769px), the actions go under the content instead.
+ */
+@media screen and (max-width: 768px) {
+  .media-wrap {
+    flex-wrap: wrap;
+
+    > .media-content {
+      flex-basis: 0;
+      min-width: 0;
+    }
+
+    > .media-right {
+      flex-basis: 100%;
+      margin-inline-start: 0;
+      margin-top: 0.75rem;
+    }
+  }
+}

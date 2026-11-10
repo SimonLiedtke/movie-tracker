@@ -22,7 +22,7 @@
   </p>
 
   @for (item of result.items; track item.movie.id) {
-    <article class="media box">
+    <article class="media media-wrap box">
       <figure class="media-left" style="width: 64px">
         <a [routerLink]="['/movies', item.movie.id]">
           <app-poster [url]="item.movie.posterUrl" [title]="item.movie.title" />
