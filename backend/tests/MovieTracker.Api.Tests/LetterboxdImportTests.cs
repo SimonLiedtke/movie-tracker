@@ -68,6 +68,26 @@ public sealed class LetterboxdImportTests(ApiFactory factory) : ApiTestBase(fact
     }
 
     [Fact]
+    public async Task Logs_an_import_as_one_line_and_an_import_that_adds_nothing_not_at_all()
+    {
+        Factory.Tmdb.Add(Heat);
+        using var first = Create(
+            diary: [DiaryRow("Alien", 1979, watchedOn: "2026-09-30"), DiaryRow("Aliens", 1986, watchedOn: "2026-10-05")],
+            watchlist: [WatchlistRow("Heat", 1995, addedOn: "2026-08-15")]);
+        await ImportAsync(first);
+        using var again = Create(
+            diary: [DiaryRow("Alien", 1979, watchedOn: "2026-09-30")], watchlist: [WatchlistRow("Heat", 1995, addedOn: "2026-08-15")]);
+        await ImportAsync(again);
+
+        var log = await GetAsync<PagedResponse<ActivityLogEntryResponse>>("/api/activity-log");
+
+        var entry = Assert.Single(log.Items, item => item.Type == ActivityLogType.LetterboxdImported);
+        Assert.Equal("Diary: 2 imported, 0 skipped · Watchlist: 1 imported, 0 skipped", entry.Detail);
+        Assert.Null(entry.MovieId);
+        Assert.Null(entry.MovieTitle);
+    }
+
+    [Fact]
     public async Task Does_not_mistake_a_sequel_for_the_film()
     {
         using var zip = Create(diary: [DiaryRow("Alien", null)]);

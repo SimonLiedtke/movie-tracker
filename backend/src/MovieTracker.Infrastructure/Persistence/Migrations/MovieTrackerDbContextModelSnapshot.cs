@@ -46,6 +46,53 @@ namespace MovieTracker.Infrastructure.Persistence.Migrations
                     b.ToTable("data_protection_keys", (string)null);
                 });
 
+            modelBuilder.Entity("MovieTracker.Domain.Activity.ActivityLogEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Detail")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("detail");
+
+                    b.Property<Guid?>("MovieId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("movie_id");
+
+                    b.Property<string>("MovieTitle")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("movie_title");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("type");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_activity_log_entries");
+
+                    b.HasIndex("MovieId")
+                        .HasDatabaseName("ix_activity_log_entries_movie_id");
+
+                    b.HasIndex("UserId", "OccurredAt", "Id")
+                        .IsDescending(false, true, true)
+                        .HasDatabaseName("ix_activity_log_entries_user_id_occurred_at_id");
+
+                    b.ToTable("activity_log_entries", (string)null);
+                });
+
             modelBuilder.Entity("MovieTracker.Domain.Diary.DiaryEntry", b =>
                 {
                     b.Property<Guid>("Id")
@@ -375,6 +422,22 @@ namespace MovieTracker.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_movie_genres_movie_id");
 
                     b.ToTable("movie_genres", (string)null);
+                });
+
+            modelBuilder.Entity("MovieTracker.Domain.Activity.ActivityLogEntry", b =>
+                {
+                    b.HasOne("MovieTracker.Domain.Movies.Movie", null)
+                        .WithMany()
+                        .HasForeignKey("MovieId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_activity_log_entries_movies_movie_id");
+
+                    b.HasOne("MovieTracker.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_activity_log_entries_users_user_id");
                 });
 
             modelBuilder.Entity("MovieTracker.Domain.Diary.DiaryEntry", b =>

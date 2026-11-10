@@ -37,3 +37,14 @@ export function formatDate(date: string): string {
     year: 'numeric',
   });
 }
+
+/** A point in time in the browser's time zone, e.g. "Nov 7, 2026, 9:30 PM". */
+export function formatDateTime(timestamp: string): string {
+  return new Date(timestamp).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}

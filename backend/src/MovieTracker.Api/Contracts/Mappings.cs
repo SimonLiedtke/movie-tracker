@@ -2,6 +2,7 @@ using MovieTracker.Application;
 using MovieTracker.Application.Diary;
 using MovieTracker.Application.Movies;
 using MovieTracker.Application.Watchlist;
+using MovieTracker.Domain.Activity;
 using MovieTracker.Domain.Movies;
 
 namespace MovieTracker.Api.Contracts;
@@ -12,6 +13,25 @@ internal static class Mappings
     public static PagedResponse<TResponse> ToResponse<TItem, TResponse>(
         this PagedResult<TItem> result, Func<TItem, TResponse> map) =>
         new(result.Items.Select(map).ToList(), result.Page, result.PageSize, result.TotalCount);
+
+    public static ActivityLogEntryResponse ToResponse(this ActivityLogEntry entry) => new(
+        entry.Id, entry.Type.ToResponse(), entry.OccurredAt, entry.MovieId, entry.MovieTitle, entry.Detail);
+
+    private static ActivityLogType ToResponse(this ActivityType type) => type switch
+    {
+        ActivityType.DiaryEntryAdded => ActivityLogType.DiaryEntryAdded,
+        ActivityType.DiaryEntryUpdated => ActivityLogType.DiaryEntryUpdated,
+        ActivityType.DiaryEntryDeleted => ActivityLogType.DiaryEntryDeleted,
+        ActivityType.WatchlistItemAdded => ActivityLogType.WatchlistItemAdded,
+        ActivityType.WatchlistNoteChanged => ActivityLogType.WatchlistNoteChanged,
+        ActivityType.WatchlistItemRemoved => ActivityLogType.WatchlistItemRemoved,
+        ActivityType.MovieImported => ActivityLogType.MovieImported,
+        ActivityType.MovieAdded => ActivityLogType.MovieAdded,
+        ActivityType.MovieUpdated => ActivityLogType.MovieUpdated,
+        ActivityType.MovieDeleted => ActivityLogType.MovieDeleted,
+        ActivityType.LetterboxdImported => ActivityLogType.LetterboxdImported,
+        _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unknown activity type."),
+    };
 
     public static GenreResponse ToResponse(this Genre genre) => new(genre.Id, genre.Name);
 

@@ -55,7 +55,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         var db = scope.ServiceProvider.GetRequiredService<MovieTrackerDbContext>();
         // Genres are seed data and stay.
         await db.Database.ExecuteSqlRawAsync(
-            "TRUNCATE diary_entries, watchlist_items, movie_genres, movies, users RESTART IDENTITY CASCADE");
+            "TRUNCATE activity_log_entries, diary_entries, watchlist_items, movie_genres, movies, users RESTART IDENTITY CASCADE");
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)

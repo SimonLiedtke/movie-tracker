@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Logging;
+using MovieTracker.Application.Activity;
 using MovieTracker.Application.Genres;
 using MovieTracker.Application.Tmdb;
+using MovieTracker.Domain.Activity;
 using MovieTracker.Domain.Movies;
 
 namespace MovieTracker.Application.Movies;
@@ -12,6 +14,7 @@ namespace MovieTracker.Application.Movies;
 public sealed class MovieService(
     IMovieRepository movies,
     IGenreRepository genres,
+    IActivityLogRepository activityLog,
     IUnitOfWork unitOfWork,
     ITmdbClient tmdb,
     TimeProvider timeProvider,
@@ -86,8 +89,16 @@ public sealed class MovieService(
 
         var detail = await movies.GetDetailAsync(userId, savedId, cancellationToken);
         // Not the same ID: someone else imported the movie at the same moment.
-        var status = savedId == movie.Id ? ImportTmdbMovieStatus.Imported : ImportTmdbMovieStatus.AlreadyImported;
-        return new ImportTmdbMovieResult(status, detail);
+        if (savedId != movie.Id)
+        {
+            return new ImportTmdbMovieResult(ImportTmdbMovieStatus.AlreadyImported, detail);
+        }
+
+        // The movie is saved already (shared, immediately), the log entry follows in its own save.
+        activityLog.Add(ActivityLogEntry.ForMovie(
+            userId, ActivityType.MovieImported, timeProvider.GetUtcNow(), movie.Id, movie.Title));
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+        return new ImportTmdbMovieResult(ImportTmdbMovieStatus.Imported, detail);
     }
 
     /// <summary>Null if the movie does not exist or is not visible to the user.</summary>
@@ -104,8 +115,10 @@ public sealed class MovieService(
             return new SaveMovieResult(SaveMovieStatus.UnknownGenres, UnknownGenreIds: movieGenres.UnknownIds);
         }
 
-        var movie = Movie.CreateManual(userId, details, movieGenres.Genres, timeProvider.GetUtcNow());
+        var now = timeProvider.GetUtcNow();
+        var movie = Movie.CreateManual(userId, details, movieGenres.Genres, now);
         movies.Add(movie);
+        activityLog.Add(ActivityLogEntry.ForMovie(userId, ActivityType.MovieAdded, now, movie.Id, movie.Title));
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new SaveMovieResult(SaveMovieStatus.Saved, await movies.GetDetailAsync(userId, movie.Id, cancellationToken));
@@ -133,6 +146,8 @@ public sealed class MovieService(
         }
 
         movie.Update(details, movieGenres.Genres);
+        activityLog.Add(ActivityLogEntry.ForMovie(
+            userId, ActivityType.MovieUpdated, timeProvider.GetUtcNow(), movie.Id, movie.Title));
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new SaveMovieResult(SaveMovieStatus.Saved, await movies.GetDetailAsync(userId, movieId, cancellationToken));
@@ -157,7 +172,11 @@ public sealed class MovieService(
             return DeleteMovieResult.HasDiaryEntries;
         }
 
-        await movies.DeleteAsync(movieId, cancellationToken);
+        movies.Remove(movie);
+        // No movie ID: the movie is gone, the log only keeps its title.
+        activityLog.Add(ActivityLogEntry.ForMovie(
+            userId, ActivityType.MovieDeleted, timeProvider.GetUtcNow(), movieId: null, movie.Title));
+        await unitOfWork.SaveChangesAsync(cancellationToken);
         return DeleteMovieResult.Deleted;
     }
 

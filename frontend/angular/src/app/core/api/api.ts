@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable, shareReplay } from 'rxjs';
 import { toHttpParams } from './http-params';
 import {
+  ActivityLogEntry,
   DiaryEntry,
   DiaryEntryRequest,
   DiaryQuery,
@@ -13,6 +14,7 @@ import {
   MovieRequest,
   MovieSearchResponse,
   MovieSummary,
+  PageQuery,
   PagedResponse,
   WatchlistItem,
   WatchlistPage,
@@ -161,5 +163,17 @@ export class LetterboxdImportApi {
   /** The progress of an import, or its result. 404 if the server does not know the import (any more). */
   get(id: string): Observable<ImportJob> {
     return this.http.get<ImportJob>(`${BASE}/imports/letterboxd/${id}`);
+  }
+}
+
+@Injectable({ providedIn: 'root' })
+export class ActivityLogApi {
+  private readonly http = inject(HttpClient);
+
+  /** What the user did that modified the database, most recent first. */
+  list(query: PageQuery = {}): Observable<PagedResponse<ActivityLogEntry>> {
+    return this.http.get<PagedResponse<ActivityLogEntry>>(`${BASE}/activity-log`, {
+      params: toHttpParams(query),
+    });
   }
 }

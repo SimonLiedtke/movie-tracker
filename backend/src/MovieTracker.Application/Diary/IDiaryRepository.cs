@@ -20,6 +20,6 @@ public interface IDiaryRepository
     /// <summary>Saved with <see cref="IUnitOfWork"/>.</summary>
     void Add(DiaryEntry entry);
 
-    /// <summary>Deletes immediately. False if there is no such entry.</summary>
-    Task<bool> DeleteAsync(Guid userId, Guid entryId, CancellationToken cancellationToken);
+    /// <summary>For removing an entry found with <see cref="FindAsync"/>: saved with <see cref="IUnitOfWork"/>.</summary>
+    void Remove(DiaryEntry entry);
 }

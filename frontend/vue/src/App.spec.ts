@@ -28,11 +28,18 @@ describe('App', () => {
     const { app } = await render(ALICE);
 
     const links = app.findAll('.navbar-start a');
-    expect(links.map((link) => link.text())).toEqual(['My movies', 'Diary', 'Watchlist', 'Import']);
+    expect(links.map((link) => link.text())).toEqual([
+      'My movies',
+      'Diary',
+      'Watchlist',
+      'Activity',
+      'Import',
+    ]);
     expect(links.map((link) => link.attributes('href'))).toEqual([
       '/movies',
       '/diary',
       '/watchlist',
+      '/activity',
       '/import',
     ]);
     expect(app.get('.navbar-end').text()).toContain('Alice');

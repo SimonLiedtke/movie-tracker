@@ -2,6 +2,7 @@ import { createRouter, type RouteRecordRaw, type Router, type RouterHistory } fr
 import type { Auth } from './core/auth/auth';
 import { createAuthGuard, createGuestGuard } from './core/auth/auth.guard';
 import {
+  activityLogProps,
   diaryEntryFormProps,
   diaryListProps,
   letterboxdImportProps,
@@ -81,6 +82,13 @@ export function createAppRouter(auth: Auth, history: RouterHistory): Router {
       meta: { title: 'Watchlist · Movie Tracker' },
       component: () => import('./features/watchlist/Watchlist.vue'),
       props: watchlistProps,
+    },
+    {
+      path: '/activity',
+      name: 'activity',
+      meta: { title: 'Activity log · Movie Tracker' },
+      component: () => import('./features/activity/ActivityLog.vue'),
+      props: activityLogProps,
     },
     {
       path: '/import',

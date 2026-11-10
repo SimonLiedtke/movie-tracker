@@ -16,6 +16,7 @@ public sealed class DiaryServiceTests
     private readonly FakeMovieRepository _movies = new();
     private readonly FakeDiaryRepository _diary;
     private readonly FakeWatchlistRepository _watchlist;
+    private readonly FakeActivityLogRepository _log = new();
     private readonly FakeUnitOfWork _unitOfWork = new();
     private readonly TestClock _clock = new(Start);
     private readonly DiaryService _service;
@@ -24,7 +25,7 @@ public sealed class DiaryServiceTests
     {
         _diary = new FakeDiaryRepository(_movies);
         _watchlist = new FakeWatchlistRepository(_movies);
-        _service = new DiaryService(_diary, _watchlist, _movies, _unitOfWork, _clock);
+        _service = new DiaryService(_diary, _watchlist, _movies, _log, _unitOfWork, _clock);
     }
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;

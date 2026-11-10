@@ -36,6 +36,8 @@ tags:
     description: Movies to watch later
   - name: Import
     description: Import of the diary and watchlist from other services
+  - name: Activity log
+    description: What the user did that modified the database
 
 paths:
   /api/movies:
@@ -457,6 +459,26 @@ paths:
         '204': { description: Removed }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /api/activity-log:
+    get:
+      tags: [Activity log]
+      operationId: listActivityLog
+      summary: List the user's actions that modified the database
+      description: |
+        Logging, changing and deleting viewings, putting movies on the watchlist, changing their notes and removing
+        them, adding, changing, importing and deleting movies, and Letterboxd imports (one entry per import), most
+        recent first. Actions that change nothing (e.g. saving the same note again) are not logged.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Page of activity log entries
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ActivityLogEntryPage' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+
   /api/imports/letterboxd:
     post:
       tags: [Import]
@@ -761,6 +783,50 @@ components:
             items:
               type: array
               items: { $ref: '#/components/schemas/DiaryEntry' }
+
+    ActivityLogEntry:
+      type: object
+      required: [id, type, occurredAt]
+      properties:
+        id: { type: string, format: uuid }
+        type:
+          type: string
+          enum:
+            - diaryEntryAdded
+            - diaryEntryUpdated
+            - diaryEntryDeleted
+            - watchlistItemAdded
+            - watchlistNoteChanged
+            - watchlistItemRemoved
+            - movieImported
+            - movieAdded
+            - movieUpdated
+            - movieDeleted
+            - letterboxdImported
+        occurredAt: { type: string, format: date-time }
+        movieId:
+          type: string
+          format: uuid
+          nullable: true
+          description: The movie the action was about. Null if it was not about one movie, or the movie was deleted since.
+        movieTitle:
+          type: string
+          nullable: true
+          description: The movie's title when the action happened. Null if the action was not about one movie.
+        detail:
+          type: string
+          nullable: true
+          description: What exactly happened, in a few words (e.g. the rating or the note). Null if the type says it all.
+
+    ActivityLogEntryPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMetadata'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/ActivityLogEntry' }
 
     WatchlistItemPage:
       allOf:

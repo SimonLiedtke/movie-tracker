@@ -26,6 +26,9 @@ public interface IMovieRepository
 
     Task<bool> ExistsAsync(Guid userId, Guid movieId, CancellationToken cancellationToken);
 
+    /// <summary>The movie's title, for naming it in the activity log. Null if the movie does not exist or is not visible to the user.</summary>
+    Task<string?> GetTitleAsync(Guid userId, Guid movieId, CancellationToken cancellationToken);
+
     /// <summary>
     /// For changing the movie (with its genres): changes are saved with <see cref="IUnitOfWork"/>.
     /// Null if the movie does not exist or is not visible to the user.
@@ -43,6 +46,9 @@ public interface IMovieRepository
 
     Task<bool> HasDiaryEntriesAsync(Guid movieId, CancellationToken cancellationToken);
 
-    /// <summary>Deletes immediately, together with the movie's watchlist items.</summary>
-    Task DeleteAsync(Guid movieId, CancellationToken cancellationToken);
+    /// <summary>
+    /// For removing a movie found with <see cref="FindAsync"/>, together with the movie's watchlist items: saved with
+    /// <see cref="IUnitOfWork"/>.
+    /// </summary>
+    void Remove(Movie movie);
 }

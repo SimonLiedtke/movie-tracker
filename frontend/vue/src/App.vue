@@ -61,6 +61,12 @@ function logout(): void {
           >
           <RouterLink
             class="navbar-item"
+            to="/activity"
+            :class="{ 'is-selected': isCurrent('/activity') }"
+            >Activity</RouterLink
+          >
+          <RouterLink
+            class="navbar-item"
             to="/import"
             :class="{ 'is-selected': isCurrent('/import') }"
             >Import</RouterLink

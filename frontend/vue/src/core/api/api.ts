@@ -3,6 +3,7 @@ import { inject, type InjectionKey } from 'vue';
 import type { Http } from './http';
 import { toSearchParams } from './http-params';
 import type {
+  ActivityLogEntry,
   DiaryEntry,
   DiaryEntryRequest,
   DiaryQuery,
@@ -13,6 +14,7 @@ import type {
   MovieRequest,
   MovieSearchResponse,
   MovieSummary,
+  PageQuery,
   PagedResponse,
   WatchlistItem,
   WatchlistPage,
@@ -173,6 +175,19 @@ function createLetterboxdImportApi(http: Http) {
   };
 }
 
+function createActivityLogApi(http: Http) {
+  return {
+    /** What the user did that modified the database, most recent first. */
+    list(query: PageQuery = {}): Promise<PagedResponse<ActivityLogEntry>> {
+      return body(
+        http.get<PagedResponse<ActivityLogEntry>>(`${BASE}/activity-log`, {
+          params: toSearchParams(query),
+        }),
+      );
+    },
+  };
+}
+
 /** Typed clients for the API's endpoints. */
 export function createApi(http: Http) {
   return {
@@ -181,6 +196,7 @@ export function createApi(http: Http) {
     diary: createDiaryApi(http),
     watchlist: createWatchlistApi(http),
     letterboxdImport: createLetterboxdImportApi(http),
+    activityLog: createActivityLogApi(http),
   };
 }
 
