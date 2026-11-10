@@ -172,7 +172,15 @@ async function load(): Promise<void> {
   loading.value = false;
 }
 
-watch(query, load, { immediate: true });
+/**
+ * What the request depends on. The match mode means nothing without genres, so changing it then
+ * must not load the same list again.
+ */
+const requestKey = computed(() =>
+  JSON.stringify({ ...query.value, genreMatch: hasGenres.value ? query.value.genreMatch : null }),
+);
+
+watch(requestKey, load, { immediate: true });
 
 function goToPage(target: number): void {
   router.push({ query: mergeQuery(router.currentRoute.value.query, { page: target }) });

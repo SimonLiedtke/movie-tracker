@@ -1,7 +1,16 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, ParamMap, Params, Router, RouterLink } from '@angular/router';
-import { Subject, catchError, map, of, startWith, switchMap, tap } from 'rxjs';
+import {
+  Subject,
+  catchError,
+  distinctUntilChanged,
+  map,
+  of,
+  startWith,
+  switchMap,
+  tap,
+} from 'rxjs';
 import { GenresApi, MoviesApi, WatchlistApi } from '../../core/api/api';
 import { ApiError, toApiError } from '../../core/api/api-error';
 import {
@@ -69,6 +78,14 @@ function describePeriod(what: string, from?: string, to?: string): string | unde
     return `${what} until ${formatDate(to)}`;
   }
   return undefined;
+}
+
+/**
+ * What the request depends on. The match mode means nothing without genres, so changing it then
+ * must not load the same list again.
+ */
+function requestKey(query: WatchlistQuery): string {
+  return JSON.stringify({ ...query, genreMatch: query.genreIds?.length ? query.genreMatch : null });
 }
 
 function parseQuery(params: ParamMap): WatchlistQuery {
@@ -147,6 +164,7 @@ export class Watchlist {
     this.route.queryParamMap
       .pipe(
         map(parseQuery),
+        distinctUntilChanged((a, b) => requestKey(a) === requestKey(b)),
         switchMap((query) =>
           this.reload.pipe(
             startWith(undefined),
