@@ -14,8 +14,9 @@ import type {
   MovieSearchResponse,
   MovieSummary,
   PagedResponse,
-  PageQuery,
   WatchlistItem,
+  WatchlistPage,
+  WatchlistQuery,
 } from './models';
 
 const BASE = '/api';
@@ -114,10 +115,33 @@ function createDiaryApi(http: Http) {
 
 function createWatchlistApi(http: Http) {
   return {
-    list(query: PageQuery = {}): Promise<PagedResponse<WatchlistItem>> {
+    list({
+      genreIds,
+      genreMatch,
+      releasedFrom,
+      releasedTo,
+      addedFrom,
+      addedTo,
+      runtimeFrom,
+      runtimeTo,
+      search,
+      ...paging
+    }: WatchlistQuery = {}): Promise<WatchlistPage> {
+      const filtered = genreIds !== undefined && genreIds.length > 0;
       return body(
-        http.get<PagedResponse<WatchlistItem>>(`${BASE}/watchlist`, {
-          params: toSearchParams(query),
+        http.get<WatchlistPage>(`${BASE}/watchlist`, {
+          params: toSearchParams({
+            ...paging,
+            genreId: genreIds,
+            genreMatch: filtered ? (genreMatch ?? 'any') : undefined,
+            releasedFrom,
+            releasedTo,
+            addedFrom,
+            addedTo,
+            runtimeFrom,
+            runtimeTo,
+            search: search?.trim(),
+          }),
         }),
       );
     },

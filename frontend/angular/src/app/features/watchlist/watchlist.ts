@@ -1,17 +1,116 @@
-import { Component, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { Subject, catchError, map, of, startWith, switchMap, tap } from 'rxjs';
-import { MoviesApi, WatchlistApi } from '../../core/api/api';
+import { Component, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, ParamMap, Params, Router, RouterLink } from '@angular/router';
+import {
+  Subject,
+  catchError,
+  debounceTime,
+  distinctUntilChanged,
+  map,
+  of,
+  startWith,
+  switchMap,
+  tap,
+} from 'rxjs';
+import { GenresApi, MoviesApi, WatchlistApi } from '../../core/api/api';
 import { ApiError, toApiError } from '../../core/api/api-error';
-import { MovieRef, PagedResponse, WatchlistItem } from '../../core/api/models';
-import { yearOf } from '../../shared/dates';
+import {
+  Genre,
+  GenreMatch,
+  MovieRef,
+  WatchlistItem,
+  WatchlistPage,
+  WatchlistQuery,
+} from '../../core/api/models';
+import { formatDate, yearOf } from '../../shared/dates';
 import { ErrorNotification } from '../../shared/error-notification';
 import { MoviePicker } from '../../shared/movie-picker';
 import { Pagination } from '../../shared/pagination';
 import { Poster } from '../../shared/poster';
 
 const PAGE_SIZE = 20;
+const SEARCH_DEBOUNCE_MS = 300;
+
+const MATCH_OPTIONS: { value: GenreMatch; label: string }[] = [
+  { value: 'any', label: 'Any of them' },
+  { value: 'all', label: 'All of them' },
+];
+
+/**
+ * Quick picks for the runtime, so that the usual questions need one click. They do not overlap:
+ * "Under 90 min" is up to 89 minutes, "Over 120 min" from 121.
+ */
+const RUNTIME_PRESETS: { label: string; from?: number; to?: number }[] = [
+  { label: 'Under 90 min', to: 89 },
+  { label: '90 to 120 min', from: 90, to: 120 },
+  { label: 'Over 120 min', from: 121 },
+];
+
+type RuntimePreset = (typeof RUNTIME_PRESETS)[number];
+
+/** A whole number of minutes; anything else (e.g. from a hand-edited URL) is left out. */
+function parseMinutes(value: string | null): number | undefined {
+  const number = Number(value);
+  return Number.isInteger(number) && number > 0 ? number : undefined;
+}
+
+/** E.g. "runtime of at least 90 minutes"; undefined without runtime. */
+function describeRuntime(from?: number, to?: number): string | undefined {
+  if (from && to) {
+    return `runtime of ${from} to ${to} minutes`;
+  }
+  if (from) {
+    return `runtime of at least ${from} minutes`;
+  }
+  if (to) {
+    return `runtime of at most ${to} minutes`;
+  }
+  return undefined;
+}
+
+/** E.g. "released from May 25, 1979 to November 3, 1989" or "added until ..."; undefined without dates. */
+function describePeriod(what: string, from?: string, to?: string): string | undefined {
+  if (from && to) {
+    return `${what} from ${formatDate(from)} to ${formatDate(to)}`;
+  }
+  if (from) {
+    return `${what} from ${formatDate(from)}`;
+  }
+  if (to) {
+    return `${what} until ${formatDate(to)}`;
+  }
+  return undefined;
+}
+
+/**
+ * What the request depends on. The match mode means nothing without genres, and spaces around the
+ * search text do not matter, so changing them must not load the same list again.
+ */
+function requestKey(query: WatchlistQuery): string {
+  return JSON.stringify({
+    ...query,
+    genreMatch: query.genreIds?.length ? query.genreMatch : null,
+    search: query.search?.trim(),
+  });
+}
+
+function parseQuery(params: ParamMap): WatchlistQuery {
+  return {
+    // Whatever is not a genre ID (e.g. from a hand-edited URL) is left out.
+    genreIds: [...new Set(params.getAll('genreId').map(Number).filter(Number.isInteger))],
+    genreMatch: params.get('genreMatch') === 'all' ? 'all' : 'any',
+    releasedFrom: params.get('releasedFrom') || undefined,
+    releasedTo: params.get('releasedTo') || undefined,
+    addedFrom: params.get('addedFrom') || undefined,
+    addedTo: params.get('addedTo') || undefined,
+    runtimeFrom: parseMinutes(params.get('runtimeFrom')),
+    runtimeTo: parseMinutes(params.get('runtimeTo')),
+    // Not trimmed: the field shows the URL's value, and trimming would eat spaces while typing.
+    search: params.get('search')?.trim() ? params.get('search')! : undefined,
+    page: Number(params.get('page')) || 1,
+    pageSize: PAGE_SIZE,
+  };
+}
 
 @Component({
   selector: 'app-watchlist',
@@ -24,8 +123,53 @@ export class Watchlist {
   private readonly watchlistApi = inject(WatchlistApi);
   private readonly moviesApi = inject(MoviesApi);
 
+  protected readonly matchOptions = MATCH_OPTIONS;
   protected readonly yearOf = yearOf;
-  protected readonly result = signal<PagedResponse<WatchlistItem> | null>(null);
+  protected readonly genres = toSignal(
+    inject(GenresApi)
+      .list()
+      .pipe(catchError(() => of([]))),
+    { initialValue: [] },
+  );
+  protected readonly query = toSignal(this.route.queryParamMap.pipe(map(parseQuery)), {
+    requireSync: true,
+  });
+  private readonly hasGenres = computed(() => (this.query().genreIds?.length ?? 0) > 0);
+  protected readonly filtered = computed(() => {
+    const { releasedFrom, releasedTo, addedFrom, addedTo, runtimeFrom, runtimeTo, search } =
+      this.query();
+    return (
+      this.hasGenres() ||
+      !!(releasedFrom || releasedTo || addedFrom || addedTo || runtimeFrom || runtimeTo || search)
+    );
+  });
+  /** What the filter selects, e.g. "with any of the selected genres, released from May 25, 1979". */
+  protected readonly filterDescription = computed(() => {
+    const {
+      genreMatch,
+      releasedFrom,
+      releasedTo,
+      addedFrom,
+      addedTo,
+      runtimeFrom,
+      runtimeTo,
+      search,
+    } = this.query();
+    const genreText = this.hasGenres()
+      ? `with ${genreMatch === 'all' ? 'all' : 'any'} of the selected genres`
+      : undefined;
+    return [
+      search ? `matching "${search.trim()}"` : undefined,
+      genreText,
+      describeRuntime(runtimeFrom, runtimeTo),
+      describePeriod('released', releasedFrom, releasedTo),
+      describePeriod('added', addedFrom, addedTo),
+    ]
+      .filter((part) => part !== undefined)
+      .join(', ');
+  });
+  protected readonly runtimePresets = RUNTIME_PRESETS;
+  protected readonly result = signal<WatchlistPage | null>(null);
   protected readonly loading = signal(true);
   protected readonly error = signal<ApiError | null>(null);
   /** Movie ID of the item whose note is being edited. */
@@ -33,20 +177,30 @@ export class Watchlist {
   protected readonly saving = signal(false);
 
   private readonly reload = new Subject<void>();
+  private readonly searchInput = new Subject<string>();
 
   constructor() {
+    this.searchInput
+      .pipe(debounceTime(SEARCH_DEBOUNCE_MS), takeUntilDestroyed())
+      .subscribe((value) => {
+        if (value !== (this.query().search ?? '')) {
+          this.updateFilter({ search: value.trim() ? value : undefined }, true);
+        }
+      });
+
     this.route.queryParamMap
       .pipe(
-        map((params) => Number(params.get('page')) || 1),
-        switchMap((page) =>
+        map(parseQuery),
+        distinctUntilChanged((a, b) => requestKey(a) === requestKey(b)),
+        switchMap((query) =>
           this.reload.pipe(
             startWith(undefined),
-            map(() => page),
+            map(() => query),
           ),
         ),
         tap(() => this.loading.set(true)),
-        switchMap((page) =>
-          this.watchlistApi.list({ page, pageSize: PAGE_SIZE }).pipe(
+        switchMap((query) =>
+          this.watchlistApi.list(query).pipe(
             tap(() => this.error.set(null)),
             catchError((error) => {
               this.error.set(toApiError(error));
@@ -68,7 +222,76 @@ export class Watchlist {
   }
 
   protected goToPage(page: number): void {
-    this.router.navigate([], { queryParams: { page } });
+    this.router.navigate([], { queryParams: { page }, queryParamsHandling: 'merge' });
+  }
+
+  protected isSelected(genre: Genre): boolean {
+    return this.query().genreIds?.includes(genre.id) ?? false;
+  }
+
+  /** Selects the genre, or deselects it if it is selected. */
+  protected toggleGenre(genre: Genre): void {
+    const selected = this.query().genreIds ?? [];
+    const genreIds = this.isSelected(genre)
+      ? selected.filter((id) => id !== genre.id)
+      : [...selected, genre.id];
+    this.updateFilter({ genreId: genreIds.length ? genreIds : undefined });
+  }
+
+  protected setGenreMatch(match: GenreMatch): void {
+    // "any" is the default, so it needs no parameter.
+    this.updateFilter({ genreMatch: match === 'all' ? 'all' : undefined });
+  }
+
+  protected onSearch(value: string): void {
+    this.searchInput.next(value);
+  }
+
+  protected onRuntime(key: 'runtimeFrom' | 'runtimeTo', value: string): void {
+    this.updateFilter({ [key]: value || undefined });
+  }
+
+  protected isRuntimePreset(preset: RuntimePreset): boolean {
+    return this.query().runtimeFrom === preset.from && this.query().runtimeTo === preset.to;
+  }
+
+  /** Sets the runtime to the quick pick, or removes it if it is selected already. */
+  protected toggleRuntimePreset(preset: RuntimePreset): void {
+    const selected = this.isRuntimePreset(preset);
+    this.updateFilter({
+      runtimeFrom: selected ? undefined : preset.from,
+      runtimeTo: selected ? undefined : preset.to,
+    });
+  }
+
+  protected onDate(
+    key: 'releasedFrom' | 'releasedTo' | 'addedFrom' | 'addedTo',
+    value: string,
+  ): void {
+    this.updateFilter({ [key]: value || undefined });
+  }
+
+  protected clearFilter(): void {
+    this.updateFilter({
+      genreId: undefined,
+      genreMatch: undefined,
+      releasedFrom: undefined,
+      releasedTo: undefined,
+      addedFrom: undefined,
+      addedTo: undefined,
+      runtimeFrom: undefined,
+      runtimeTo: undefined,
+      search: undefined,
+    });
+  }
+
+  /** Changing the filter starts again at page 1. */
+  private updateFilter(changes: Params, replaceUrl = false): void {
+    this.router.navigate([], {
+      queryParams: { ...changes, page: undefined },
+      queryParamsHandling: 'merge',
+      replaceUrl,
+    });
   }
 
   /** Adds the movie at the top of the list (the newest come first). Already on it: nothing changes. */

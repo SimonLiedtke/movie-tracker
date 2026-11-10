@@ -6,9 +6,9 @@ namespace MovieTracker.Application.Watchlist;
 public sealed class WatchlistService(
     IWatchlistRepository watchlist, IMovieRepository movies, IUnitOfWork unitOfWork, TimeProvider timeProvider)
 {
-    public Task<PagedResult<WatchlistItemView>> ListAsync(
-        Guid userId, int page, int pageSize, CancellationToken cancellationToken) =>
-        watchlist.ListAsync(userId, page, pageSize, cancellationToken);
+    public Task<WatchlistPage> ListAsync(
+        Guid userId, WatchlistFilter filter, int page, int pageSize, CancellationToken cancellationToken) =>
+        watchlist.ListAsync(userId, filter, page, pageSize, cancellationToken);
 
     /// <summary>Puts the movie on the watchlist, or replaces the note if it is on it already (idempotent).</summary>
     public async Task<PutWatchlistItemResult> PutAsync(

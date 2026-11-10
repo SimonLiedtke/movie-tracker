@@ -67,6 +67,10 @@ a Render PostgreSQL database. `render.yaml` describes the web service.
 Every push to the connected branch deploys again; the migrations run when the app starts. The keys
 of the session cookies are stored in the database, so users stay signed in across deploys.
 
+The title search ignores accents, which uses the PostgreSQL extension `unaccent`.
+A migration creates it. It is one of the standard contrib extensions (included in the
+`postgres` Docker image and available on Render) and a trusted one, so the database owner may create it.
+
 ## Development
 
 Requirements: .NET 10 SDK, Docker.

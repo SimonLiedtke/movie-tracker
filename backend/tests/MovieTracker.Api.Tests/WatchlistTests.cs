@@ -95,6 +95,507 @@ public sealed class WatchlistTests(ApiFactory factory) : ApiTestBase(factory)
         Assert.Equal(3, page2.TotalCount);
     }
 
+    private async Task<List<string>> ListTitlesAsync(string query)
+    {
+        var result = await GetAsync<PagedResponse<WatchlistItemResponse>>($"/api/watchlist{query}");
+        return result.Items.Select(item => item.Movie.Title).Order().ToList();
+    }
+
+    /// <summary>Alien: horror, sci-fi. Halloween: horror. Solaris: sci-fi, drama. Heat: drama. Paddington: no genre.</summary>
+    private async Task PutGenreMoviesOnTheWatchlistAsync()
+    {
+        foreach (var (title, genreIds) in new (string, int[])[]
+        {
+            ("Alien", [Horror, ScienceFiction]),
+            ("Halloween", [Horror]),
+            ("Solaris", [ScienceFiction, Drama]),
+            ("Heat", [Drama]),
+            ("Paddington", []),
+        })
+        {
+            var movie = await CreateMovieAsync(title, genreIds: genreIds);
+            await Client.PutAsJsonAsync($"/api/watchlist/{movie.Id}", new { }, Ct);
+        }
+    }
+
+    [Fact]
+    public async Task List_and_put_include_the_genres_of_the_movie_alphabetically()
+    {
+        var movie = await CreateMovieAsync(genreIds: [ScienceFiction, Horror]);
+        var put = await Client.PutAsJsonAsync($"/api/watchlist/{movie.Id}", new { }, Ct);
+
+        var created = await ReadAsync<WatchlistItemResponse>(put, HttpStatusCode.Created);
+        var listed = (await GetAsync<PagedResponse<WatchlistItemResponse>>("/api/watchlist")).Items.Single();
+
+        Assert.Equal(["Horror", "Science Fiction"], created.Genres.Select(genre => genre.Name));
+        Assert.Equal(created.Genres, listed.Genres);
+    }
+
+    [Fact]
+    public async Task List_and_put_include_the_runtime_of_the_movie_or_null_if_unknown()
+    {
+        var known = await CreateMovieAsync("Alien", runtimeMinutes: 117);
+        var unknown = await CreateMovieAsync("Unknown", runtimeMinutes: null);
+        var put = await Client.PutAsJsonAsync($"/api/watchlist/{known.Id}", new { }, Ct);
+        await Client.PutAsJsonAsync($"/api/watchlist/{unknown.Id}", new { }, Ct);
+
+        var created = await ReadAsync<WatchlistItemResponse>(put, HttpStatusCode.Created);
+        var listed = (await GetAsync<PagedResponse<WatchlistItemResponse>>("/api/watchlist")).Items
+            .ToDictionary(item => item.Movie.Title, item => item.RuntimeMinutes);
+
+        Assert.Equal(117, created.RuntimeMinutes);
+        Assert.Equal(117, listed["Alien"]);
+        Assert.Null(listed["Unknown"]);
+    }
+
+    [Fact]
+    public async Task List_with_one_genre_returns_the_movies_with_that_genre()
+    {
+        await PutGenreMoviesOnTheWatchlistAsync();
+
+        Assert.Equal(["Alien", "Halloween"], await ListTitlesAsync($"?genreId={Horror}"));
+    }
+
+    [Fact]
+    public async Task List_with_several_genres_returns_the_movies_with_any_of_them_by_default()
+    {
+        await PutGenreMoviesOnTheWatchlistAsync();
+
+        var expected = new[] { "Alien", "Halloween", "Solaris" };
+        Assert.Equal(expected, await ListTitlesAsync($"?genreId={Horror}&genreId={ScienceFiction}"));
+        Assert.Equal(expected, await ListTitlesAsync($"?genreId={Horror}&genreId={ScienceFiction}&genreMatch=any"));
+    }
+
+    [Fact]
+    public async Task List_with_genreMatch_all_returns_only_the_movies_with_every_genre()
+    {
+        await PutGenreMoviesOnTheWatchlistAsync();
+
+        Assert.Equal(["Alien"], await ListTitlesAsync($"?genreId={Horror}&genreId={ScienceFiction}&genreMatch=all"));
+        Assert.Equal(["Solaris"], await ListTitlesAsync($"?genreId={Drama}&genreId={ScienceFiction}&genreMatch=all"));
+        Assert.Empty(await ListTitlesAsync($"?genreId={Horror}&genreId={Drama}&genreMatch=all"));
+    }
+
+    [Fact]
+    public async Task List_with_a_repeated_genre_counts_it_once()
+    {
+        await PutGenreMoviesOnTheWatchlistAsync();
+
+        Assert.Equal(
+            ["Alien", "Halloween"], await ListTitlesAsync($"?genreId={Horror}&genreId={Horror}&genreMatch=all"));
+    }
+
+    [Fact]
+    public async Task List_with_an_unknown_genre_matches_nothing_for_all_and_is_ignored_for_any()
+    {
+        await PutGenreMoviesOnTheWatchlistAsync();
+
+        Assert.Empty(await ListTitlesAsync($"?genreId={Horror}&genreId=99999&genreMatch=all"));
+        Assert.Equal(["Alien", "Halloween"], await ListTitlesAsync($"?genreId={Horror}&genreId=99999"));
+    }
+
+    [Fact]
+    public async Task List_counts_and_pages_only_the_movies_matching_the_genres()
+    {
+        await PutGenreMoviesOnTheWatchlistAsync();
+
+        var result = await GetAsync<PagedResponse<WatchlistItemResponse>>(
+            $"/api/watchlist?genreId={Horror}&genreId={ScienceFiction}&pageSize=2&page=2");
+
+        Assert.Equal(3, result.TotalCount);
+        Assert.Single(result.Items);
+    }
+
+    [Fact]
+    public async Task List_returns_the_number_of_all_items_whatever_the_filter()
+    {
+        await PutGenreMoviesOnTheWatchlistAsync();
+
+        var unfiltered = await GetAsync<WatchlistPageResponse>("/api/watchlist");
+        var horror = await GetAsync<WatchlistPageResponse>($"/api/watchlist?genreId={Horror}");
+        var none = await GetAsync<WatchlistPageResponse>($"/api/watchlist?genreId={Horror}&genreId={Drama}&genreMatch=all");
+        var page2 = await GetAsync<WatchlistPageResponse>($"/api/watchlist?genreId={Horror}&pageSize=1&page=2");
+
+        Assert.Equal((5, 5), (unfiltered.TotalCount, unfiltered.UnfilteredCount));
+        Assert.Equal((2, 5), (horror.TotalCount, horror.UnfilteredCount));
+        Assert.Equal((0, 5), (none.TotalCount, none.UnfilteredCount));
+        Assert.Equal((2, 5), (page2.TotalCount, page2.UnfilteredCount));
+    }
+
+    [Fact]
+    public async Task List_does_not_count_other_users_items_as_unfiltered()
+    {
+        await PutGenreMoviesOnTheWatchlistAsync();
+
+        var result = await Bob.GetFromJsonAsync<WatchlistPageResponse>($"/api/watchlist?genreId={Horror}", Ct);
+
+        Assert.Equal((0, 0), (result!.TotalCount, result.UnfilteredCount));
+    }
+
+    [Fact]
+    public async Task List_with_genres_does_not_show_other_users_items()
+    {
+        await PutGenreMoviesOnTheWatchlistAsync();
+
+        var result = await Bob.GetFromJsonAsync<PagedResponse<WatchlistItemResponse>>(
+            $"/api/watchlist?genreId={Horror}", Ct);
+
+        Assert.Empty(result!.Items);
+    }
+
+    /// <summary>Alien 1979-05-25 (horror), Heat 1995-12-15 (drama), Solaris 1972-03-20 (sci-fi), Unreleased: no date.</summary>
+    private async Task PutDatedMoviesOnTheWatchlistAsync()
+    {
+        foreach (var (title, releaseDate, genreId) in new (string, string?, int)[]
+        {
+            ("Alien", "1979-05-25", Horror),
+            ("Heat", "1995-12-15", Drama),
+            ("Solaris", "1972-03-20", ScienceFiction),
+            ("Unreleased", null, Horror),
+        })
+        {
+            var movie = await CreateMovieAsync(title, releaseDate, genreIds: [genreId]);
+            await Client.PutAsJsonAsync($"/api/watchlist/{movie.Id}", new { }, Ct);
+        }
+    }
+
+    [Fact]
+    public async Task List_with_releasedFrom_returns_the_movies_released_on_or_after_that_day()
+    {
+        await PutDatedMoviesOnTheWatchlistAsync();
+
+        Assert.Equal(["Alien", "Heat"], await ListTitlesAsync("?releasedFrom=1979-05-25"));
+        Assert.Equal(["Heat"], await ListTitlesAsync("?releasedFrom=1979-05-26"));
+    }
+
+    [Fact]
+    public async Task List_with_releasedTo_returns_the_movies_released_on_or_before_that_day()
+    {
+        await PutDatedMoviesOnTheWatchlistAsync();
+
+        Assert.Equal(["Alien", "Solaris"], await ListTitlesAsync("?releasedTo=1979-05-25"));
+        Assert.Equal(["Solaris"], await ListTitlesAsync("?releasedTo=1979-05-24"));
+    }
+
+    [Fact]
+    public async Task List_with_both_release_dates_returns_the_movies_released_in_the_period_and_not_those_without_a_date()
+    {
+        await PutDatedMoviesOnTheWatchlistAsync();
+
+        Assert.Equal(["Alien", "Solaris"], await ListTitlesAsync("?releasedFrom=1972-03-20&releasedTo=1979-05-25"));
+        Assert.Equal(["Heat"], await ListTitlesAsync("?releasedFrom=1995-12-15&releasedTo=1995-12-15"));
+        // Without a date filter, the movie without release date is listed.
+        Assert.Contains("Unreleased", await ListTitlesAsync(""));
+    }
+
+    [Fact]
+    public async Task List_combines_the_release_dates_with_the_genres()
+    {
+        await PutDatedMoviesOnTheWatchlistAsync();
+
+        Assert.Equal(["Alien"], await ListTitlesAsync($"?genreId={Horror}&releasedFrom=1970-01-01"));
+        Assert.Empty(await ListTitlesAsync($"?genreId={Drama}&releasedTo=1990-01-01"));
+    }
+
+    [Fact]
+    public async Task List_counts_all_items_as_unfiltered_when_only_the_release_date_filters()
+    {
+        await PutDatedMoviesOnTheWatchlistAsync();
+
+        var result = await GetAsync<WatchlistPageResponse>("/api/watchlist?releasedFrom=1990-01-01");
+
+        Assert.Equal((1, 4), (result.TotalCount, result.UnfilteredCount));
+    }
+
+    /// <summary>
+    /// Added on 2026-11-03 (12:00), 2026-11-03 (23:59:59), 2026-11-04 (00:00) and 2026-11-10 (12:00), all UTC.
+    /// </summary>
+    private async Task PutMoviesOnTheWatchlistOverSeveralDaysAsync()
+    {
+        foreach (var (title, advance) in new (string, TimeSpan)[]
+        {
+            ("Monday noon", TimeSpan.Zero),
+            ("Monday night", new TimeSpan(11, 59, 59)),
+            ("Tuesday midnight", TimeSpan.FromSeconds(1)),
+            ("Next week", new TimeSpan(6, 12, 0, 0)),
+        })
+        {
+            Factory.Clock.Advance(advance);
+            var movie = await CreateMovieAsync(title);
+            await Client.PutAsJsonAsync($"/api/watchlist/{movie.Id}", new { }, Ct);
+        }
+    }
+
+    [Fact]
+    public async Task List_with_addedFrom_returns_the_items_added_on_or_after_the_start_of_that_day()
+    {
+        await PutMoviesOnTheWatchlistOverSeveralDaysAsync();
+
+        Assert.Equal(["Monday night", "Monday noon", "Next week", "Tuesday midnight"], await ListTitlesAsync("?addedFrom=2026-11-03"));
+        Assert.Equal(["Next week", "Tuesday midnight"], await ListTitlesAsync("?addedFrom=2026-11-04"));
+        Assert.Equal(["Next week"], await ListTitlesAsync("?addedFrom=2026-11-05"));
+    }
+
+    [Fact]
+    public async Task List_with_addedTo_returns_the_items_added_on_or_before_the_end_of_that_day()
+    {
+        await PutMoviesOnTheWatchlistOverSeveralDaysAsync();
+
+        Assert.Equal(["Monday night", "Monday noon"], await ListTitlesAsync("?addedTo=2026-11-03"));
+        Assert.Equal(["Monday night", "Monday noon", "Tuesday midnight"], await ListTitlesAsync("?addedTo=2026-11-04"));
+        Assert.Empty(await ListTitlesAsync("?addedTo=2026-11-02"));
+    }
+
+    [Fact]
+    public async Task List_with_both_added_dates_returns_the_items_added_in_the_period()
+    {
+        await PutMoviesOnTheWatchlistOverSeveralDaysAsync();
+
+        Assert.Equal(["Tuesday midnight"], await ListTitlesAsync("?addedFrom=2026-11-04&addedTo=2026-11-04"));
+        Assert.Equal(
+            ["Monday night", "Monday noon", "Tuesday midnight"], await ListTitlesAsync("?addedFrom=2026-11-03&addedTo=2026-11-09"));
+    }
+
+    [Fact]
+    public async Task List_accepts_the_last_possible_day_as_addedTo()
+    {
+        await PutMoviesOnTheWatchlistOverSeveralDaysAsync();
+
+        Assert.Equal(4, (await ListTitlesAsync("?addedTo=9999-12-31")).Count);
+    }
+
+    [Fact]
+    public async Task List_combines_the_added_dates_with_the_other_filters()
+    {
+        await PutDatedMoviesOnTheWatchlistAsync();
+        Factory.Clock.Advance(TimeSpan.FromDays(5));
+        var late = await CreateMovieAsync("Late", "1979-01-01", genreIds: [Horror]);
+        await Client.PutAsJsonAsync($"/api/watchlist/{late.Id}", new { }, Ct);
+
+        Assert.Equal(["Late"], await ListTitlesAsync($"?genreId={Horror}&addedFrom=2026-11-08"));
+        Assert.Equal(["Alien"], await ListTitlesAsync($"?genreId={Horror}&addedTo=2026-11-07&releasedFrom=1970-01-01"));
+        var result = await GetAsync<WatchlistPageResponse>("/api/watchlist?addedFrom=2026-11-08");
+        Assert.Equal((1, 5), (result.TotalCount, result.UnfilteredCount));
+    }
+
+    /// <summary>Short 23 min, Heat 170 min, Alien 117 min, Unknown: no runtime.</summary>
+    private async Task PutMoviesOfDifferentLengthOnTheWatchlistAsync()
+    {
+        foreach (var (title, minutes) in new (string, int?)[]
+        {
+            ("Short", 23),
+            ("Heat", 170),
+            ("Alien", 117),
+            ("Unknown", null),
+        })
+        {
+            var movie = await CreateMovieAsync(title, runtimeMinutes: minutes);
+            await Client.PutAsJsonAsync($"/api/watchlist/{movie.Id}", new { }, Ct);
+        }
+    }
+
+    [Fact]
+    public async Task List_with_runtimeFrom_returns_the_movies_that_are_at_least_that_long()
+    {
+        await PutMoviesOfDifferentLengthOnTheWatchlistAsync();
+
+        Assert.Equal(["Alien", "Heat"], await ListTitlesAsync("?runtimeFrom=117"));
+        Assert.Equal(["Heat"], await ListTitlesAsync("?runtimeFrom=118"));
+    }
+
+    [Fact]
+    public async Task List_with_runtimeTo_returns_the_movies_that_are_at_most_that_long()
+    {
+        await PutMoviesOfDifferentLengthOnTheWatchlistAsync();
+
+        Assert.Equal(["Alien", "Short"], await ListTitlesAsync("?runtimeTo=117"));
+        Assert.Equal(["Short"], await ListTitlesAsync("?runtimeTo=116"));
+    }
+
+    [Fact]
+    public async Task List_with_both_runtimes_returns_the_movies_in_between_and_not_those_without_runtime()
+    {
+        await PutMoviesOfDifferentLengthOnTheWatchlistAsync();
+
+        Assert.Equal(["Alien", "Short"], await ListTitlesAsync("?runtimeFrom=23&runtimeTo=148"));
+        Assert.Equal(["Short"], await ListTitlesAsync("?runtimeFrom=23&runtimeTo=23"));
+        Assert.Contains("Unknown", await ListTitlesAsync(""));
+    }
+
+    [Fact]
+    public async Task List_combines_the_runtime_with_the_other_filters_and_counts_all_items_as_unfiltered()
+    {
+        await PutMoviesOfDifferentLengthOnTheWatchlistAsync();
+
+        Assert.Equal(["Alien", "Short"], await ListTitlesAsync($"?genreId={Horror}&runtimeTo=148"));
+        Assert.Empty(await ListTitlesAsync($"?genreId={Drama}&runtimeTo=148"));
+        var result = await GetAsync<WatchlistPageResponse>("/api/watchlist?runtimeFrom=150");
+        Assert.Equal((1, 4), (result.TotalCount, result.UnfilteredCount));
+    }
+
+    [Theory]
+    [InlineData("runtimeFrom=0")]
+    [InlineData("runtimeTo=-5")]
+    [InlineData("runtimeFrom=1501")]
+    [InlineData("runtimeTo=abc")]
+    public async Task List_rejects_an_invalid_runtime(string query)
+    {
+        var response = await Client.GetAsync($"/api/watchlist?{query}", Ct);
+
+        await ReadValidationProblemAsync(response);
+    }
+
+    [Fact]
+    public async Task List_rejects_a_runtime_range_that_ends_before_it_starts()
+    {
+        var response = await Client.GetAsync("/api/watchlist?runtimeFrom=148&runtimeTo=23", Ct);
+
+        var problem = await ReadValidationProblemAsync(response);
+        Assert.Contains("runtimeFrom", problem.Errors.Keys);
+    }
+
+    [Fact]
+    public async Task List_rejects_an_added_period_that_ends_before_it_starts()
+    {
+        var response = await Client.GetAsync("/api/watchlist?addedFrom=2026-11-04&addedTo=2026-11-03", Ct);
+
+        var problem = await ReadValidationProblemAsync(response);
+        Assert.Contains("addedFrom", problem.Errors.Keys);
+    }
+
+    [Fact]
+    public async Task List_rejects_an_invalid_added_date()
+    {
+        var response = await Client.GetAsync("/api/watchlist?addedTo=tomorrow", Ct);
+
+        var problem = await ReadValidationProblemAsync(response);
+        Assert.Contains("addedTo", problem.Errors.Keys);
+    }
+
+    private async Task PutOnTheWatchlistAsync(params (string Title, string? OriginalTitle, int[] GenreIds)[] movies)
+    {
+        foreach (var (title, originalTitle, genreIds) in movies)
+        {
+            var movie = await CreateMovieAsync(title, originalTitle: originalTitle, genreIds: genreIds);
+            await Client.PutAsJsonAsync($"/api/watchlist/{movie.Id}", new { }, Ct);
+        }
+    }
+
+    [Fact]
+    public async Task List_with_search_returns_the_movies_whose_title_or_original_title_contains_the_text_in_any_case()
+    {
+        await PutOnTheWatchlistAsync(
+            ("Alien", null, [Horror]),
+            ("Aliens", null, [Horror]),
+            ("Spirited Away", "Sen to Chihiro no Kamikakushi", [Drama]),
+            ("Heat", null, [Drama]));
+
+        Assert.Equal(["Alien", "Aliens"], await ListTitlesAsync("?search=ALI"));
+        Assert.Equal(["Spirited Away"], await ListTitlesAsync("?search=chihiro"));
+        Assert.Equal(["Alien", "Aliens"], await ListTitlesAsync("?search=%20%20alien%20"));
+        Assert.Empty(await ListTitlesAsync("?search=zzz"));
+    }
+
+    [Theory]
+    [InlineData("o briain")]
+    [InlineData("Ó BRIAIN")]
+    [InlineData("ó briain")]
+    [InlineData("voice of reason")]
+    public async Task List_with_search_ignores_accents_and_case_in_the_text_and_the_title(string search)
+    {
+        await PutOnTheWatchlistAsync(("Dara Ó Briain: Voice of Reason", null, []), ("Heat", null, []));
+
+        Assert.Equal(["Dara Ó Briain: Voice of Reason"], await ListTitlesAsync($"?search={Uri.EscapeDataString(search)}"));
+    }
+
+    [Theory]
+    [InlineData("amelie", "Amélie")]
+    [InlineData("amélie", "Amelie")]
+    [InlineData("strasse", "Die Straße")]
+    [InlineData("aeon", "Æon Flux")]
+    [InlineData("ornen", "Ørnen")]
+    [InlineData("naive", "Naïve")]
+    [InlineData("sen to chihiro no kamikakushi", "Spirited Away")]
+    [InlineData("la maman et la putain", "Maman")]
+    public async Task List_with_search_ignores_accents_and_similar_letter_variants(string search, string expectedTitle)
+    {
+        await PutOnTheWatchlistAsync(
+            ("Amélie", null, []),
+            ("Amelie", null, []),
+            ("Die Straße", null, []),
+            ("Æon Flux", null, []),
+            ("Ørnen", null, []),
+            ("Naïve", null, []),
+            ("Spirited Away", "Sen to Chihiro no Kamikakushi", []),
+            ("Maman", "La Maman et la Putain", []),
+            ("Heat", null, []));
+
+        var titles = await ListTitlesAsync($"?search={Uri.EscapeDataString(search)}");
+
+        Assert.Contains(expectedTitle, titles);
+        Assert.DoesNotContain("Heat", titles);
+    }
+
+    [Theory]
+    [InlineData("100%", "100% Wolf")]
+    [InlineData("a_b", "a_b")]
+    [InlineData(@"AC\DC", @"AC\DC")]
+    public async Task List_with_search_treats_wildcards_literally(string search, string expectedTitle)
+    {
+        await PutOnTheWatchlistAsync(
+            ("100% Wolf", null, []), ("1000 Wolves", null, []), ("a_b", null, []), ("axb", null, []), (@"AC\DC", null, []));
+
+        Assert.Equal([expectedTitle], await ListTitlesAsync($"?search={Uri.EscapeDataString(search)}"));
+    }
+
+    [Fact]
+    public async Task List_ignores_a_blank_search_and_combines_it_with_the_other_filters()
+    {
+        await PutOnTheWatchlistAsync(
+            ("Alien", null, [Horror]), ("Aliens", null, [Horror, ScienceFiction]), ("Heat", null, [Drama]));
+
+        Assert.Equal(["Alien", "Aliens", "Heat"], await ListTitlesAsync("?search=%20%20"));
+        Assert.Equal(["Aliens"], await ListTitlesAsync($"?search=alien&genreId={ScienceFiction}"));
+        var result = await GetAsync<WatchlistPageResponse>("/api/watchlist?search=heat");
+        Assert.Equal((1, 3), (result.TotalCount, result.UnfilteredCount));
+    }
+
+    [Fact]
+    public async Task List_rejects_a_search_longer_than_200_characters()
+    {
+        var response = await Client.GetAsync($"/api/watchlist?search={new string('a', 201)}", Ct);
+
+        var problem = await ReadValidationProblemAsync(response);
+        Assert.Contains("search", problem.Errors.Keys);
+    }
+
+    [Fact]
+    public async Task List_rejects_a_release_period_that_ends_before_it_starts()
+    {
+        var response = await Client.GetAsync("/api/watchlist?releasedFrom=1990-01-01&releasedTo=1980-01-01", Ct);
+
+        var problem = await ReadValidationProblemAsync(response);
+        Assert.Contains("releasedFrom", problem.Errors.Keys);
+    }
+
+    [Fact]
+    public async Task List_rejects_an_invalid_release_date()
+    {
+        var response = await Client.GetAsync("/api/watchlist?releasedFrom=yesterday", Ct);
+
+        var problem = await ReadValidationProblemAsync(response);
+        Assert.Contains("releasedFrom", problem.Errors.Keys);
+    }
+
+    [Fact]
+    public async Task List_rejects_an_unknown_genreMatch()
+    {
+        var response = await Client.GetAsync("/api/watchlist?genreMatch=some", Ct);
+
+        var problem = await ReadValidationProblemAsync(response);
+        Assert.Contains("genreMatch", problem.Errors.Keys);
+    }
+
     [Fact]
     public async Task List_rejects_an_invalid_page_size()
     {

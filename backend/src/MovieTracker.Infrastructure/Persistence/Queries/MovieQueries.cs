@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using MovieTracker.Application.Movies;
+using MovieTracker.Application.Watchlist;
 using MovieTracker.Domain.Diary;
 using MovieTracker.Domain.Movies;
+using MovieTracker.Domain.Watchlist;
 
 namespace MovieTracker.Infrastructure.Persistence.Queries;
 
@@ -32,13 +34,79 @@ internal static class MovieQueries
             return movies;
         }
 
-        var pattern = $"%{EscapeLikePattern(search.Trim())}%";
+        var pattern = ContainsPattern(search);
         // The escape character must be passed explicitly: without it, Npgsql generates ESCAPE '' and the
         // backslashes added by EscapeLikePattern would be matched literally.
         return movies.Where(movie =>
-            EF.Functions.ILike(movie.Title, pattern, LikeEscapeCharacter) ||
-            (movie.OriginalTitle != null && EF.Functions.ILike(movie.OriginalTitle, pattern, LikeEscapeCharacter)));
+            EF.Functions.ILike(EF.Functions.Unaccent(movie.Title), EF.Functions.Unaccent(pattern), LikeEscapeCharacter) ||
+            (movie.OriginalTitle != null &&
+             EF.Functions.ILike(EF.Functions.Unaccent(movie.OriginalTitle), EF.Functions.Unaccent(pattern), LikeEscapeCharacter)));
     }
+
+    /// <summary>Watchlist items that match the filter.</summary>
+    public static IQueryable<WatchlistItem> Matching(this IQueryable<WatchlistItem> items, WatchlistFilter filter)
+    {
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            // Like the search in the movie list: title or original title, any case and without regard to
+            // accents, wildcards taken literally.
+            var pattern = ContainsPattern(filter.Search);
+            items = items.Where(item =>
+                EF.Functions.ILike(EF.Functions.Unaccent(item.Movie.Title), EF.Functions.Unaccent(pattern), LikeEscapeCharacter) ||
+                (item.Movie.OriginalTitle != null &&
+                 EF.Functions.ILike(EF.Functions.Unaccent(item.Movie.OriginalTitle), EF.Functions.Unaccent(pattern), LikeEscapeCharacter)));
+        }
+
+        var genreIds = filter.GenreIds.Distinct().ToList();
+        if (genreIds.Count > 0)
+        {
+            items = filter.GenreMatch == GenreMatch.All
+                // Genres are assigned to a movie at most once, so counting the matches counts the distinct genres.
+                ? items.Where(item => item.Movie.Genres.Count(genre => genreIds.Contains(genre.Id)) == genreIds.Count)
+                : items.Where(item => item.Movie.Genres.Any(genre => genreIds.Contains(genre.Id)));
+        }
+
+        // Comparing a missing release date is never true: such movies are left out if a bound is set.
+        if (filter.ReleasedFrom is { } from)
+        {
+            items = items.Where(item => item.Movie.ReleaseDate >= from);
+        }
+
+        if (filter.ReleasedTo is { } to)
+        {
+            items = items.Where(item => item.Movie.ReleaseDate <= to);
+        }
+
+        // Like the release date, a missing runtime never compares true.
+        if (filter.RuntimeFrom is { } runtimeFrom)
+        {
+            items = items.Where(item => item.Movie.RuntimeMinutes >= runtimeFrom);
+        }
+
+        if (filter.RuntimeTo is { } runtimeTo)
+        {
+            items = items.Where(item => item.Movie.RuntimeMinutes <= runtimeTo);
+        }
+
+        // Days are UTC days, like the date the frontends show for "added".
+        if (filter.AddedFrom is { } addedFrom)
+        {
+            var start = StartOfDay(addedFrom);
+            items = items.Where(item => item.AddedAt >= start);
+        }
+
+        // Exclusive upper bound: the start of the day after. For the last possible day there is none.
+        if (filter.AddedTo is { } addedTo && addedTo < DateOnly.MaxValue)
+        {
+            var end = StartOfDay(addedTo.AddDays(1));
+            items = items.Where(item => item.AddedAt < end);
+        }
+
+        return items;
+    }
+
+    private static DateTimeOffset StartOfDay(DateOnly day) =>
+        new(day.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
 
     public static IQueryable<MovieSummaryRow> SelectSummaryRows(
         this IQueryable<Movie> movies, MovieTrackerDbContext db, Guid userId) =>
@@ -87,6 +155,14 @@ internal static class MovieQueries
                 .Where(entry => entry.MovieId == movie.Id && entry.UserId == userId)
                 .Max(entry => (DateOnly?)entry.WatchedOn),
             movie.CreatedAt));
+
+    /// <summary>
+    /// The LIKE pattern for "contains the (trimmed) text, taken literally". Both the pattern and the searched column
+    /// go through <c>unaccent</c> (a PostgreSQL extension, see the migration).
+    /// Accents are removed before the case-insensitive comparison, which therefore also
+    /// works for accented capitals in a database with the "C" collation.
+    /// </summary>
+    private static string ContainsPattern(string search) => $"%{EscapeLikePattern(search.Trim())}%";
 
     private static string EscapeLikePattern(string value) => value
         .Replace(@"\", @"\\")

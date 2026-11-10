@@ -23,5 +23,9 @@ public sealed class MovieTrackerDbContext(DbContextOptions<MovieTrackerDbContext
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
-        => modelBuilder.ApplyConfigurationsFromAssembly(typeof(MovieTrackerDbContext).Assembly);
+    {
+        // For searching titles without regard to accents, see MovieQueries.
+        modelBuilder.HasPostgresExtension("unaccent");
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(MovieTrackerDbContext).Assembly);
+    }
 }

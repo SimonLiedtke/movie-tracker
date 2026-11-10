@@ -27,7 +27,11 @@ internal static class Mappings
         entry.Liked,
         entry.CreatedAt);
 
-    public static WatchlistItemResponse ToResponse(this WatchlistItemView item) => new(item.Movie.ToResponse(), item.AddedAt, item.Note);
+    public static WatchlistItemResponse ToResponse(this WatchlistItemView item) => new(
+        item.Movie.ToResponse(), item.AddedAt, item.Note, item.Genres.Select(ToResponse).ToList(), item.RuntimeMinutes);
+
+    public static WatchlistPageResponse ToResponse(this WatchlistPage page) => new(
+        page.Items.Select(item => item.ToResponse()).ToList(), page.Page, page.PageSize, page.TotalCount, page.UnfilteredCount);
 
     public static MovieSummaryResponse ToResponse(this MovieSummary movie) => new(
         movie.Id,

@@ -14,8 +14,9 @@ import {
   MovieSearchResponse,
   MovieSummary,
   PagedResponse,
-  PageQuery,
   WatchlistItem,
+  WatchlistPage,
+  WatchlistQuery,
 } from './models';
 
 // Relative URLs: the dev server proxies /api to the backend (see proxy.conf.json).
@@ -107,9 +108,32 @@ export class DiaryApi {
 export class WatchlistApi {
   private readonly http = inject(HttpClient);
 
-  list(query: PageQuery = {}): Observable<PagedResponse<WatchlistItem>> {
-    return this.http.get<PagedResponse<WatchlistItem>>(`${BASE}/watchlist`, {
-      params: toHttpParams(query),
+  list({
+    genreIds,
+    genreMatch,
+    releasedFrom,
+    releasedTo,
+    addedFrom,
+    addedTo,
+    runtimeFrom,
+    runtimeTo,
+    search,
+    ...paging
+  }: WatchlistQuery = {}): Observable<WatchlistPage> {
+    const filtered = genreIds !== undefined && genreIds.length > 0;
+    return this.http.get<WatchlistPage>(`${BASE}/watchlist`, {
+      params: toHttpParams({
+        ...paging,
+        genreId: genreIds,
+        genreMatch: filtered ? (genreMatch ?? 'any') : undefined,
+        releasedFrom,
+        releasedTo,
+        addedFrom,
+        addedTo,
+        runtimeFrom,
+        runtimeTo,
+        search: search?.trim(),
+      }),
     });
   }
 

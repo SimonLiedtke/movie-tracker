@@ -349,7 +349,68 @@ paths:
       tags: [Watchlist]
       operationId: listWatchlist
       summary: List the watchlist, most recently added first
+      description: |
+        With `genreId`, only movies that have any or all of these genres are listed (see `genreMatch`).
+        With `releasedFrom` and/or `releasedTo`, only movies released in this period are listed.
+        With `addedFrom` and/or `addedTo`, only items added to the watchlist in this period are listed.
+        With `runtimeFrom` and/or `runtimeTo`, only movies of this length in minutes are listed.
+        With `search`, only movies with this text in their title or original title are listed.
+        All filters apply together.
+        `totalCount` counts the matching items only; `unfilteredCount` all items.
       parameters:
+        - name: genreId
+          in: query
+          description: |
+            Filter by genre; repeat the parameter to filter by several genres (`genreId=27&genreId=878`).
+            Genres that do not exist are not an error: no movie has them.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items: { type: integer, format: int32 }
+        - name: genreMatch
+          in: query
+          description: |
+            How several `genreId`s are combined: `any` lists movies with at least one of the genres,
+            `all` only movies that have every one of them. Without `genreId` it has no effect.
+          schema:
+            type: string
+            enum: [any, all]
+            default: any
+        - name: releasedFrom
+          in: query
+          description: |
+            Only movies released on or after this day (inclusive).
+            Movies without a release date are left out when `releasedFrom` or `releasedTo` is set.
+          schema: { type: string, format: date }
+        - name: releasedTo
+          in: query
+          description: Only movies released on or before this day (inclusive). Must not be before `releasedFrom`.
+          schema: { type: string, format: date }
+        - name: addedFrom
+          in: query
+          description: |
+            Only items put on the watchlist on or after this day (inclusive).
+            Days are UTC days, like `addedAt`.
+          schema: { type: string, format: date }
+        - name: addedTo
+          in: query
+          description: Only items put on the watchlist on or before this day (inclusive, UTC). Must not be before `addedFrom`.
+          schema: { type: string, format: date }
+        - name: runtimeFrom
+          in: query
+          description: |
+            Only movies that are at least this many minutes long (inclusive).
+            Movies without a runtime are left out when `runtimeFrom` or `runtimeTo` is set.
+          schema: { type: integer, format: int32, minimum: 1, maximum: 1500 }
+        - name: runtimeTo
+          in: query
+          description: Only movies that are at most this many minutes long (inclusive). Must not be less than `runtimeFrom`.
+          schema: { type: integer, format: int32, minimum: 1, maximum: 1500 }
+        - name: search
+          in: query
+          description: Only movies whose title or original title contains this text (any case; blank means no search).
+          schema: { type: string, maxLength: 200 }
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PageSize'
       responses:
@@ -656,11 +717,16 @@ components:
 
     WatchlistItem:
       type: object
-      required: [movie, addedAt]
+      required: [movie, addedAt, genres]
       properties:
         movie: { $ref: '#/components/schemas/MovieRef' }
         addedAt: { type: string, format: date-time }
         note: { type: string, nullable: true }
+        genres:
+          type: array
+          description: The movie's genres, alphabetically
+          items: { $ref: '#/components/schemas/Genre' }
+        runtimeMinutes: { type: integer, format: int32, minimum: 1, nullable: true, description: The movie's runtime }
 
     WatchlistItemInput:
       type: object
@@ -700,8 +766,14 @@ components:
       allOf:
         - $ref: '#/components/schemas/PageMetadata'
         - type: object
-          required: [items]
+          required: [items, unfilteredCount]
           properties:
+            unfilteredCount:
+              type: integer
+              format: int32
+              description: |
+                The number of items on the watchlist, whatever the filter (`totalCount` counts the matching ones).
+                Shows how selective the filter is.
             items:
               type: array
               items: { $ref: '#/components/schemas/WatchlistItem' }

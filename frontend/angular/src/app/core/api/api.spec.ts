@@ -41,6 +41,59 @@ describe('API services', () => {
     request.flush({});
   });
 
+  it('lists the watchlist without filter', () => {
+    TestBed.inject(WatchlistApi).list({ page: 2, pageSize: 20 }).subscribe();
+
+    http.expectOne('/api/watchlist?page=2&pageSize=20').flush({});
+  });
+
+  it('lists the watchlist filtered by genres, repeating the parameter', () => {
+    TestBed.inject(WatchlistApi)
+      .list({ genreIds: [27, 878], genreMatch: 'all', page: 1, pageSize: 20 })
+      .subscribe();
+
+    http
+      .expectOne('/api/watchlist?page=1&pageSize=20&genreId=27&genreId=878&genreMatch=all')
+      .flush({});
+  });
+
+  it('lists the watchlist filtered by the release period', () => {
+    TestBed.inject(WatchlistApi)
+      .list({ releasedFrom: '1979-01-01', releasedTo: '1989-12-31', page: 1 })
+      .subscribe();
+
+    http.expectOne('/api/watchlist?page=1&releasedFrom=1979-01-01&releasedTo=1989-12-31').flush({});
+  });
+
+  it('lists the watchlist filtered by the period it was added in', () => {
+    TestBed.inject(WatchlistApi)
+      .list({ addedFrom: '2026-11-01', addedTo: '2026-11-05', page: 1 })
+      .subscribe();
+
+    http.expectOne('/api/watchlist?page=1&addedFrom=2026-11-01&addedTo=2026-11-05').flush({});
+  });
+
+  it('lists the watchlist filtered by the runtime', () => {
+    TestBed.inject(WatchlistApi).list({ runtimeFrom: 23, runtimeTo: 148, page: 1 }).subscribe();
+
+    http.expectOne('/api/watchlist?page=1&runtimeFrom=23&runtimeTo=148').flush({});
+  });
+
+  it('lists the watchlist filtered by title, without the spaces around the text', () => {
+    TestBed.inject(WatchlistApi).list({ search: ' alien ', page: 1 }).subscribe();
+
+    http.expectOne('/api/watchlist?page=1&search=alien').flush({});
+  });
+
+  it('matches any genre by default, and sends no match mode without genres', () => {
+    const api = TestBed.inject(WatchlistApi);
+    api.list({ genreIds: [27] }).subscribe();
+    api.list({ genreIds: [], genreMatch: 'all' }).subscribe();
+
+    http.expectOne('/api/watchlist?genreId=27&genreMatch=any').flush({});
+    http.expectOne('/api/watchlist').flush({});
+  });
+
   it('puts a movie on the watchlist with a note', () => {
     TestBed.inject(WatchlistApi).put('42', "Director's cut").subscribe();
 

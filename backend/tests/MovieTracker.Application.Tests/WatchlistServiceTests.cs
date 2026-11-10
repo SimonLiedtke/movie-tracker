@@ -165,10 +165,20 @@ public sealed class WatchlistServiceTests
         await _service.PutAsync(Alice, aliens.Id, null, Ct);
         await _service.PutAsync(Bob, alien.Id, null, Ct);
 
-        var result = await _service.ListAsync(Alice, page: 1, pageSize: 10, Ct);
+        var result = await _service.ListAsync(Alice, WatchlistFilter.None, page: 1, pageSize: 10, Ct);
 
-        Assert.Equal((Alice, 1, 10), _watchlist.LastList);
+        Assert.Equal((Alice, WatchlistFilter.None, 1, 10), _watchlist.LastList);
         Assert.Equal(["Aliens", "Alien"], result.Items.Select(item => item.Movie.Title));
         Assert.Equal(2, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task List_passes_the_filter_on()
+    {
+        var filter = new WatchlistFilter([27, 878], GenreMatch.All);
+
+        await _service.ListAsync(Alice, filter, page: 2, pageSize: 5, Ct);
+
+        Assert.Equal((Alice, filter, 2, 5), _watchlist.LastList);
     }
 }

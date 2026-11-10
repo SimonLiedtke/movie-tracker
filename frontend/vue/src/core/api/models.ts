@@ -112,11 +112,45 @@ export interface WatchlistItem {
   movie: MovieRef;
   addedAt: string;
   note: string | null;
+  /** The movie's genres, alphabetically. */
+  genres: Genre[];
+  /** The movie's runtime in minutes; null if unknown. */
+  runtimeMinutes: number | null;
+}
+
+/** A page of the watchlist. */
+export interface WatchlistPage extends PagedResponse<WatchlistItem> {
+  /** The number of items on the watchlist, whatever the filter; `totalCount` counts the matching ones. */
+  unfilteredCount: number;
 }
 
 export interface PageQuery {
   page?: number;
   pageSize?: number;
+}
+
+/** `any`: at least one of the genres, `all`: every one of them. */
+export type GenreMatch = 'any' | 'all';
+
+export interface WatchlistQuery extends PageQuery {
+  /** Only movies with these genres; all movies if empty. */
+  genreIds?: number[];
+  /** How `genreIds` are combined. Default: `any`. */
+  genreMatch?: GenreMatch;
+  /** Only movies released on or after this day ("YYYY-MM-DD"); movies without release date are left out. */
+  releasedFrom?: string;
+  /** Only movies released on or before this day ("YYYY-MM-DD"); movies without release date are left out. */
+  releasedTo?: string;
+  /** Only movies put on the watchlist on or after this day ("YYYY-MM-DD", UTC). */
+  addedFrom?: string;
+  /** Only movies put on the watchlist on or before this day ("YYYY-MM-DD", UTC). */
+  addedTo?: string;
+  /** Only movies that are at least this many minutes long; movies without runtime are left out. */
+  runtimeFrom?: number;
+  /** Only movies that are at most this many minutes long; movies without runtime are left out. */
+  runtimeTo?: number;
+  /** Only movies whose title or original title contains this text. */
+  search?: string;
 }
 
 export interface User {
