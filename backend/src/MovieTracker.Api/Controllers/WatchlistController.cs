@@ -16,7 +16,8 @@ public sealed class WatchlistController(WatchlistService watchlist) : Controller
     /// <summary>
     /// With <paramref name="genreId"/> (repeatable), only movies with any (<c>genreMatch=any</c>, the default)
     /// or all (<c>genreMatch=all</c>) of these genres. With <paramref name="releasedFrom"/> and
-    /// <paramref name="releasedTo"/>, only movies released in this period (both ends included).
+    /// <paramref name="releasedTo"/>, only movies released in this period, with <paramref name="addedFrom"/> and
+    /// <paramref name="addedTo"/>, only items added in this period (both ends included, UTC days).
     /// </summary>
     [HttpGet(Name = "listWatchlist")]
     [ProducesResponseType<WatchlistPageResponse>(StatusCodes.Status200OK)]
@@ -26,6 +27,8 @@ public sealed class WatchlistController(WatchlistService watchlist) : Controller
         [FromQuery, AllowedValues("any", "all")] string genreMatch = "any",
         [FromQuery] DateOnly? releasedFrom = null,
         [FromQuery] DateOnly? releasedTo = null,
+        [FromQuery] DateOnly? addedFrom = null,
+        [FromQuery] DateOnly? addedTo = null,
         [FromQuery, Range(1, int.MaxValue)] int page = 1,
         [FromQuery, Range(1, 100)] int pageSize = 20,
         CancellationToken cancellationToken = default)
@@ -36,8 +39,19 @@ public sealed class WatchlistController(WatchlistService watchlist) : Controller
             return ValidationProblem(ModelState);
         }
 
+        if (addedFrom > addedTo)
+        {
+            ModelState.AddModelError("addedFrom", "'addedFrom' must not be after 'addedTo'.");
+            return ValidationProblem(ModelState);
+        }
+
         var filter = new WatchlistFilter(
-            genreId ?? [], genreMatch == "all" ? GenreMatch.All : GenreMatch.Any, releasedFrom, releasedTo);
+            genreId ?? [],
+            genreMatch == "all" ? GenreMatch.All : GenreMatch.Any,
+            releasedFrom,
+            releasedTo,
+            addedFrom,
+            addedTo);
         var result = await watchlist.ListAsync(User.GetUserId(), filter, page, pageSize, cancellationToken);
         return result.ToResponse();
     }

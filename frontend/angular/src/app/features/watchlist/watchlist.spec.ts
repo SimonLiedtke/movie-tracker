@@ -279,8 +279,8 @@ describe('Watchlist genre filter', () => {
     );
   });
 
-  describe('release date filter', () => {
-    const input = (id: 'released-from' | 'released-to') =>
+  describe('date filters', () => {
+    const input = (id: 'released-from' | 'released-to' | 'added-from' | 'added-to') =>
       page().querySelector<HTMLInputElement>(`#${id}`)!;
     const clearButton = () =>
       Array.from(page().querySelectorAll<HTMLButtonElement>('button')).find(
@@ -289,7 +289,7 @@ describe('Watchlist genre filter', () => {
 
     /** Enters the date, and answers the request that follows. */
     async function enter(
-      id: 'released-from' | 'released-to',
+      id: 'released-from' | 'released-to' | 'added-from' | 'added-to',
       value: string,
       expectedUrl: string,
       filter: string,
@@ -407,6 +407,72 @@ describe('Watchlist genre filter', () => {
 
       expect(input('released-from').value).toBe('');
       expect(input('released-to').value).toBe('');
+    });
+
+    it('lists the movies added from a day on, until a day, and in a period, and says so', async () => {
+      await open();
+
+      await enter(
+        'added-from',
+        '2026-11-01',
+        '/watchlist?addedFrom=2026-11-01',
+        '&addedFrom=2026-11-01',
+        paged([ALIEN], { unfilteredCount: 52 }),
+      );
+      expect(text()).toContain('1 of 52 movies to watch added from November 1, 2026');
+      expect(input('added-to').min).toBe('2026-11-01');
+
+      await enter(
+        'added-to',
+        '2026-11-05',
+        '/watchlist?addedFrom=2026-11-01&addedTo=2026-11-05',
+        '&addedFrom=2026-11-01&addedTo=2026-11-05',
+        paged([ALIEN], { unfilteredCount: 52 }),
+      );
+      expect(text()).toContain('added from November 1, 2026 to November 5, 2026');
+      expect(input('added-from').max).toBe('2026-11-05');
+    });
+
+    it('lists the movies added until a day', async () => {
+      await open();
+
+      await enter(
+        'added-to',
+        '2026-11-05',
+        '/watchlist?addedTo=2026-11-05',
+        '&addedTo=2026-11-05',
+        paged([ALIEN], { unfilteredCount: 52 }),
+      );
+
+      expect(text()).toContain('1 of 52 movies to watch added until November 5, 2026');
+    });
+
+    it('combines both periods with the genres, and shows them from the URL', async () => {
+      await open(
+        '/watchlist?genreId=27&releasedFrom=1979-01-01&addedTo=2026-11-05',
+        '&genreId=27&genreMatch=any&releasedFrom=1979-01-01&addedTo=2026-11-05',
+        paged([ALIEN], { unfilteredCount: 9 }),
+      );
+
+      expect(input('released-from').value).toBe('1979-01-01');
+      expect(input('added-from').value).toBe('');
+      expect(input('added-to').value).toBe('2026-11-05');
+      expect(text()).toContain(
+        '1 of 9 movies to watch with any of the selected genres, released from January 1, 1979, added until November 5, 2026',
+      );
+    });
+
+    it('clears the added dates, too', async () => {
+      await open(
+        '/watchlist?addedFrom=2026-11-01&addedTo=2026-11-05',
+        '&addedFrom=2026-11-01&addedTo=2026-11-05',
+        paged([ALIEN]),
+      );
+
+      await click(clearButton()!, '/watchlist', '', paged([ALIEN, HEAT]));
+
+      expect(input('added-from').value).toBe('');
+      expect(input('added-to').value).toBe('');
     });
 
     it('says when no movie was released in the period', async () => {

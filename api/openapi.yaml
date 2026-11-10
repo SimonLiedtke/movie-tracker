@@ -352,6 +352,7 @@ paths:
       description: |
         With `genreId`, only movies that have any or all of these genres are listed (see `genreMatch`).
         With `releasedFrom` and/or `releasedTo`, only movies released in this period are listed.
+        With `addedFrom` and/or `addedTo`, only items added to the watchlist in this period are listed.
         All filters apply together.
         `totalCount` counts the matching items only; `unfilteredCount` all items.
       parameters:
@@ -383,6 +384,16 @@ paths:
         - name: releasedTo
           in: query
           description: Only movies released on or before this day (inclusive). Must not be before `releasedFrom`.
+          schema: { type: string, format: date }
+        - name: addedFrom
+          in: query
+          description: |
+            Only items put on the watchlist on or after this day (inclusive).
+            Days are UTC days, like `addedAt`.
+          schema: { type: string, format: date }
+        - name: addedTo
+          in: query
+          description: Only items put on the watchlist on or before this day (inclusive, UTC). Must not be before `addedFrom`.
           schema: { type: string, format: date }
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PageSize'

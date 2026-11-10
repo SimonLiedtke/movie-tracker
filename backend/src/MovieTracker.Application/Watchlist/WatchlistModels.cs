@@ -31,16 +31,21 @@ public enum GenreMatch
 /// </param>
 /// <param name="ReleasedFrom">Movies released on or after this day. Movies without a release date do not match.</param>
 /// <param name="ReleasedTo">Movies released on or before this day. Movies without a release date do not match.</param>
+/// <param name="AddedFrom">Items put on the watchlist on or after this day (UTC).</param>
+/// <param name="AddedTo">Items put on the watchlist on or before this day (UTC).</param>
 public sealed record WatchlistFilter(
     IReadOnlyList<int> GenreIds,
     GenreMatch GenreMatch,
     DateOnly? ReleasedFrom = null,
-    DateOnly? ReleasedTo = null)
+    DateOnly? ReleasedTo = null,
+    DateOnly? AddedFrom = null,
+    DateOnly? AddedTo = null)
 {
     public static WatchlistFilter None { get; } = new([], GenreMatch.Any);
 
     /// <summary>True if every item matches.</summary>
-    public bool IsEmpty => GenreIds.Count == 0 && ReleasedFrom is null && ReleasedTo is null;
+    public bool IsEmpty =>
+        GenreIds.Count == 0 && ReleasedFrom is null && ReleasedTo is null && AddedFrom is null && AddedTo is null;
 }
 
 public enum PutWatchlistItemStatus

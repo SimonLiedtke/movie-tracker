@@ -65,8 +65,25 @@ internal static class MovieQueries
             items = items.Where(item => item.Movie.ReleaseDate <= to);
         }
 
+        // Days are UTC days, like the date the frontends show for "added".
+        if (filter.AddedFrom is { } addedFrom)
+        {
+            var start = StartOfDay(addedFrom);
+            items = items.Where(item => item.AddedAt >= start);
+        }
+
+        // Exclusive upper bound: the start of the day after. For the last possible day there is none.
+        if (filter.AddedTo is { } addedTo && addedTo < DateOnly.MaxValue)
+        {
+            var end = StartOfDay(addedTo.AddDays(1));
+            items = items.Where(item => item.AddedAt < end);
+        }
+
         return items;
     }
+
+    private static DateTimeOffset StartOfDay(DateOnly day) =>
+        new(day.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
 
     public static IQueryable<MovieSummaryRow> SelectSummaryRows(
         this IQueryable<Movie> movies, MovieTrackerDbContext db, Guid userId) =>

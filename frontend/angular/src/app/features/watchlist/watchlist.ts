@@ -25,6 +25,20 @@ const MATCH_OPTIONS: { value: GenreMatch; label: string }[] = [
   { value: 'all', label: 'All of them' },
 ];
 
+/** E.g. "released from May 25, 1979 to November 3, 1989" or "added until ..."; undefined without dates. */
+function describePeriod(what: string, from?: string, to?: string): string | undefined {
+  if (from && to) {
+    return `${what} from ${formatDate(from)} to ${formatDate(to)}`;
+  }
+  if (from) {
+    return `${what} from ${formatDate(from)}`;
+  }
+  if (to) {
+    return `${what} until ${formatDate(to)}`;
+  }
+  return undefined;
+}
+
 function parseQuery(params: ParamMap): WatchlistQuery {
   return {
     // Whatever is not a genre ID (e.g. from a hand-edited URL) is left out.
@@ -32,6 +46,8 @@ function parseQuery(params: ParamMap): WatchlistQuery {
     genreMatch: params.get('genreMatch') === 'all' ? 'all' : 'any',
     releasedFrom: params.get('releasedFrom') || undefined,
     releasedTo: params.get('releasedTo') || undefined,
+    addedFrom: params.get('addedFrom') || undefined,
+    addedTo: params.get('addedTo') || undefined,
     page: Number(params.get('page')) || 1,
     pageSize: PAGE_SIZE,
   };
@@ -60,24 +76,23 @@ export class Watchlist {
     requireSync: true,
   });
   private readonly hasGenres = computed(() => (this.query().genreIds?.length ?? 0) > 0);
-  protected readonly filtered = computed(
-    () => this.hasGenres() || !!this.query().releasedFrom || !!this.query().releasedTo,
-  );
+  protected readonly filtered = computed(() => {
+    const { releasedFrom, releasedTo, addedFrom, addedTo } = this.query();
+    return this.hasGenres() || !!(releasedFrom || releasedTo || addedFrom || addedTo);
+  });
   /** What the filter selects, e.g. "with any of the selected genres, released from May 25, 1979". */
   protected readonly filterDescription = computed(() => {
-    const { genreMatch, releasedFrom, releasedTo } = this.query();
-    const parts: string[] = [];
-    if (this.hasGenres()) {
-      parts.push(`with ${genreMatch === 'all' ? 'all' : 'any'} of the selected genres`);
-    }
-    if (releasedFrom && releasedTo) {
-      parts.push(`released from ${formatDate(releasedFrom)} to ${formatDate(releasedTo)}`);
-    } else if (releasedFrom) {
-      parts.push(`released from ${formatDate(releasedFrom)}`);
-    } else if (releasedTo) {
-      parts.push(`released until ${formatDate(releasedTo)}`);
-    }
-    return parts.join(', ');
+    const { genreMatch, releasedFrom, releasedTo, addedFrom, addedTo } = this.query();
+    const genreText = this.hasGenres()
+      ? `with ${genreMatch === 'all' ? 'all' : 'any'} of the selected genres`
+      : undefined;
+    return [
+      genreText,
+      describePeriod('released', releasedFrom, releasedTo),
+      describePeriod('added', addedFrom, addedTo),
+    ]
+      .filter((part) => part !== undefined)
+      .join(', ');
   });
   protected readonly result = signal<WatchlistPage | null>(null);
   protected readonly loading = signal(true);
@@ -143,7 +158,10 @@ export class Watchlist {
     this.updateFilter({ genreMatch: match === 'all' ? 'all' : undefined });
   }
 
-  protected onReleaseDate(key: 'releasedFrom' | 'releasedTo', value: string): void {
+  protected onDate(
+    key: 'releasedFrom' | 'releasedTo' | 'addedFrom' | 'addedTo',
+    value: string,
+  ): void {
     this.updateFilter({ [key]: value || undefined });
   }
 
@@ -153,6 +171,8 @@ export class Watchlist {
       genreMatch: undefined,
       releasedFrom: undefined,
       releasedTo: undefined,
+      addedFrom: undefined,
+      addedTo: undefined,
     });
   }
 

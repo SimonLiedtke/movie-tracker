@@ -214,15 +214,17 @@ describe('Watchlist', () => {
     });
   });
 
-  describe('release date filter', () => {
-    const input = (page: VueWrapper, id: 'released-from' | 'released-to') =>
-      page.get<HTMLInputElement>(`#${id}`);
+  describe('date filters', () => {
+    const input = (
+      page: VueWrapper,
+      id: 'released-from' | 'released-to' | 'added-from' | 'added-to',
+    ) => page.get<HTMLInputElement>(`#${id}`);
 
     /** Enters the date, and answers the request that follows. */
     async function enter(
       page: VueWrapper,
       router: { currentRoute: { value: { fullPath: string } } },
-      id: 'released-from' | 'released-to',
+      id: 'released-from' | 'released-to' | 'added-from' | 'added-to',
       value: string,
       expected: { url: string; filter: string },
       response: WatchlistPage,
@@ -364,6 +366,84 @@ describe('Watchlist', () => {
       await flushPromises();
       expect(input(page, 'released-from').element.value).toBe('');
       expect(input(page, 'released-to').element.value).toBe('');
+    });
+
+    it('lists the movies added from a day on, until a day, and in a period, and says so', async () => {
+      const { page, router } = await openWith([HEAT, ALIEN]);
+
+      await enter(
+        page,
+        router,
+        'added-from',
+        '2026-11-01',
+        { url: '/watchlist?addedFrom=2026-11-01', filter: '&addedFrom=2026-11-01' },
+        paged([ALIEN], { unfilteredCount: 52 }),
+      );
+      expect(text(page)).toContain('1 of 52 movies to watch added from November 1, 2026');
+      expect(input(page, 'added-to').attributes('min')).toBe('2026-11-01');
+
+      await enter(
+        page,
+        router,
+        'added-to',
+        '2026-11-05',
+        {
+          url: '/watchlist?addedFrom=2026-11-01&addedTo=2026-11-05',
+          filter: '&addedFrom=2026-11-01&addedTo=2026-11-05',
+        },
+        paged([ALIEN], { unfilteredCount: 52 }),
+      );
+      expect(text(page)).toContain('added from November 1, 2026 to November 5, 2026');
+      expect(input(page, 'added-from').attributes('max')).toBe('2026-11-05');
+    });
+
+    it('lists the movies added until a day', async () => {
+      const { page, router } = await openWith([HEAT, ALIEN]);
+
+      await enter(
+        page,
+        router,
+        'added-to',
+        '2026-11-05',
+        { url: '/watchlist?addedTo=2026-11-05', filter: '&addedTo=2026-11-05' },
+        paged([ALIEN], { unfilteredCount: 52 }),
+      );
+
+      expect(text(page)).toContain('1 of 52 movies to watch added until November 5, 2026');
+    });
+
+    it('combines both periods with the genres, and shows them from the URL', async () => {
+      const { page } = await openWith(
+        [ALIEN],
+        '/watchlist?genreId=27&releasedFrom=1979-01-01&addedTo=2026-11-05',
+        paged([ALIEN], { unfilteredCount: 9 }),
+        '&genreId=27&genreMatch=any&releasedFrom=1979-01-01&addedTo=2026-11-05',
+      );
+
+      expect(input(page, 'released-from').element.value).toBe('1979-01-01');
+      expect(input(page, 'added-from').element.value).toBe('');
+      expect(input(page, 'added-to').element.value).toBe('2026-11-05');
+      expect(text(page)).toContain(
+        '1 of 9 movies to watch with any of the selected genres, released from January 1, 1979, added until November 5, 2026',
+      );
+    });
+
+    it('clears the added dates, too', async () => {
+      const { page, router } = await openWith(
+        [ALIEN],
+        '/watchlist?addedFrom=2026-11-01&addedTo=2026-11-05',
+        paged([ALIEN]),
+        '&addedFrom=2026-11-01&addedTo=2026-11-05',
+      );
+
+      await buttonOf(page, 'Clear filter').trigger('click');
+      await flushPromises();
+
+      expect(router.currentRoute.value.fullPath).toBe('/watchlist');
+      listRequest().flush(paged([HEAT, ALIEN]));
+      await flushPromises();
+      expect(input(page, 'added-from').element.value).toBe('');
+      expect(input(page, 'added-to').element.value).toBe('');
     });
 
     it('says when no movie was released in the period', async () => {

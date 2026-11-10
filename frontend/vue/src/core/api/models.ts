@@ -139,6 +139,10 @@ export interface WatchlistQuery extends PageQuery {
   releasedFrom?: string;
   /** Only movies released on or before this day ("YYYY-MM-DD"); movies without release date are left out. */
   releasedTo?: string;
+  /** Only movies put on the watchlist on or after this day ("YYYY-MM-DD", UTC). */
+  addedFrom?: string;
+  /** Only movies put on the watchlist on or before this day ("YYYY-MM-DD", UTC). */
+  addedTo?: string;
 }
 
 export interface User {

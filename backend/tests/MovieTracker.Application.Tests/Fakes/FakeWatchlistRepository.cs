@@ -50,7 +50,10 @@ public sealed class FakeWatchlistRepository(FakeMovieRepository movies) : IWatch
             : ids.Any(movieGenreIds.Contains));
         var releasedFromMatches = filter.ReleasedFrom is null || movie.ReleaseDate >= filter.ReleasedFrom;
         var releasedToMatches = filter.ReleasedTo is null || movie.ReleaseDate <= filter.ReleasedTo;
-        return genresMatch && releasedFromMatches && releasedToMatches;
+        var addedDay = DateOnly.FromDateTime(item.AddedAt.UtcDateTime);
+        var addedFromMatches = filter.AddedFrom is null || addedDay >= filter.AddedFrom;
+        var addedToMatches = filter.AddedTo is null || addedDay <= filter.AddedTo;
+        return genresMatch && releasedFromMatches && releasedToMatches && addedFromMatches && addedToMatches;
     }
 
     private WatchlistItem? Own(Guid userId, Guid movieId) =>

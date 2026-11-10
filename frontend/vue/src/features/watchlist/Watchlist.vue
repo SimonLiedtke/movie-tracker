@@ -31,6 +31,8 @@ const props = defineProps<{
   genreMatch?: string;
   releasedFrom?: string;
   releasedTo?: string;
+  addedFrom?: string;
+  addedTo?: string;
   page?: string;
 }>();
 
@@ -43,29 +45,48 @@ const query = computed<WatchlistQuery>(() => ({
   genreMatch: props.genreMatch === 'all' ? 'all' : 'any',
   releasedFrom: props.releasedFrom || undefined,
   releasedTo: props.releasedTo || undefined,
+  addedFrom: props.addedFrom || undefined,
+  addedTo: props.addedTo || undefined,
   page: Number(props.page) || 1,
   pageSize: PAGE_SIZE,
 }));
 const hasGenres = computed(() => (query.value.genreIds?.length ?? 0) > 0);
 const filtered = computed(
-  () => hasGenres.value || !!query.value.releasedFrom || !!query.value.releasedTo,
+  () =>
+    hasGenres.value ||
+    !!query.value.releasedFrom ||
+    !!query.value.releasedTo ||
+    !!query.value.addedFrom ||
+    !!query.value.addedTo,
 );
+
+/** E.g. "released from May 25, 1979 to November 3, 1989" or "added until ..."; undefined without dates. */
+function describePeriod(what: string, from?: string, to?: string): string | undefined {
+  if (from && to) {
+    return `${what} from ${formatDate(from)} to ${formatDate(to)}`;
+  }
+  if (from) {
+    return `${what} from ${formatDate(from)}`;
+  }
+  if (to) {
+    return `${what} until ${formatDate(to)}`;
+  }
+  return undefined;
+}
 
 /** What the filter selects, e.g. "with any of the selected genres, released from May 25, 1979". */
 const filterDescription = computed(() => {
-  const { genreMatch, releasedFrom, releasedTo } = query.value;
-  const parts: string[] = [];
-  if (hasGenres.value) {
-    parts.push(`with ${genreMatch === 'all' ? 'all' : 'any'} of the selected genres`);
-  }
-  if (releasedFrom && releasedTo) {
-    parts.push(`released from ${formatDate(releasedFrom)} to ${formatDate(releasedTo)}`);
-  } else if (releasedFrom) {
-    parts.push(`released from ${formatDate(releasedFrom)}`);
-  } else if (releasedTo) {
-    parts.push(`released until ${formatDate(releasedTo)}`);
-  }
-  return parts.join(', ');
+  const { genreMatch, releasedFrom, releasedTo, addedFrom, addedTo } = query.value;
+  const genreText = hasGenres.value
+    ? `with ${genreMatch === 'all' ? 'all' : 'any'} of the selected genres`
+    : undefined;
+  return [
+    genreText,
+    describePeriod('released', releasedFrom, releasedTo),
+    describePeriod('added', addedFrom, addedTo),
+  ]
+    .filter((part) => part !== undefined)
+    .join(', ');
 });
 
 const genres = ref<Genre[]>([]);
@@ -140,7 +161,7 @@ function genreFilterLink(genre: Genre): RouteLocationRaw {
   };
 }
 
-function onReleaseDate(key: 'releasedFrom' | 'releasedTo', value: string): void {
+function onDate(key: 'releasedFrom' | 'releasedTo' | 'addedFrom' | 'addedTo', value: string): void {
   updateFilter({ [key]: value || undefined });
 }
 
@@ -150,6 +171,8 @@ function clearFilter(): void {
     genreMatch: undefined,
     releasedFrom: undefined,
     releasedTo: undefined,
+    addedFrom: undefined,
+    addedTo: undefined,
   });
 }
 
@@ -276,7 +299,7 @@ async function remove(item: WatchlistItem): Promise<void> {
               type="date"
               :value="query.releasedFrom ?? ''"
               :max="query.releasedTo ?? ''"
-              @change="onReleaseDate('releasedFrom', ($event.target as HTMLInputElement).value)"
+              @change="onDate('releasedFrom', ($event.target as HTMLInputElement).value)"
             />
           </div>
         </div>
@@ -291,7 +314,37 @@ async function remove(item: WatchlistItem): Promise<void> {
               type="date"
               :value="query.releasedTo ?? ''"
               :min="query.releasedFrom ?? ''"
-              @change="onReleaseDate('releasedTo', ($event.target as HTMLInputElement).value)"
+              @change="onDate('releasedTo', ($event.target as HTMLInputElement).value)"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="column is-half-mobile is-3-tablet">
+        <div class="field">
+          <label class="label" for="added-from">Added from</label>
+          <div class="control">
+            <input
+              id="added-from"
+              class="input is-small"
+              type="date"
+              :value="query.addedFrom ?? ''"
+              :max="query.addedTo ?? ''"
+              @change="onDate('addedFrom', ($event.target as HTMLInputElement).value)"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="column is-half-mobile is-3-tablet">
+        <div class="field">
+          <label class="label" for="added-to">Added until</label>
+          <div class="control">
+            <input
+              id="added-to"
+              class="input is-small"
+              type="date"
+              :value="query.addedTo ?? ''"
+              :min="query.addedFrom ?? ''"
+              @change="onDate('addedTo', ($event.target as HTMLInputElement).value)"
             />
           </div>
         </div>

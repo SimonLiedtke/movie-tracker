@@ -113,6 +113,8 @@ export class WatchlistApi {
     genreMatch,
     releasedFrom,
     releasedTo,
+    addedFrom,
+    addedTo,
     ...paging
   }: WatchlistQuery = {}): Observable<WatchlistPage> {
     const filtered = genreIds !== undefined && genreIds.length > 0;
@@ -123,6 +125,8 @@ export class WatchlistApi {
         genreMatch: filtered ? (genreMatch ?? 'any') : undefined,
         releasedFrom,
         releasedTo,
+        addedFrom,
+        addedTo,
       }),
     });
   }

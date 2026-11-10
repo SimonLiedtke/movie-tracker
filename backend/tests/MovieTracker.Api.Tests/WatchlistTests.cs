@@ -290,6 +290,95 @@ public sealed class WatchlistTests(ApiFactory factory) : ApiTestBase(factory)
         Assert.Equal((1, 4), (result.TotalCount, result.UnfilteredCount));
     }
 
+    /// <summary>
+    /// Added on 2026-11-03 (12:00), 2026-11-03 (23:59:59), 2026-11-04 (00:00) and 2026-11-10 (12:00), all UTC.
+    /// </summary>
+    private async Task PutMoviesOnTheWatchlistOverSeveralDaysAsync()
+    {
+        foreach (var (title, advance) in new (string, TimeSpan)[]
+        {
+            ("Monday noon", TimeSpan.Zero),
+            ("Monday night", new TimeSpan(11, 59, 59)),
+            ("Tuesday midnight", TimeSpan.FromSeconds(1)),
+            ("Next week", new TimeSpan(6, 12, 0, 0)),
+        })
+        {
+            Factory.Clock.Advance(advance);
+            var movie = await CreateMovieAsync(title);
+            await Client.PutAsJsonAsync($"/api/watchlist/{movie.Id}", new { }, Ct);
+        }
+    }
+
+    [Fact]
+    public async Task List_with_addedFrom_returns_the_items_added_on_or_after_the_start_of_that_day()
+    {
+        await PutMoviesOnTheWatchlistOverSeveralDaysAsync();
+
+        Assert.Equal(["Monday night", "Monday noon", "Next week", "Tuesday midnight"], await ListTitlesAsync("?addedFrom=2026-11-03"));
+        Assert.Equal(["Next week", "Tuesday midnight"], await ListTitlesAsync("?addedFrom=2026-11-04"));
+        Assert.Equal(["Next week"], await ListTitlesAsync("?addedFrom=2026-11-05"));
+    }
+
+    [Fact]
+    public async Task List_with_addedTo_returns_the_items_added_on_or_before_the_end_of_that_day()
+    {
+        await PutMoviesOnTheWatchlistOverSeveralDaysAsync();
+
+        Assert.Equal(["Monday night", "Monday noon"], await ListTitlesAsync("?addedTo=2026-11-03"));
+        Assert.Equal(["Monday night", "Monday noon", "Tuesday midnight"], await ListTitlesAsync("?addedTo=2026-11-04"));
+        Assert.Empty(await ListTitlesAsync("?addedTo=2026-11-02"));
+    }
+
+    [Fact]
+    public async Task List_with_both_added_dates_returns_the_items_added_in_the_period()
+    {
+        await PutMoviesOnTheWatchlistOverSeveralDaysAsync();
+
+        Assert.Equal(["Tuesday midnight"], await ListTitlesAsync("?addedFrom=2026-11-04&addedTo=2026-11-04"));
+        Assert.Equal(
+            ["Monday night", "Monday noon", "Tuesday midnight"], await ListTitlesAsync("?addedFrom=2026-11-03&addedTo=2026-11-09"));
+    }
+
+    [Fact]
+    public async Task List_accepts_the_last_possible_day_as_addedTo()
+    {
+        await PutMoviesOnTheWatchlistOverSeveralDaysAsync();
+
+        Assert.Equal(4, (await ListTitlesAsync("?addedTo=9999-12-31")).Count);
+    }
+
+    [Fact]
+    public async Task List_combines_the_added_dates_with_the_other_filters()
+    {
+        await PutDatedMoviesOnTheWatchlistAsync();
+        Factory.Clock.Advance(TimeSpan.FromDays(5));
+        var late = await CreateMovieAsync("Late", "1979-01-01", genreIds: [Horror]);
+        await Client.PutAsJsonAsync($"/api/watchlist/{late.Id}", new { }, Ct);
+
+        Assert.Equal(["Late"], await ListTitlesAsync($"?genreId={Horror}&addedFrom=2026-11-08"));
+        Assert.Equal(["Alien"], await ListTitlesAsync($"?genreId={Horror}&addedTo=2026-11-07&releasedFrom=1970-01-01"));
+        var result = await GetAsync<WatchlistPageResponse>("/api/watchlist?addedFrom=2026-11-08");
+        Assert.Equal((1, 5), (result.TotalCount, result.UnfilteredCount));
+    }
+
+    [Fact]
+    public async Task List_rejects_an_added_period_that_ends_before_it_starts()
+    {
+        var response = await Client.GetAsync("/api/watchlist?addedFrom=2026-11-04&addedTo=2026-11-03", Ct);
+
+        var problem = await ReadValidationProblemAsync(response);
+        Assert.Contains("addedFrom", problem.Errors.Keys);
+    }
+
+    [Fact]
+    public async Task List_rejects_an_invalid_added_date()
+    {
+        var response = await Client.GetAsync("/api/watchlist?addedTo=tomorrow", Ct);
+
+        var problem = await ReadValidationProblemAsync(response);
+        Assert.Contains("addedTo", problem.Errors.Keys);
+    }
+
     [Fact]
     public async Task List_rejects_a_release_period_that_ends_before_it_starts()
     {

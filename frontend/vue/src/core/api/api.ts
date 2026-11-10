@@ -120,6 +120,8 @@ function createWatchlistApi(http: Http) {
       genreMatch,
       releasedFrom,
       releasedTo,
+      addedFrom,
+      addedTo,
       ...paging
     }: WatchlistQuery = {}): Promise<WatchlistPage> {
       const filtered = genreIds !== undefined && genreIds.length > 0;
@@ -131,6 +133,8 @@ function createWatchlistApi(http: Http) {
             genreMatch: filtered ? (genreMatch ?? 'any') : undefined,
             releasedFrom,
             releasedTo,
+            addedFrom,
+            addedTo,
           }),
         }),
       );
