@@ -4,7 +4,9 @@ using MovieTracker.Domain.Movies;
 namespace MovieTracker.Application.Watchlist;
 
 /// <param name="Genres">The movie's genres, alphabetically.</param>
-public sealed record WatchlistItemView(MovieRef Movie, DateTimeOffset AddedAt, string? Note, IReadOnlyList<Genre> Genres);
+/// <param name="RuntimeMinutes">The movie's runtime; null if unknown.</param>
+public sealed record WatchlistItemView(
+    MovieRef Movie, DateTimeOffset AddedAt, string? Note, IReadOnlyList<Genre> Genres, int? RuntimeMinutes);
 
 /// <summary>A page of the items matching a <see cref="WatchlistFilter"/>.</summary>
 /// <param name="TotalCount">The number of items matching the filter.</param>

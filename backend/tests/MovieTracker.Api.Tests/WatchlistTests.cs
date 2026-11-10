@@ -132,6 +132,23 @@ public sealed class WatchlistTests(ApiFactory factory) : ApiTestBase(factory)
     }
 
     [Fact]
+    public async Task List_and_put_include_the_runtime_of_the_movie_or_null_if_unknown()
+    {
+        var known = await CreateMovieAsync("Alien", runtimeMinutes: 117);
+        var unknown = await CreateMovieAsync("Unknown", runtimeMinutes: null);
+        var put = await Client.PutAsJsonAsync($"/api/watchlist/{known.Id}", new { }, Ct);
+        await Client.PutAsJsonAsync($"/api/watchlist/{unknown.Id}", new { }, Ct);
+
+        var created = await ReadAsync<WatchlistItemResponse>(put, HttpStatusCode.Created);
+        var listed = (await GetAsync<PagedResponse<WatchlistItemResponse>>("/api/watchlist")).Items
+            .ToDictionary(item => item.Movie.Title, item => item.RuntimeMinutes);
+
+        Assert.Equal(117, created.RuntimeMinutes);
+        Assert.Equal(117, listed["Alien"]);
+        Assert.Null(listed["Unknown"]);
+    }
+
+    [Fact]
     public async Task List_with_one_genre_returns_the_movies_with_that_genre()
     {
         await PutGenreMoviesOnTheWatchlistAsync();

@@ -13,12 +13,14 @@ const item = (id: string, title: string, changes: Partial<WatchlistItem> = {}): 
   addedAt: '2026-11-05T21:30:00Z',
   note: null,
   genres: [],
+  runtimeMinutes: null,
   ...changes,
 });
 
 const HEAT = item('m1', 'Heat', {
   note: 'Recommended by Alice.',
   genres: [{ id: 18, name: 'Drama' }],
+  runtimeMinutes: 170,
   movie: {
     id: 'm1',
     title: 'Heat',
@@ -27,6 +29,7 @@ const HEAT = item('m1', 'Heat', {
   },
 });
 const ALIEN = item('m2', 'Alien', {
+  runtimeMinutes: 117,
   genres: [
     { id: 27, name: 'Horror' },
     { id: 878, name: 'Science Fiction' },
@@ -160,6 +163,20 @@ describe('Watchlist', () => {
     listRequest(3).flush(paged([ALIEN], { page: 3, totalCount: 45 }));
     await flushPromises();
     expect(page.findAll('article')).toHaveLength(1);
+  });
+
+  describe('runtime of a movie', () => {
+    const line = (article: ReturnType<VueWrapper['findAll']>[number]) =>
+      article.get('.is-size-7.has-text-grey').text().replace(/\s+/g, ' ');
+
+    it('is shown after the date added, and left out if unknown', async () => {
+      const { page } = await openWith([HEAT, ALIEN, item('m3', 'Unknown')]);
+
+      const articles = page.findAll('article');
+      expect(line(articles[0])).toBe('Added 2026-11-05 · 170 min');
+      expect(line(articles[1])).toBe('Added 2026-11-05 · 117 min');
+      expect(line(articles[2])).toBe('Added 2026-11-05');
+    });
   });
 
   describe('genres of a movie', () => {

@@ -19,7 +19,8 @@ internal sealed class WatchlistRepository(MovieTrackerDbContext db) : IWatchlist
             item.Movie.Genres
                 .OrderBy(genre => genre.Name)
                 .Select(genre => new GenreRow(genre.Id, genre.Name))
-                .ToList());
+                .ToList(),
+            item.Movie.RuntimeMinutes);
 
     private IQueryable<WatchlistItem> OwnItems(Guid userId) => db.WatchlistItems.Where(item => item.UserId == userId);
 
@@ -59,7 +60,9 @@ internal sealed class WatchlistRepository(MovieTrackerDbContext db) : IWatchlist
         await OwnItems(userId).Where(item => item.MovieId == movieId).ExecuteDeleteAsync(cancellationToken) > 0;
 }
 
-internal sealed record WatchlistItemRow(MovieRef Movie, DateTimeOffset AddedAt, string? Note, List<GenreRow> Genres)
+internal sealed record WatchlistItemRow(
+    MovieRef Movie, DateTimeOffset AddedAt, string? Note, List<GenreRow> Genres, int? RuntimeMinutes)
 {
-    public WatchlistItemView ToModel() => new(Movie, AddedAt, Note, Genres.Select(genre => genre.ToModel()).ToList());
+    public WatchlistItemView ToModel() =>
+        new(Movie, AddedAt, Note, Genres.Select(genre => genre.ToModel()).ToList(), RuntimeMinutes);
 }

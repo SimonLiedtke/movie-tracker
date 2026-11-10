@@ -3,7 +3,11 @@ using System.ComponentModel.DataAnnotations;
 namespace MovieTracker.Api.Contracts;
 
 public sealed record WatchlistItemResponse(
-    MovieRefResponse Movie, DateTimeOffset AddedAt, string? Note, IReadOnlyList<GenreResponse> Genres);
+    MovieRefResponse Movie,
+    DateTimeOffset AddedAt,
+    string? Note,
+    IReadOnlyList<GenreResponse> Genres,
+    int? RuntimeMinutes);
 
 /// <summary>A page of the watchlist. <paramref name="UnfilteredCount"/>: all items, whatever the filter.</summary>
 public sealed record WatchlistPageResponse(

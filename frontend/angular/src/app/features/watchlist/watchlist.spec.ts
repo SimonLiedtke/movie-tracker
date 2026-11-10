@@ -17,6 +17,7 @@ const item = (id: string, title: string): WatchlistItem => ({
   addedAt: '2026-11-05T21:30:00Z',
   note: null,
   genres: [],
+  runtimeMinutes: null,
 });
 const ALIEN: WatchlistItem = {
   ...item('m1', 'Alien'),
@@ -24,8 +25,13 @@ const ALIEN: WatchlistItem = {
     { id: 27, name: 'Horror' },
     { id: 878, name: 'Science Fiction' },
   ],
+  runtimeMinutes: 117,
 };
-const HEAT: WatchlistItem = { ...item('m2', 'Heat'), genres: [{ id: 18, name: 'Drama' }] };
+const HEAT: WatchlistItem = {
+  ...item('m2', 'Heat'),
+  genres: [{ id: 18, name: 'Drama' }],
+  runtimeMinutes: 170,
+};
 
 const paged = (
   items: WatchlistItem[],
@@ -627,6 +633,20 @@ describe('Watchlist genre filter', () => {
 
       expect(text()).toContain('0 of 3 movies to watch released until January 1, 1900');
       expect(text()).toContain('No movie on your watchlist matches the filter.');
+    });
+  });
+
+  describe('runtime of a movie', () => {
+    const line = (article: Element) =>
+      article.querySelector('.is-size-7.has-text-grey')!.textContent!.replace(/\s+/g, ' ').trim();
+
+    it('is shown after the date added, and left out if unknown', async () => {
+      await open('/watchlist', '', paged([HEAT, ALIEN, item('m3', 'Unknown')]));
+
+      const articles = Array.from(page().querySelectorAll('article'));
+      expect(line(articles[0])).toBe('Added 2026-11-05 · 170 min');
+      expect(line(articles[1])).toBe('Added 2026-11-05 · 117 min');
+      expect(line(articles[2])).toBe('Added 2026-11-05');
     });
   });
 

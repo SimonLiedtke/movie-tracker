@@ -203,7 +203,12 @@
             <span class="has-text-grey"> ({{ yearOf(item.movie.releaseDate) }})</span>
           }
         </p>
-        <p class="is-size-7 has-text-grey">Added {{ item.addedAt.slice(0, 10) }}</p>
+        <p class="is-size-7 has-text-grey">
+          Added {{ item.addedAt.slice(0, 10) }}
+          @if (item.runtimeMinutes) {
+            · {{ item.runtimeMinutes }} min
+          }
+        </p>
         @if (item.genres.length) {
           <div class="tags mt-2 mb-0">
             @for (genre of item.genres; track genre.id) {

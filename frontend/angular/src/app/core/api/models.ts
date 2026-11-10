@@ -114,6 +114,8 @@ export interface WatchlistItem {
   note: string | null;
   /** The movie's genres, alphabetically. */
   genres: Genre[];
+  /** The movie's runtime in minutes; null if unknown. */
+  runtimeMinutes: number | null;
 }
 
 /** A page of the watchlist. */

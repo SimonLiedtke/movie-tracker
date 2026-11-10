@@ -494,7 +494,10 @@ async function remove(item: WatchlistItem): Promise<void> {
               ({{ yearOf(item.movie.releaseDate) }})</span
             >
           </p>
-          <p class="is-size-7 has-text-grey">Added {{ item.addedAt.slice(0, 10) }}</p>
+          <p class="is-size-7 has-text-grey">
+            Added {{ item.addedAt.slice(0, 10) }}
+            <template v-if="item.runtimeMinutes"> · {{ item.runtimeMinutes }} min</template>
+          </p>
           <div v-if="item.genres.length" class="tags mt-2 mb-0">
             <RouterLink
               v-for="genre in item.genres"
