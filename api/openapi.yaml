@@ -351,7 +351,7 @@ paths:
       summary: List the watchlist, most recently added first
       description: |
         With `genreId`, only movies that have any or all of these genres are listed (see `genreMatch`).
-        `totalCount` counts the matching items only.
+        `totalCount` counts the matching items only; `unfilteredCount` all items.
       parameters:
         - name: genreId
           in: query
@@ -726,8 +726,14 @@ components:
       allOf:
         - $ref: '#/components/schemas/PageMetadata'
         - type: object
-          required: [items]
+          required: [items, unfilteredCount]
           properties:
+            unfilteredCount:
+              type: integer
+              format: int32
+              description: |
+                The number of items on the watchlist, whatever the filter (`totalCount` counts the matching ones).
+                Shows how selective the filter is.
             items:
               type: array
               items: { $ref: '#/components/schemas/WatchlistItem' }

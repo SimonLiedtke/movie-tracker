@@ -2,7 +2,7 @@ import { flushPromises, type VueWrapper } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createApi } from '../../core/api/api';
 import { createHttp } from '../../core/api/http';
-import type { Movie, PagedResponse, WatchlistItem } from '../../core/api/models';
+import type { Movie, WatchlistPage, WatchlistItem } from '../../core/api/models';
 import { watchlistProps } from '../../route-props';
 import { useFakeBackend } from '../../test/fake-backend';
 import { mountRoute } from '../../test/services';
@@ -36,8 +36,18 @@ const ALIEN = item('m2', 'Alien', {
 
 const paged = (
   items: WatchlistItem[],
-  { page = 1, totalCount = items.length } = {},
-): PagedResponse<WatchlistItem> => ({ items, page, pageSize: 20, totalCount });
+  {
+    page = 1,
+    totalCount = items.length,
+    unfilteredCount,
+  }: { page?: number; totalCount?: number; unfilteredCount?: number } = {},
+): WatchlistPage => ({
+  items,
+  page,
+  pageSize: 20,
+  totalCount,
+  unfilteredCount: unfilteredCount ?? totalCount,
+});
 
 describe('Watchlist', () => {
   const backend = useFakeBackend();
@@ -220,7 +230,7 @@ describe('Watchlist', () => {
       button: { trigger: (event: string) => Promise<unknown> },
       url: string,
       expected: { page?: number; filter: string },
-      response: PagedResponse<WatchlistItem>,
+      response: WatchlistPage,
       router: { currentRoute: { value: { fullPath: string } } },
     ) {
       await button.trigger('click');
@@ -251,14 +261,43 @@ describe('Watchlist', () => {
         genreButton(page, 'Horror'),
         '/watchlist?genreId=27',
         { filter: '&genreId=27&genreMatch=any' },
-        paged([ALIEN]),
+        paged([ALIEN], { unfilteredCount: 52 }),
         router,
       );
 
       expect(page.findAll('article')).toHaveLength(1);
       expect(selectedGenres(page)).toEqual(['Horror']);
-      expect(text(page)).toContain('1 movie to watch with any of the selected genres');
+      expect(text(page)).toContain('1 of 52 movies to watch with any of the selected genres');
       expect(buttonOf(page, 'Clear filter')).toBeDefined();
+    });
+
+    it('counts the movies of the filter and all movies on the watchlist, so that its effect is clear', async () => {
+      const { page } = await openWith(
+        [ALIEN],
+        '/watchlist?genreId=27&genreId=878&genreMatch=all',
+        paged([ALIEN], { totalCount: 14, unfilteredCount: 52 }),
+        '&genreId=27&genreId=878&genreMatch=all',
+      );
+
+      expect(text(page)).toContain('14 of 52 movies to watch with all of the selected genres');
+    });
+
+    it('says "of 1 movie" if the watchlist has one movie only, and "0 of" if none matches', async () => {
+      const { page } = await openWith(
+        [],
+        '/watchlist?genreId=18',
+        paged([], { unfilteredCount: 1 }),
+        '&genreId=18&genreMatch=any',
+      );
+
+      expect(text(page)).toContain('0 of 1 movie to watch with any of the selected genres');
+    });
+
+    it('shows no "of" without a filter', async () => {
+      const { page } = await openWith([HEAT, ALIEN]);
+
+      expect(text(page)).toContain('2 movies to watch');
+      expect(text(page)).not.toMatch(/\d of \d/);
     });
 
     it('selects several genres, and deselects one again', async () => {

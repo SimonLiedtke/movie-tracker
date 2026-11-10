@@ -15,6 +15,7 @@ import {
   MovieSummary,
   PagedResponse,
   WatchlistItem,
+  WatchlistPage,
   WatchlistQuery,
 } from './models';
 
@@ -107,11 +108,9 @@ export class DiaryApi {
 export class WatchlistApi {
   private readonly http = inject(HttpClient);
 
-  list({ genreIds, genreMatch, ...paging }: WatchlistQuery = {}): Observable<
-    PagedResponse<WatchlistItem>
-  > {
+  list({ genreIds, genreMatch, ...paging }: WatchlistQuery = {}): Observable<WatchlistPage> {
     const filtered = genreIds !== undefined && genreIds.length > 0;
-    return this.http.get<PagedResponse<WatchlistItem>>(`${BASE}/watchlist`, {
+    return this.http.get<WatchlistPage>(`${BASE}/watchlist`, {
       params: toHttpParams({
         ...paging,
         genreId: genreIds,

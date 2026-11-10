@@ -3,7 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { PagedResponse, WatchlistItem } from '../../core/api/models';
+import { WatchlistPage, WatchlistItem } from '../../core/api/models';
 import { Watchlist } from './watchlist';
 
 const GENRES = [
@@ -29,8 +29,18 @@ const HEAT: WatchlistItem = { ...item('m2', 'Heat'), genres: [{ id: 18, name: 'D
 
 const paged = (
   items: WatchlistItem[],
-  { page = 1, totalCount = items.length } = {},
-): PagedResponse<WatchlistItem> => ({ items, page, pageSize: 20, totalCount });
+  {
+    page = 1,
+    totalCount = items.length,
+    unfilteredCount,
+  }: { page?: number; totalCount?: number; unfilteredCount?: number } = {},
+): WatchlistPage => ({
+  items,
+  page,
+  pageSize: 20,
+  totalCount,
+  unfilteredCount: unfilteredCount ?? totalCount,
+});
 
 describe('Watchlist genre filter', () => {
   let http: HttpTestingController;
@@ -83,7 +93,7 @@ describe('Watchlist genre filter', () => {
     button: HTMLElement,
     expectedUrl: string,
     filter: string,
-    response: PagedResponse<WatchlistItem>,
+    response: WatchlistPage,
     pageNumber = 1,
   ) {
     button.click();
@@ -111,6 +121,33 @@ describe('Watchlist genre filter', () => {
     expect(text()).not.toContain('Clear filter');
   });
 
+  it('counts the movies of the filter and all movies on the watchlist, so that its effect is clear', async () => {
+    await open(
+      '/watchlist?genreId=27&genreId=878&genreMatch=all',
+      '&genreId=27&genreId=878&genreMatch=all',
+      paged([ALIEN], { totalCount: 14, unfilteredCount: 52 }),
+    );
+
+    expect(text()).toContain('14 of 52 movies to watch with all of the selected genres');
+  });
+
+  it('says "of 1 movie" if the watchlist has one movie only, and "0 of" if none matches', async () => {
+    await open(
+      '/watchlist?genreId=18',
+      '&genreId=18&genreMatch=any',
+      paged([], { unfilteredCount: 1 }),
+    );
+
+    expect(text()).toContain('0 of 1 movie to watch with any of the selected genres');
+  });
+
+  it('shows no "of" without a filter', async () => {
+    await open();
+
+    expect(text()).toContain('2 movies to watch');
+    expect(text()).not.toMatch(/\d of \d/);
+  });
+
   it('selects several genres, and deselects them again', async () => {
     await open();
 
@@ -118,10 +155,10 @@ describe('Watchlist genre filter', () => {
       buttonLabelled('genre-label', 'Horror'),
       '/watchlist?genreId=27',
       '&genreId=27&genreMatch=any',
-      paged([ALIEN]),
+      paged([ALIEN], { unfilteredCount: 52 }),
     );
     expect(titles()).toEqual(['Alien']);
-    expect(text()).toContain('1 movie to watch with any of the selected genres');
+    expect(text()).toContain('1 of 52 movies to watch with any of the selected genres');
 
     await click(
       buttonLabelled('genre-label', 'Drama'),

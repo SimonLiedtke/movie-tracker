@@ -116,6 +116,12 @@ export interface WatchlistItem {
   genres: Genre[];
 }
 
+/** A page of the watchlist. */
+export interface WatchlistPage extends PagedResponse<WatchlistItem> {
+  /** The number of items on the watchlist, whatever the filter; `totalCount` counts the matching ones. */
+  unfilteredCount: number;
+}
+
 export interface PageQuery {
   page?: number;
   pageSize?: number;

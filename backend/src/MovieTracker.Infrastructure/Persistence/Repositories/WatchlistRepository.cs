@@ -23,12 +23,14 @@ internal sealed class WatchlistRepository(MovieTrackerDbContext db) : IWatchlist
 
     private IQueryable<WatchlistItem> OwnItems(Guid userId) => db.WatchlistItems.Where(item => item.UserId == userId);
 
-    public async Task<PagedResult<WatchlistItemView>> ListAsync(
+    public async Task<WatchlistPage> ListAsync(
         Guid userId, WatchlistFilter filter, int page, int pageSize, CancellationToken cancellationToken)
     {
-        var items = OwnItems(userId).AsNoTracking().MatchingGenres(filter);
+        var own = OwnItems(userId).AsNoTracking();
+        var items = own.MatchingGenres(filter);
 
         var totalCount = await items.CountAsync(cancellationToken);
+        var unfilteredCount = filter.GenreIds.Count == 0 ? totalCount : await own.CountAsync(cancellationToken);
         var views = await items
             .OrderByDescending(item => item.AddedAt)
             .ThenBy(item => item.MovieId)
@@ -36,7 +38,7 @@ internal sealed class WatchlistRepository(MovieTrackerDbContext db) : IWatchlist
             .Select(ToRow)
             .ToListAsync(cancellationToken);
 
-        return new PagedResult<WatchlistItemView>(views.Select(row => row.ToModel()).ToList(), page, pageSize, totalCount);
+        return new WatchlistPage(views.Select(row => row.ToModel()).ToList(), page, pageSize, totalCount, unfilteredCount);
     }
 
     public async Task<WatchlistItemView?> GetAsync(Guid userId, Guid movieId, CancellationToken cancellationToken) =>

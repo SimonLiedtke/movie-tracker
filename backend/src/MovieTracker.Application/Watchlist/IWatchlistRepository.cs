@@ -6,7 +6,7 @@ namespace MovieTracker.Application.Watchlist;
 public interface IWatchlistRepository
 {
     /// <summary>The items matching the filter, most recently added first.</summary>
-    Task<PagedResult<WatchlistItemView>> ListAsync(
+    Task<WatchlistPage> ListAsync(
         Guid userId, WatchlistFilter filter, int page, int pageSize, CancellationToken cancellationToken);
 
     Task<WatchlistItemView?> GetAsync(Guid userId, Guid movieId, CancellationToken cancellationToken);

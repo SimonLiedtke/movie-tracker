@@ -8,8 +8,8 @@ import {
   Genre,
   GenreMatch,
   MovieRef,
-  PagedResponse,
   WatchlistItem,
+  WatchlistPage,
   WatchlistQuery,
 } from '../../core/api/models';
 import { yearOf } from '../../shared/dates';
@@ -58,7 +58,7 @@ export class Watchlist {
     requireSync: true,
   });
   protected readonly filtered = computed(() => (this.query().genreIds?.length ?? 0) > 0);
-  protected readonly result = signal<PagedResponse<WatchlistItem> | null>(null);
+  protected readonly result = signal<WatchlistPage | null>(null);
   protected readonly loading = signal(true);
   protected readonly error = signal<ApiError | null>(null);
   /** Movie ID of the item whose note is being edited. */

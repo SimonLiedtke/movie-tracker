@@ -56,7 +56,11 @@
 
 @if (result(); as result) {
   <p class="mb-4 has-text-grey">
-    {{ result.totalCount }} {{ result.totalCount === 1 ? 'movie' : 'movies' }} to watch
+    {{ result.totalCount }}
+    @if (filtered()) {
+      of {{ result.unfilteredCount }}
+    }
+    {{ result.unfilteredCount === 1 ? 'movie' : 'movies' }} to watch
     @if (filtered()) {
       with {{ query().genreMatch === 'all' ? 'all' : 'any' }} of the selected genres
     }

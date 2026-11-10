@@ -190,6 +190,32 @@ public sealed class WatchlistTests(ApiFactory factory) : ApiTestBase(factory)
     }
 
     [Fact]
+    public async Task List_returns_the_number_of_all_items_whatever_the_filter()
+    {
+        await PutGenreMoviesOnTheWatchlistAsync();
+
+        var unfiltered = await GetAsync<WatchlistPageResponse>("/api/watchlist");
+        var horror = await GetAsync<WatchlistPageResponse>($"/api/watchlist?genreId={Horror}");
+        var none = await GetAsync<WatchlistPageResponse>($"/api/watchlist?genreId={Horror}&genreId={Drama}&genreMatch=all");
+        var page2 = await GetAsync<WatchlistPageResponse>($"/api/watchlist?genreId={Horror}&pageSize=1&page=2");
+
+        Assert.Equal((5, 5), (unfiltered.TotalCount, unfiltered.UnfilteredCount));
+        Assert.Equal((2, 5), (horror.TotalCount, horror.UnfilteredCount));
+        Assert.Equal((0, 5), (none.TotalCount, none.UnfilteredCount));
+        Assert.Equal((2, 5), (page2.TotalCount, page2.UnfilteredCount));
+    }
+
+    [Fact]
+    public async Task List_does_not_count_other_users_items_as_unfiltered()
+    {
+        await PutGenreMoviesOnTheWatchlistAsync();
+
+        var result = await Bob.GetFromJsonAsync<WatchlistPageResponse>($"/api/watchlist?genreId={Horror}", Ct);
+
+        Assert.Equal((0, 0), (result!.TotalCount, result.UnfilteredCount));
+    }
+
+    [Fact]
     public async Task List_with_genres_does_not_show_other_users_items()
     {
         await PutGenreMoviesOnTheWatchlistAsync();

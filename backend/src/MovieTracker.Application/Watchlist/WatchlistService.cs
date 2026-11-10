@@ -6,7 +6,7 @@ namespace MovieTracker.Application.Watchlist;
 public sealed class WatchlistService(
     IWatchlistRepository watchlist, IMovieRepository movies, IUnitOfWork unitOfWork, TimeProvider timeProvider)
 {
-    public Task<PagedResult<WatchlistItemView>> ListAsync(
+    public Task<WatchlistPage> ListAsync(
         Guid userId, WatchlistFilter filter, int page, int pageSize, CancellationToken cancellationToken) =>
         watchlist.ListAsync(userId, filter, page, pageSize, cancellationToken);
 

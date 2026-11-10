@@ -12,19 +12,19 @@ public sealed class FakeWatchlistRepository(FakeMovieRepository movies) : IWatch
 
     public (Guid UserId, WatchlistFilter Filter, int Page, int PageSize)? LastList { get; private set; }
 
-    public Task<PagedResult<WatchlistItemView>> ListAsync(
+    public Task<WatchlistPage> ListAsync(
         Guid userId, WatchlistFilter filter, int page, int pageSize, CancellationToken cancellationToken)
     {
         LastList = (userId, filter, page, pageSize);
 
-        var own = Items
-            .Where(item => item.UserId == userId)
+        var all = Items.Where(item => item.UserId == userId).ToList();
+        var own = all
             .Where(item => MatchesGenres(item, filter))
             .OrderByDescending(item => item.AddedAt)
             .ThenBy(item => item.MovieId)
             .ToList();
         var views = own.Skip((page - 1) * pageSize).Take(pageSize).Select(ToView).ToList();
-        return Task.FromResult(new PagedResult<WatchlistItemView>(views, page, pageSize, own.Count));
+        return Task.FromResult(new WatchlistPage(views, page, pageSize, own.Count, all.Count));
     }
 
     public Task<WatchlistItemView?> GetAsync(Guid userId, Guid movieId, CancellationToken cancellationToken) =>

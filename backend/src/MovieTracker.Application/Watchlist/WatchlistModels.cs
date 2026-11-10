@@ -6,6 +6,12 @@ namespace MovieTracker.Application.Watchlist;
 /// <param name="Genres">The movie's genres, alphabetically.</param>
 public sealed record WatchlistItemView(MovieRef Movie, DateTimeOffset AddedAt, string? Note, IReadOnlyList<Genre> Genres);
 
+/// <summary>A page of the items matching a <see cref="WatchlistFilter"/>.</summary>
+/// <param name="TotalCount">The number of items matching the filter.</param>
+/// <param name="UnfilteredCount">The number of items on the watchlist, whatever the filter: how selective the filter is.</param>
+public sealed record WatchlistPage(
+    IReadOnlyList<WatchlistItemView> Items, int Page, int PageSize, int TotalCount, int UnfilteredCount);
+
 /// <summary>How the genres of a <see cref="WatchlistFilter"/> are combined.</summary>
 public enum GenreMatch
 {

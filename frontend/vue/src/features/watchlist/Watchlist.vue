@@ -7,8 +7,8 @@ import type {
   Genre,
   GenreMatch,
   MovieRef,
-  PagedResponse,
   WatchlistItem,
+  WatchlistPage,
   WatchlistQuery,
 } from '../../core/api/models';
 import { yearOf } from '../../shared/dates';
@@ -50,7 +50,7 @@ api.genres.list().then(
   () => undefined, // Without genres, the filter just has no choices.
 );
 
-const result = ref<PagedResponse<WatchlistItem> | null>(null);
+const result = ref<WatchlistPage | null>(null);
 const loading = ref(true);
 const error = ref<ApiError | null>(null);
 /** Movie ID of the item whose note is being edited. */
@@ -65,7 +65,7 @@ let latestLoad = 0;
 async function load(): Promise<void> {
   const thisLoad = ++latestLoad;
   loading.value = true;
-  let loaded: PagedResponse<WatchlistItem> | null;
+  let loaded: WatchlistPage | null;
   try {
     loaded = await api.watchlist.list(query.value);
     if (thisLoad !== latestLoad) {
@@ -246,7 +246,8 @@ async function remove(item: WatchlistItem): Promise<void> {
 
   <template v-if="result">
     <p class="mb-4 has-text-grey">
-      {{ result.totalCount }} {{ result.totalCount === 1 ? 'movie' : 'movies' }} to watch
+      {{ result.totalCount }}<template v-if="filtered"> of {{ result.unfilteredCount }}</template>
+      {{ result.unfilteredCount === 1 ? 'movie' : 'movies' }} to watch
       <template v-if="filtered">
         with {{ query.genreMatch === 'all' ? 'all' : 'any' }} of the selected genres</template
       >
