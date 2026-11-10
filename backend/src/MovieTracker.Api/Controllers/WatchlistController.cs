@@ -13,15 +13,22 @@ namespace MovieTracker.Api.Controllers;
 [Tags("Watchlist")]
 public sealed class WatchlistController(WatchlistService watchlist) : ControllerBase
 {
+    /// <summary>
+    /// With <paramref name="genreId"/> (repeatable), only movies with any (<c>genreMatch=any</c>, the default)
+    /// or all (<c>genreMatch=all</c>) of these genres.
+    /// </summary>
     [HttpGet(Name = "listWatchlist")]
     [ProducesResponseType<PagedResponse<WatchlistItemResponse>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, MediaTypeNames.Application.ProblemJson)]
     public async Task<ActionResult<PagedResponse<WatchlistItemResponse>>> ListWatchlist(
+        [FromQuery] int[]? genreId,
+        [FromQuery, AllowedValues("any", "all")] string genreMatch = "any",
         [FromQuery, Range(1, int.MaxValue)] int page = 1,
         [FromQuery, Range(1, 100)] int pageSize = 20,
         CancellationToken cancellationToken = default)
     {
-        var result = await watchlist.ListAsync(User.GetUserId(), page, pageSize, cancellationToken);
+        var filter = new WatchlistFilter(genreId ?? [], genreMatch == "all" ? GenreMatch.All : GenreMatch.Any);
+        var result = await watchlist.ListAsync(User.GetUserId(), filter, page, pageSize, cancellationToken);
         return result.ToResponse(item => item.ToResponse());
     }
 

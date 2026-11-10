@@ -3,24 +3,52 @@ import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useApi } from '../../core/api/api';
 import { toApiError, type ApiError } from '../../core/api/api-error';
-import type { MovieRef, PagedResponse, WatchlistItem } from '../../core/api/models';
+import type {
+  Genre,
+  GenreMatch,
+  MovieRef,
+  PagedResponse,
+  WatchlistItem,
+  WatchlistQuery,
+} from '../../core/api/models';
 import { yearOf } from '../../shared/dates';
 import ErrorNotification from '../../shared/ErrorNotification.vue';
 import MoviePicker from '../../shared/MoviePicker.vue';
 import Pagination from '../../shared/Pagination.vue';
 import Poster from '../../shared/Poster.vue';
+import { mergeQuery } from '../../shared/query';
 
 const PAGE_SIZE = 20;
 
-/** The page, from the route's query parameters. */
+const MATCH_OPTIONS: { value: GenreMatch; label: string }[] = [
+  { value: 'any', label: 'Any of them' },
+  { value: 'all', label: 'All of them' },
+];
+
+/** The filter and the page, from the route's query parameters. */
 const props = defineProps<{
+  genreId?: string[];
+  genreMatch?: string;
   page?: string;
 }>();
 
 const router = useRouter();
 const api = useApi();
 
-const page = computed(() => Number(props.page) || 1);
+const query = computed<WatchlistQuery>(() => ({
+  // Whatever is not a genre ID (e.g. from a hand-edited URL) is left out.
+  genreIds: [...new Set((props.genreId ?? []).map(Number).filter(Number.isInteger))],
+  genreMatch: props.genreMatch === 'all' ? 'all' : 'any',
+  page: Number(props.page) || 1,
+  pageSize: PAGE_SIZE,
+}));
+const filtered = computed(() => (query.value.genreIds?.length ?? 0) > 0);
+
+const genres = ref<Genre[]>([]);
+api.genres.list().then(
+  (loaded) => (genres.value = loaded),
+  () => undefined, // Without genres, the filter just has no choices.
+);
 
 const result = ref<PagedResponse<WatchlistItem> | null>(null);
 const loading = ref(true);
@@ -39,7 +67,7 @@ async function load(): Promise<void> {
   loading.value = true;
   let loaded: PagedResponse<WatchlistItem> | null;
   try {
-    loaded = await api.watchlist.list({ page: page.value, pageSize: PAGE_SIZE });
+    loaded = await api.watchlist.list(query.value);
     if (thisLoad !== latestLoad) {
       return;
     }
@@ -61,10 +89,34 @@ async function load(): Promise<void> {
   loading.value = false;
 }
 
-watch(page, load, { immediate: true });
+watch(query, load, { immediate: true });
 
 function goToPage(target: number): void {
-  router.push({ query: { page: target } });
+  router.push({ query: mergeQuery(router.currentRoute.value.query, { page: target }) });
+}
+
+/** Selects the genre, or deselects it if it is selected. Changing the filter starts again at page 1. */
+function toggleGenre(genre: Genre): void {
+  const selected = query.value.genreIds ?? [];
+  const genreIds = selected.includes(genre.id)
+    ? selected.filter((id) => id !== genre.id)
+    : [...selected, genre.id];
+  updateFilter({ genreId: genreIds });
+}
+
+function setGenreMatch(match: GenreMatch): void {
+  // "any" is the default, so it needs no parameter.
+  updateFilter({ genreMatch: match === 'all' ? 'all' : undefined });
+}
+
+function clearFilter(): void {
+  updateFilter({ genreId: [], genreMatch: undefined });
+}
+
+function updateFilter(changes: Parameters<typeof mergeQuery>[1]): void {
+  router.push({
+    query: mergeQuery(router.currentRoute.value.query, { ...changes, page: undefined }),
+  });
 }
 
 /** Adds the movie at the top of the list (the newest come first). Already on it: nothing changes. */
@@ -136,11 +188,61 @@ async function remove(item: WatchlistItem): Promise<void> {
     />
   </div>
 
+  <div class="box">
+    <div class="field">
+      <label class="label" id="genre-label">Genres</label>
+      <div class="buttons are-small" role="group" aria-labelledby="genre-label">
+        <button
+          v-for="genre in genres"
+          :key="genre.id"
+          type="button"
+          class="button"
+          :class="{ 'is-link': query.genreIds?.includes(genre.id) }"
+          :aria-pressed="query.genreIds?.includes(genre.id)"
+          @click="toggleGenre(genre)"
+        >
+          {{ genre.name }}
+        </button>
+      </div>
+    </div>
+    <div class="field is-flex is-flex-wrap-wrap is-align-items-center">
+      <span class="mr-3" id="genre-match-label">Show movies with</span>
+      <div
+        class="buttons has-addons are-small mb-0"
+        role="group"
+        aria-labelledby="genre-match-label"
+      >
+        <button
+          v-for="option in MATCH_OPTIONS"
+          :key="option.value"
+          type="button"
+          class="button mb-0"
+          :class="{ 'is-link is-selected': query.genreMatch === option.value }"
+          :aria-pressed="query.genreMatch === option.value"
+          @click="setGenreMatch(option.value)"
+        >
+          {{ option.label }}
+        </button>
+      </div>
+      <button
+        v-if="filtered"
+        type="button"
+        class="button is-small is-ghost ml-3"
+        @click="clearFilter"
+      >
+        Clear filter
+      </button>
+    </div>
+  </div>
+
   <ErrorNotification :error="error" @dismiss="error = null" />
 
   <template v-if="result">
     <p class="mb-4 has-text-grey">
       {{ result.totalCount }} {{ result.totalCount === 1 ? 'movie' : 'movies' }} to watch
+      <template v-if="filtered">
+        with {{ query.genreMatch === 'all' ? 'all' : 'any' }} of the selected genres</template
+      >
       <span v-if="loading" class="ml-2">· loading…</span>
     </p>
 
@@ -207,6 +309,12 @@ async function remove(item: WatchlistItem): Promise<void> {
         </div>
       </article>
     </template>
+    <div v-else-if="filtered" class="notification">
+      No movie on your watchlist matches the selected genres.
+      <button type="button" class="button is-small is-ghost" @click="clearFilter">
+        Clear filter
+      </button>
+    </div>
     <div v-else class="notification">Your watchlist is empty. Search a movie above to add it.</div>
 
     <Pagination

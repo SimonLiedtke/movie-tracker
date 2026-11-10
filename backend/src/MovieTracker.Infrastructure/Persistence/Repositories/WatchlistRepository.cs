@@ -19,9 +19,9 @@ internal sealed class WatchlistRepository(MovieTrackerDbContext db) : IWatchlist
     private IQueryable<WatchlistItem> OwnItems(Guid userId) => db.WatchlistItems.Where(item => item.UserId == userId);
 
     public async Task<PagedResult<WatchlistItemView>> ListAsync(
-        Guid userId, int page, int pageSize, CancellationToken cancellationToken)
+        Guid userId, WatchlistFilter filter, int page, int pageSize, CancellationToken cancellationToken)
     {
-        var items = OwnItems(userId).AsNoTracking();
+        var items = OwnItems(userId).AsNoTracking().MatchingGenres(filter);
 
         var totalCount = await items.CountAsync(cancellationToken);
         var views = await items

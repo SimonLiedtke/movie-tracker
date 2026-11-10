@@ -1,5 +1,5 @@
 import type { RouteLocationNormalized } from 'vue-router';
-import { queryString } from './shared/query';
+import { queryString, queryStrings } from './shared/query';
 
 // How the pages get their inputs from the URL (like Angular's component input binding): route and
 // query parameters become props. Missing parameters are `undefined`.
@@ -44,8 +44,10 @@ export const diaryEntryFormProps = (route: RouteLocationNormalized) => ({
   movieId: queryString(route.query['movieId']),
 });
 
-/** The page of the watchlist. */
+/** The genre filter (the genre IDs, any or all of them) and the page of the watchlist. */
 export const watchlistProps = (route: RouteLocationNormalized) => ({
+  genreId: queryStrings(route.query['genreId']),
+  genreMatch: queryString(route.query['genreMatch']),
   page: queryString(route.query['page']),
 });
 

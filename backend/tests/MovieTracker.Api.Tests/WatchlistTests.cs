@@ -95,6 +95,107 @@ public sealed class WatchlistTests(ApiFactory factory) : ApiTestBase(factory)
         Assert.Equal(3, page2.TotalCount);
     }
 
+    private async Task<List<string>> ListTitlesAsync(string query)
+    {
+        var result = await GetAsync<PagedResponse<WatchlistItemResponse>>($"/api/watchlist{query}");
+        return result.Items.Select(item => item.Movie.Title).Order().ToList();
+    }
+
+    /// <summary>Alien: horror, sci-fi. Halloween: horror. Solaris: sci-fi, drama. Heat: drama. Paddington: no genre.</summary>
+    private async Task PutGenreMoviesOnTheWatchlistAsync()
+    {
+        foreach (var (title, genreIds) in new (string, int[])[]
+        {
+            ("Alien", [Horror, ScienceFiction]),
+            ("Halloween", [Horror]),
+            ("Solaris", [ScienceFiction, Drama]),
+            ("Heat", [Drama]),
+            ("Paddington", []),
+        })
+        {
+            var movie = await CreateMovieAsync(title, genreIds: genreIds);
+            await Client.PutAsJsonAsync($"/api/watchlist/{movie.Id}", new { }, Ct);
+        }
+    }
+
+    [Fact]
+    public async Task List_with_one_genre_returns_the_movies_with_that_genre()
+    {
+        await PutGenreMoviesOnTheWatchlistAsync();
+
+        Assert.Equal(["Alien", "Halloween"], await ListTitlesAsync($"?genreId={Horror}"));
+    }
+
+    [Fact]
+    public async Task List_with_several_genres_returns_the_movies_with_any_of_them_by_default()
+    {
+        await PutGenreMoviesOnTheWatchlistAsync();
+
+        var expected = new[] { "Alien", "Halloween", "Solaris" };
+        Assert.Equal(expected, await ListTitlesAsync($"?genreId={Horror}&genreId={ScienceFiction}"));
+        Assert.Equal(expected, await ListTitlesAsync($"?genreId={Horror}&genreId={ScienceFiction}&genreMatch=any"));
+    }
+
+    [Fact]
+    public async Task List_with_genreMatch_all_returns_only_the_movies_with_every_genre()
+    {
+        await PutGenreMoviesOnTheWatchlistAsync();
+
+        Assert.Equal(["Alien"], await ListTitlesAsync($"?genreId={Horror}&genreId={ScienceFiction}&genreMatch=all"));
+        Assert.Equal(["Solaris"], await ListTitlesAsync($"?genreId={Drama}&genreId={ScienceFiction}&genreMatch=all"));
+        Assert.Empty(await ListTitlesAsync($"?genreId={Horror}&genreId={Drama}&genreMatch=all"));
+    }
+
+    [Fact]
+    public async Task List_with_a_repeated_genre_counts_it_once()
+    {
+        await PutGenreMoviesOnTheWatchlistAsync();
+
+        Assert.Equal(
+            ["Alien", "Halloween"], await ListTitlesAsync($"?genreId={Horror}&genreId={Horror}&genreMatch=all"));
+    }
+
+    [Fact]
+    public async Task List_with_an_unknown_genre_matches_nothing_for_all_and_is_ignored_for_any()
+    {
+        await PutGenreMoviesOnTheWatchlistAsync();
+
+        Assert.Empty(await ListTitlesAsync($"?genreId={Horror}&genreId=99999&genreMatch=all"));
+        Assert.Equal(["Alien", "Halloween"], await ListTitlesAsync($"?genreId={Horror}&genreId=99999"));
+    }
+
+    [Fact]
+    public async Task List_counts_and_pages_only_the_movies_matching_the_genres()
+    {
+        await PutGenreMoviesOnTheWatchlistAsync();
+
+        var result = await GetAsync<PagedResponse<WatchlistItemResponse>>(
+            $"/api/watchlist?genreId={Horror}&genreId={ScienceFiction}&pageSize=2&page=2");
+
+        Assert.Equal(3, result.TotalCount);
+        Assert.Single(result.Items);
+    }
+
+    [Fact]
+    public async Task List_with_genres_does_not_show_other_users_items()
+    {
+        await PutGenreMoviesOnTheWatchlistAsync();
+
+        var result = await Bob.GetFromJsonAsync<PagedResponse<WatchlistItemResponse>>(
+            $"/api/watchlist?genreId={Horror}", Ct);
+
+        Assert.Empty(result!.Items);
+    }
+
+    [Fact]
+    public async Task List_rejects_an_unknown_genreMatch()
+    {
+        var response = await Client.GetAsync("/api/watchlist?genreMatch=some", Ct);
+
+        var problem = await ReadValidationProblemAsync(response);
+        Assert.Contains("genreMatch", problem.Errors.Keys);
+    }
+
     [Fact]
     public async Task List_rejects_an_invalid_page_size()
     {

@@ -1,10 +1,17 @@
-import { Component, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { Component, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, ParamMap, Params, Router, RouterLink } from '@angular/router';
 import { Subject, catchError, map, of, startWith, switchMap, tap } from 'rxjs';
-import { MoviesApi, WatchlistApi } from '../../core/api/api';
+import { GenresApi, MoviesApi, WatchlistApi } from '../../core/api/api';
 import { ApiError, toApiError } from '../../core/api/api-error';
-import { MovieRef, PagedResponse, WatchlistItem } from '../../core/api/models';
+import {
+  Genre,
+  GenreMatch,
+  MovieRef,
+  PagedResponse,
+  WatchlistItem,
+  WatchlistQuery,
+} from '../../core/api/models';
 import { yearOf } from '../../shared/dates';
 import { ErrorNotification } from '../../shared/error-notification';
 import { MoviePicker } from '../../shared/movie-picker';
@@ -12,6 +19,21 @@ import { Pagination } from '../../shared/pagination';
 import { Poster } from '../../shared/poster';
 
 const PAGE_SIZE = 20;
+
+const MATCH_OPTIONS: { value: GenreMatch; label: string }[] = [
+  { value: 'any', label: 'Any of them' },
+  { value: 'all', label: 'All of them' },
+];
+
+function parseQuery(params: ParamMap): WatchlistQuery {
+  return {
+    // Whatever is not a genre ID (e.g. from a hand-edited URL) is left out.
+    genreIds: [...new Set(params.getAll('genreId').map(Number).filter(Number.isInteger))],
+    genreMatch: params.get('genreMatch') === 'all' ? 'all' : 'any',
+    page: Number(params.get('page')) || 1,
+    pageSize: PAGE_SIZE,
+  };
+}
 
 @Component({
   selector: 'app-watchlist',
@@ -24,7 +46,18 @@ export class Watchlist {
   private readonly watchlistApi = inject(WatchlistApi);
   private readonly moviesApi = inject(MoviesApi);
 
+  protected readonly matchOptions = MATCH_OPTIONS;
   protected readonly yearOf = yearOf;
+  protected readonly genres = toSignal(
+    inject(GenresApi)
+      .list()
+      .pipe(catchError(() => of([]))),
+    { initialValue: [] },
+  );
+  protected readonly query = toSignal(this.route.queryParamMap.pipe(map(parseQuery)), {
+    requireSync: true,
+  });
+  protected readonly filtered = computed(() => (this.query().genreIds?.length ?? 0) > 0);
   protected readonly result = signal<PagedResponse<WatchlistItem> | null>(null);
   protected readonly loading = signal(true);
   protected readonly error = signal<ApiError | null>(null);
@@ -37,16 +70,16 @@ export class Watchlist {
   constructor() {
     this.route.queryParamMap
       .pipe(
-        map((params) => Number(params.get('page')) || 1),
-        switchMap((page) =>
+        map(parseQuery),
+        switchMap((query) =>
           this.reload.pipe(
             startWith(undefined),
-            map(() => page),
+            map(() => query),
           ),
         ),
         tap(() => this.loading.set(true)),
-        switchMap((page) =>
-          this.watchlistApi.list({ page, pageSize: PAGE_SIZE }).pipe(
+        switchMap((query) =>
+          this.watchlistApi.list(query).pipe(
             tap(() => this.error.set(null)),
             catchError((error) => {
               this.error.set(toApiError(error));
@@ -68,7 +101,37 @@ export class Watchlist {
   }
 
   protected goToPage(page: number): void {
-    this.router.navigate([], { queryParams: { page } });
+    this.router.navigate([], { queryParams: { page }, queryParamsHandling: 'merge' });
+  }
+
+  protected isSelected(genre: Genre): boolean {
+    return this.query().genreIds?.includes(genre.id) ?? false;
+  }
+
+  /** Selects the genre, or deselects it if it is selected. */
+  protected toggleGenre(genre: Genre): void {
+    const selected = this.query().genreIds ?? [];
+    const genreIds = this.isSelected(genre)
+      ? selected.filter((id) => id !== genre.id)
+      : [...selected, genre.id];
+    this.updateFilter({ genreId: genreIds.length ? genreIds : undefined });
+  }
+
+  protected setGenreMatch(match: GenreMatch): void {
+    // "any" is the default, so it needs no parameter.
+    this.updateFilter({ genreMatch: match === 'all' ? 'all' : undefined });
+  }
+
+  protected clearFilter(): void {
+    this.updateFilter({ genreId: undefined, genreMatch: undefined });
+  }
+
+  /** Changing the filter starts again at page 1. */
+  private updateFilter(changes: Params): void {
+    this.router.navigate([], {
+      queryParams: { ...changes, page: undefined },
+      queryParamsHandling: 'merge',
+    });
   }
 
   /** Adds the movie at the top of the list (the newest come first). Already on it: nothing changes. */

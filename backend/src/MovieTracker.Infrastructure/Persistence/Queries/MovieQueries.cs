@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using MovieTracker.Application.Movies;
+using MovieTracker.Application.Watchlist;
 using MovieTracker.Domain.Diary;
 using MovieTracker.Domain.Movies;
+using MovieTracker.Domain.Watchlist;
 
 namespace MovieTracker.Infrastructure.Persistence.Queries;
 
@@ -38,6 +40,21 @@ internal static class MovieQueries
         return movies.Where(movie =>
             EF.Functions.ILike(movie.Title, pattern, LikeEscapeCharacter) ||
             (movie.OriginalTitle != null && EF.Functions.ILike(movie.OriginalTitle, pattern, LikeEscapeCharacter)));
+    }
+
+    /// <summary>Watchlist items of movies that have any or all of the filter's genres.</summary>
+    public static IQueryable<WatchlistItem> MatchingGenres(this IQueryable<WatchlistItem> items, WatchlistFilter filter)
+    {
+        var genreIds = filter.GenreIds.Distinct().ToList();
+        if (genreIds.Count == 0)
+        {
+            return items;
+        }
+
+        return filter.GenreMatch == GenreMatch.All
+            // Genres are assigned to a movie at most once, so counting the matches counts the distinct genres.
+            ? items.Where(item => item.Movie.Genres.Count(genre => genreIds.Contains(genre.Id)) == genreIds.Count)
+            : items.Where(item => item.Movie.Genres.Any(genre => genreIds.Contains(genre.Id)));
     }
 
     public static IQueryable<MovieSummaryRow> SelectSummaryRows(

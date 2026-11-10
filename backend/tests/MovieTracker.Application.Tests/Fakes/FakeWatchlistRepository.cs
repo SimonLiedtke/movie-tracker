@@ -10,14 +10,16 @@ public sealed class FakeWatchlistRepository(FakeMovieRepository movies) : IWatch
 {
     public List<WatchlistItem> Items { get; } = [];
 
-    public (Guid UserId, int Page, int PageSize)? LastList { get; private set; }
+    public (Guid UserId, WatchlistFilter Filter, int Page, int PageSize)? LastList { get; private set; }
 
-    public Task<PagedResult<WatchlistItemView>> ListAsync(Guid userId, int page, int pageSize, CancellationToken cancellationToken)
+    public Task<PagedResult<WatchlistItemView>> ListAsync(
+        Guid userId, WatchlistFilter filter, int page, int pageSize, CancellationToken cancellationToken)
     {
-        LastList = (userId, page, pageSize);
+        LastList = (userId, filter, page, pageSize);
 
         var own = Items
             .Where(item => item.UserId == userId)
+            .Where(item => MatchesGenres(item, filter))
             .OrderByDescending(item => item.AddedAt)
             .ThenBy(item => item.MovieId)
             .ToList();
@@ -37,6 +39,15 @@ public sealed class FakeWatchlistRepository(FakeMovieRepository movies) : IWatch
 
     public Task<bool> RemoveAsync(Guid userId, Guid movieId, CancellationToken cancellationToken) =>
         Task.FromResult(Own(userId, movieId) is { } item && Items.Remove(item));
+
+    private bool MatchesGenres(WatchlistItem item, WatchlistFilter filter)
+    {
+        var ids = filter.GenreIds.Distinct().ToList();
+        var movieGenreIds = movies.Movies.Single(movie => movie.Id == item.MovieId).Genres.Select(genre => genre.Id).ToList();
+        return ids.Count == 0 || (filter.GenreMatch == GenreMatch.All
+            ? ids.All(movieGenreIds.Contains)
+            : ids.Any(movieGenreIds.Contains));
+    }
 
     private WatchlistItem? Own(Guid userId, Guid movieId) =>
         Items.FirstOrDefault(item => item.UserId == userId && item.MovieId == movieId);

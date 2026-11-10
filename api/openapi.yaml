@@ -349,7 +349,29 @@ paths:
       tags: [Watchlist]
       operationId: listWatchlist
       summary: List the watchlist, most recently added first
+      description: |
+        With `genreId`, only movies that have any or all of these genres are listed (see `genreMatch`).
+        `totalCount` counts the matching items only.
       parameters:
+        - name: genreId
+          in: query
+          description: |
+            Filter by genre; repeat the parameter to filter by several genres (`genreId=27&genreId=878`).
+            Genres that do not exist are not an error: no movie has them.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items: { type: integer, format: int32 }
+        - name: genreMatch
+          in: query
+          description: |
+            How several `genreId`s are combined: `any` lists movies with at least one of the genres,
+            `all` only movies that have every one of them. Without `genreId` it has no effect.
+          schema:
+            type: string
+            enum: [any, all]
+            default: any
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PageSize'
       responses:

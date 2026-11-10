@@ -5,8 +5,9 @@ namespace MovieTracker.Application.Watchlist;
 /// <summary>Every user has their own watchlist: every method only sees the items of the given user.</summary>
 public interface IWatchlistRepository
 {
-    /// <summary>Most recently added first.</summary>
-    Task<PagedResult<WatchlistItemView>> ListAsync(Guid userId, int page, int pageSize, CancellationToken cancellationToken);
+    /// <summary>The items matching the filter, most recently added first.</summary>
+    Task<PagedResult<WatchlistItemView>> ListAsync(
+        Guid userId, WatchlistFilter filter, int page, int pageSize, CancellationToken cancellationToken);
 
     Task<WatchlistItemView?> GetAsync(Guid userId, Guid movieId, CancellationToken cancellationToken);
 

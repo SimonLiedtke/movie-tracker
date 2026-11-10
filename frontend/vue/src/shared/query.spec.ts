@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mergeQuery, queryString } from './query';
+import { mergeQuery, queryString, queryStrings } from './query';
 
 describe('queryString', () => {
   it('is the value of the parameter', () => {
@@ -18,6 +18,19 @@ describe('queryString', () => {
   });
 });
 
+describe('queryStrings', () => {
+  it('is all values of the parameter', () => {
+    expect(queryStrings('27')).toEqual(['27']);
+    expect(queryStrings(['27', '878'])).toEqual(['27', '878']);
+  });
+
+  it('is empty for a missing parameter, and skips values without text', () => {
+    expect(queryStrings(undefined)).toEqual([]);
+    expect(queryStrings(null)).toEqual([]);
+    expect(queryStrings(['27', null])).toEqual(['27']);
+  });
+});
+
 describe('mergeQuery', () => {
   it('keeps the parameters that are not changed', () => {
     expect(mergeQuery({ search: 'alien', page: '2' }, { year: 1979 })).toEqual({
@@ -32,6 +45,14 @@ describe('mergeQuery', () => {
       { search: 'heat' },
     );
     expect(mergeQuery({ page: '2' }, { page: null })).toEqual({});
+  });
+
+  it('sets a parameter that is repeated for an array, and removes it for an empty one', () => {
+    expect(mergeQuery({ page: '2' }, { genreId: [27, '878'] })).toEqual({
+      page: '2',
+      genreId: ['27', '878'],
+    });
+    expect(mergeQuery({ genreId: ['27', '878'] }, { genreId: [] })).toEqual({});
   });
 
   it('does not change the current query', () => {

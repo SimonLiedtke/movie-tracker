@@ -38,21 +38,39 @@ describe('Watchlist', () => {
 
   afterEach(() => vi.useRealTimers());
 
-  const open = (url = '/watchlist') =>
-    mountRoute(
+  const GENRES = [
+    { id: 27, name: 'Horror' },
+    { id: 878, name: 'Science Fiction' },
+    { id: 18, name: 'Drama' },
+  ];
+
+  /** Opens the page and answers the request for the genres of the filter. */
+  async function open(url = '/watchlist') {
+    const opened = await mountRoute(
       url,
       { path: '/watchlist', component: Watchlist, props: watchlistProps },
       { api: createApi(createHttp()) },
     );
+    backend.expectOne('/api/genres').flush(GENRES);
+    await flushPromises();
+    return opened;
+  }
 
-  const listRequest = (page = 1) => backend.expectOne(`/api/watchlist?page=${page}&pageSize=20`);
+  /** The request for a page; `filter` is the rest of the query string, e.g. `&genreId=27&genreMatch=any`. */
+  const listRequest = (page = 1, filter = '') =>
+    backend.expectOne(`/api/watchlist?page=${page}&pageSize=20${filter}`);
   const text = (page: VueWrapper) => page.text().replace(/\s+/g, ' ');
   const buttonOf = (page: VueWrapper, label: string, index = 0) =>
     page.findAll('button, a.button').filter((b) => b.text() === label)[index];
 
-  async function openWith(items: WatchlistItem[], url = '/watchlist', response = paged(items)) {
+  async function openWith(
+    items: WatchlistItem[],
+    url = '/watchlist',
+    response = paged(items),
+    filter = '',
+  ) {
     const opened = await open(url);
-    listRequest(response.page).flush(response);
+    listRequest(response.page, filter).flush(response);
     await flushPromises();
     return opened;
   }
@@ -126,6 +144,238 @@ describe('Watchlist', () => {
     listRequest(3).flush(paged([ALIEN], { page: 3, totalCount: 45 }));
     await flushPromises();
     expect(page.findAll('article')).toHaveLength(1);
+  });
+
+  describe('genre filter', () => {
+    const genreButtons = (page: VueWrapper) => page.findAll('[aria-labelledby=genre-label] button');
+    const genreButton = (page: VueWrapper, name: string) =>
+      genreButtons(page).find((b) => b.text() === name)!;
+    const matchButton = (page: VueWrapper, label: string) =>
+      page.findAll('[aria-labelledby=genre-match-label] button').find((b) => b.text() === label)!;
+    const selectedGenres = (page: VueWrapper) =>
+      genreButtons(page)
+        .filter((b) => b.attributes('aria-pressed') === 'true')
+        .map((b) => b.text());
+
+    /** Clicks the button, and answers the request that follows with the items. */
+    async function click(
+      button: { trigger: (event: string) => Promise<unknown> },
+      url: string,
+      expected: { page?: number; filter: string },
+      response: PagedResponse<WatchlistItem>,
+      router: { currentRoute: { value: { fullPath: string } } },
+    ) {
+      await button.trigger('click');
+      await flushPromises();
+      expect(router.currentRoute.value.fullPath).toBe(url);
+      listRequest(expected.page, expected.filter).flush(response);
+      await flushPromises();
+    }
+
+    it('offers every genre, none selected, and "any of them" to combine them', async () => {
+      const { page } = await openWith([HEAT]);
+
+      expect(genreButtons(page).map((b) => b.text())).toEqual([
+        'Horror',
+        'Science Fiction',
+        'Drama',
+      ]);
+      expect(selectedGenres(page)).toEqual([]);
+      expect(matchButton(page, 'Any of them').attributes('aria-pressed')).toBe('true');
+      expect(matchButton(page, 'All of them').attributes('aria-pressed')).toBe('false');
+      expect(buttonOf(page, 'Clear filter')).toBeUndefined();
+    });
+
+    it('selects a genre, which loads the matching movies', async () => {
+      const { page, router } = await openWith([HEAT, ALIEN]);
+
+      await click(
+        genreButton(page, 'Horror'),
+        '/watchlist?genreId=27',
+        { filter: '&genreId=27&genreMatch=any' },
+        paged([ALIEN]),
+        router,
+      );
+
+      expect(page.findAll('article')).toHaveLength(1);
+      expect(selectedGenres(page)).toEqual(['Horror']);
+      expect(text(page)).toContain('1 movie to watch with any of the selected genres');
+      expect(buttonOf(page, 'Clear filter')).toBeDefined();
+    });
+
+    it('selects several genres, and deselects one again', async () => {
+      const { page, router } = await openWith([HEAT, ALIEN]);
+
+      await click(
+        genreButton(page, 'Horror'),
+        '/watchlist?genreId=27',
+        { filter: '&genreId=27&genreMatch=any' },
+        paged([ALIEN]),
+        router,
+      );
+      await click(
+        genreButton(page, 'Drama'),
+        '/watchlist?genreId=27&genreId=18',
+        { filter: '&genreId=27&genreId=18&genreMatch=any' },
+        paged([ALIEN, HEAT]),
+        router,
+      );
+      expect(selectedGenres(page)).toEqual(['Horror', 'Drama']);
+
+      await click(
+        genreButton(page, 'Horror'),
+        '/watchlist?genreId=18',
+        { filter: '&genreId=18&genreMatch=any' },
+        paged([HEAT]),
+        router,
+      );
+      expect(selectedGenres(page)).toEqual(['Drama']);
+
+      await click(
+        genreButton(page, 'Drama'),
+        '/watchlist',
+        { filter: '' },
+        paged([HEAT, ALIEN]),
+        router,
+      );
+      expect(selectedGenres(page)).toEqual([]);
+    });
+
+    it('matches all genres instead of any, and back', async () => {
+      const { page, router } = await openWith(
+        [ALIEN],
+        '/watchlist?genreId=27&genreId=878',
+        paged([ALIEN]),
+        '&genreId=27&genreId=878&genreMatch=any',
+      );
+
+      await click(
+        matchButton(page, 'All of them'),
+        '/watchlist?genreId=27&genreId=878&genreMatch=all',
+        { filter: '&genreId=27&genreId=878&genreMatch=all' },
+        paged([ALIEN]),
+        router,
+      );
+      expect(matchButton(page, 'All of them').attributes('aria-pressed')).toBe('true');
+      expect(matchButton(page, 'Any of them').attributes('aria-pressed')).toBe('false');
+      expect(text(page)).toContain('with all of the selected genres');
+
+      // "any" is the default, so it is not in the URL.
+      await click(
+        matchButton(page, 'Any of them'),
+        '/watchlist?genreId=27&genreId=878',
+        { filter: '&genreId=27&genreId=878&genreMatch=any' },
+        paged([ALIEN, HEAT]),
+        router,
+      );
+      expect(matchButton(page, 'Any of them').attributes('aria-pressed')).toBe('true');
+    });
+
+    it('shows the filter of the URL', async () => {
+      const { page } = await openWith(
+        [ALIEN],
+        '/watchlist?genreId=27&genreId=878&genreMatch=all',
+        paged([ALIEN]),
+        '&genreId=27&genreId=878&genreMatch=all',
+      );
+
+      expect(selectedGenres(page)).toEqual(['Horror', 'Science Fiction']);
+      expect(matchButton(page, 'All of them').attributes('aria-pressed')).toBe('true');
+    });
+
+    it('ignores what is not a genre ID in the URL, and duplicates', async () => {
+      const { page } = await openWith(
+        [ALIEN],
+        '/watchlist?genreId=27&genreId=abc&genreId=27&genreMatch=some',
+        paged([ALIEN]),
+        '&genreId=27&genreMatch=any',
+      );
+
+      expect(selectedGenres(page)).toEqual(['Horror']);
+    });
+
+    it('does not send the match mode without genres', async () => {
+      await openWith([HEAT], '/watchlist?genreMatch=all');
+    });
+
+    it('keeps the filter when going to another page, and starts at page 1 when it changes', async () => {
+      const { page, router } = await openWith(
+        [HEAT],
+        '/watchlist?genreId=27',
+        paged([HEAT], { totalCount: 45 }),
+        '&genreId=27&genreMatch=any',
+      );
+
+      await click(
+        page.findAll('.pagination-link')[2],
+        '/watchlist?genreId=27&page=3',
+        { page: 3, filter: '&genreId=27&genreMatch=any' },
+        paged([ALIEN], { page: 3, totalCount: 45 }),
+        router,
+      );
+
+      await click(
+        genreButton(page, 'Drama'),
+        '/watchlist?genreId=27&genreId=18',
+        { filter: '&genreId=27&genreId=18&genreMatch=any' },
+        paged([HEAT]),
+        router,
+      );
+    });
+
+    it('clears the filter, and starts at page 1', async () => {
+      const { page, router } = await openWith(
+        [ALIEN],
+        '/watchlist?genreId=27&genreId=878&genreMatch=all&page=2',
+        paged([ALIEN], { page: 2, totalCount: 21 }),
+        '&genreId=27&genreId=878&genreMatch=all',
+      );
+
+      await click(
+        buttonOf(page, 'Clear filter'),
+        '/watchlist',
+        { filter: '' },
+        paged([HEAT, ALIEN]),
+        router,
+      );
+
+      expect(selectedGenres(page)).toEqual([]);
+      expect(matchButton(page, 'Any of them').attributes('aria-pressed')).toBe('true');
+    });
+
+    it('says when no movie matches, and offers to clear the filter', async () => {
+      const { page, router } = await openWith(
+        [],
+        '/watchlist?genreId=18',
+        paged([]),
+        '&genreId=18&genreMatch=any',
+      );
+
+      expect(text(page)).toContain('No movie on your watchlist matches the selected genres.');
+      expect(text(page)).not.toContain('Your watchlist is empty');
+
+      await click(
+        page.get('.notification button'),
+        '/watchlist',
+        { filter: '' },
+        paged([HEAT]),
+        router,
+      );
+    });
+
+    it('still shows the watchlist if the genres cannot be loaded', async () => {
+      const { page } = await mountRoute(
+        '/watchlist',
+        { path: '/watchlist', component: Watchlist, props: watchlistProps },
+        { api: createApi(createHttp()) },
+      );
+      backend.expectOne('/api/genres').networkError();
+      listRequest().flush(paged([HEAT]));
+      await flushPromises();
+
+      expect(page.findAll('article')).toHaveLength(1);
+      expect(genreButtons(page)).toHaveLength(0);
+    });
   });
 
   it('shows why the watchlist cannot be loaded, until it is dismissed', async () => {

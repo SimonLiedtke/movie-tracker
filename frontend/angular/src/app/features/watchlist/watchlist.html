@@ -11,11 +11,55 @@
   />
 </div>
 
+<div class="box">
+  <div class="field">
+    <label class="label" id="genre-label">Genres</label>
+    <div class="buttons are-small" role="group" aria-labelledby="genre-label">
+      @for (genre of genres(); track genre.id) {
+        <button
+          type="button"
+          class="button"
+          [class.is-link]="isSelected(genre)"
+          [attr.aria-pressed]="isSelected(genre)"
+          (click)="toggleGenre(genre)"
+        >
+          {{ genre.name }}
+        </button>
+      }
+    </div>
+  </div>
+  <div class="field is-flex is-flex-wrap-wrap is-align-items-center">
+    <span class="mr-3" id="genre-match-label">Show movies with</span>
+    <div class="buttons has-addons are-small mb-0" role="group" aria-labelledby="genre-match-label">
+      @for (option of matchOptions; track option.value) {
+        <button
+          type="button"
+          class="button mb-0"
+          [class.is-link]="query().genreMatch === option.value"
+          [class.is-selected]="query().genreMatch === option.value"
+          [attr.aria-pressed]="query().genreMatch === option.value"
+          (click)="setGenreMatch(option.value)"
+        >
+          {{ option.label }}
+        </button>
+      }
+    </div>
+    @if (filtered()) {
+      <button type="button" class="button is-small is-ghost ml-3" (click)="clearFilter()">
+        Clear filter
+      </button>
+    }
+  </div>
+</div>
+
 <app-error-notification [error]="error()" (dismiss)="error.set(null)" />
 
 @if (result(); as result) {
   <p class="mb-4 has-text-grey">
     {{ result.totalCount }} {{ result.totalCount === 1 ? 'movie' : 'movies' }} to watch
+    @if (filtered()) {
+      with {{ query().genreMatch === 'all' ? 'all' : 'any' }} of the selected genres
+    }
     @if (loading()) {
       <span class="ml-2">· loading…</span>
     }
@@ -90,7 +134,16 @@
       </div>
     </article>
   } @empty {
-    <div class="notification">Your watchlist is empty. Search a movie above to add it.</div>
+    @if (filtered()) {
+      <div class="notification">
+        No movie on your watchlist matches the selected genres.
+        <button type="button" class="button is-small is-ghost" (click)="clearFilter()">
+          Clear filter
+        </button>
+      </div>
+    } @else {
+      <div class="notification">Your watchlist is empty. Search a movie above to add it.</div>
+    }
   }
 
   <app-pagination

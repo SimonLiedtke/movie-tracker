@@ -41,6 +41,31 @@ describe('API services', () => {
     request.flush({});
   });
 
+  it('lists the watchlist without filter', () => {
+    TestBed.inject(WatchlistApi).list({ page: 2, pageSize: 20 }).subscribe();
+
+    http.expectOne('/api/watchlist?page=2&pageSize=20').flush({});
+  });
+
+  it('lists the watchlist filtered by genres, repeating the parameter', () => {
+    TestBed.inject(WatchlistApi)
+      .list({ genreIds: [27, 878], genreMatch: 'all', page: 1, pageSize: 20 })
+      .subscribe();
+
+    http
+      .expectOne('/api/watchlist?page=1&pageSize=20&genreId=27&genreId=878&genreMatch=all')
+      .flush({});
+  });
+
+  it('matches any genre by default, and sends no match mode without genres', () => {
+    const api = TestBed.inject(WatchlistApi);
+    api.list({ genreIds: [27] }).subscribe();
+    api.list({ genreIds: [], genreMatch: 'all' }).subscribe();
+
+    http.expectOne('/api/watchlist?genreId=27&genreMatch=any').flush({});
+    http.expectOne('/api/watchlist').flush({});
+  });
+
   it('puts a movie on the watchlist with a note', () => {
     TestBed.inject(WatchlistApi).put('42', "Director's cut").subscribe();
 

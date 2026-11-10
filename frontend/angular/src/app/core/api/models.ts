@@ -119,6 +119,16 @@ export interface PageQuery {
   pageSize?: number;
 }
 
+/** `any`: at least one of the genres, `all`: every one of them. */
+export type GenreMatch = 'any' | 'all';
+
+export interface WatchlistQuery extends PageQuery {
+  /** Only movies with these genres; all movies if empty. */
+  genreIds?: number[];
+  /** How `genreIds` are combined. Default: `any`. */
+  genreMatch?: GenreMatch;
+}
+
 export interface User {
   id: string;
   email: string;

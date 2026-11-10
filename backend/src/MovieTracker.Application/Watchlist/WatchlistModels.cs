@@ -4,6 +4,25 @@ namespace MovieTracker.Application.Watchlist;
 
 public sealed record WatchlistItemView(MovieRef Movie, DateTimeOffset AddedAt, string? Note);
 
+/// <summary>How the genres of a <see cref="WatchlistFilter"/> are combined.</summary>
+public enum GenreMatch
+{
+    /// <summary>The movie has at least one of the genres.</summary>
+    Any,
+
+    /// <summary>The movie has every one of the genres (and possibly more).</summary>
+    All,
+}
+
+/// <summary>
+/// Only items whose movie matches the genres. No genres: no restriction. Genres that no movie has are not an error;
+/// they match nothing with <see cref="GenreMatch.All"/> and are ignored with <see cref="GenreMatch.Any"/>.
+/// </summary>
+public sealed record WatchlistFilter(IReadOnlyList<int> GenreIds, GenreMatch GenreMatch)
+{
+    public static WatchlistFilter None { get; } = new([], GenreMatch.Any);
+}
+
 public enum PutWatchlistItemStatus
 {
     /// <summary>The movie was put on the watchlist now.</summary>
