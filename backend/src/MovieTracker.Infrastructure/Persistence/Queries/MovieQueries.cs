@@ -38,8 +38,9 @@ internal static class MovieQueries
         // The escape character must be passed explicitly: without it, Npgsql generates ESCAPE '' and the
         // backslashes added by EscapeLikePattern would be matched literally.
         return movies.Where(movie =>
-            EF.Functions.ILike(movie.Title, pattern, LikeEscapeCharacter) ||
-            (movie.OriginalTitle != null && EF.Functions.ILike(movie.OriginalTitle, pattern, LikeEscapeCharacter)));
+            EF.Functions.ILike(EF.Functions.Unaccent(movie.Title), EF.Functions.Unaccent(pattern), LikeEscapeCharacter) ||
+            (movie.OriginalTitle != null &&
+             EF.Functions.ILike(EF.Functions.Unaccent(movie.OriginalTitle), EF.Functions.Unaccent(pattern), LikeEscapeCharacter)));
     }
 
     /// <summary>Watchlist items that match the filter.</summary>
@@ -47,12 +48,13 @@ internal static class MovieQueries
     {
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
-            // Like the search in the movie list: title or original title, any case, wildcards taken literally.
+            // Like the search in the movie list: title or original title, any case and without regard to
+            // accents, wildcards taken literally.
             var pattern = ContainsPattern(filter.Search);
             items = items.Where(item =>
-                EF.Functions.ILike(item.Movie.Title, pattern, LikeEscapeCharacter) ||
+                EF.Functions.ILike(EF.Functions.Unaccent(item.Movie.Title), EF.Functions.Unaccent(pattern), LikeEscapeCharacter) ||
                 (item.Movie.OriginalTitle != null &&
-                 EF.Functions.ILike(item.Movie.OriginalTitle, pattern, LikeEscapeCharacter)));
+                 EF.Functions.ILike(EF.Functions.Unaccent(item.Movie.OriginalTitle), EF.Functions.Unaccent(pattern), LikeEscapeCharacter)));
         }
 
         var genreIds = filter.GenreIds.Distinct().ToList();
@@ -154,7 +156,12 @@ internal static class MovieQueries
                 .Max(entry => (DateOnly?)entry.WatchedOn),
             movie.CreatedAt));
 
-    /// <summary>The LIKE pattern for "contains the (trimmed) text, taken literally".</summary>
+    /// <summary>
+    /// The LIKE pattern for "contains the (trimmed) text, taken literally". Both the pattern and the searched column
+    /// go through <c>unaccent</c> (a PostgreSQL extension, see the migration).
+    /// Accents are removed before the case-insensitive comparison, which therefore also
+    /// works for accented capitals in a database with the "C" collation.
+    /// </summary>
     private static string ContainsPattern(string search) => $"%{EscapeLikePattern(search.Trim())}%";
 
     private static string EscapeLikePattern(string value) => value

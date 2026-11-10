@@ -497,6 +497,46 @@ public sealed class WatchlistTests(ApiFactory factory) : ApiTestBase(factory)
     }
 
     [Theory]
+    [InlineData("o briain")]
+    [InlineData("Ó BRIAIN")]
+    [InlineData("ó briain")]
+    [InlineData("voice of reason")]
+    public async Task List_with_search_ignores_accents_and_case_in_the_text_and_the_title(string search)
+    {
+        await PutOnTheWatchlistAsync(("Dara Ó Briain: Voice of Reason", null, []), ("Heat", null, []));
+
+        Assert.Equal(["Dara Ó Briain: Voice of Reason"], await ListTitlesAsync($"?search={Uri.EscapeDataString(search)}"));
+    }
+
+    [Theory]
+    [InlineData("amelie", "Amélie")]
+    [InlineData("amélie", "Amelie")]
+    [InlineData("strasse", "Die Straße")]
+    [InlineData("aeon", "Æon Flux")]
+    [InlineData("ornen", "Ørnen")]
+    [InlineData("naive", "Naïve")]
+    [InlineData("sen to chihiro no kamikakushi", "Spirited Away")]
+    [InlineData("la maman et la putain", "Maman")]
+    public async Task List_with_search_ignores_accents_and_similar_letter_variants(string search, string expectedTitle)
+    {
+        await PutOnTheWatchlistAsync(
+            ("Amélie", null, []),
+            ("Amelie", null, []),
+            ("Die Straße", null, []),
+            ("Æon Flux", null, []),
+            ("Ørnen", null, []),
+            ("Naïve", null, []),
+            ("Spirited Away", "Sen to Chihiro no Kamikakushi", []),
+            ("Maman", "La Maman et la Putain", []),
+            ("Heat", null, []));
+
+        var titles = await ListTitlesAsync($"?search={Uri.EscapeDataString(search)}");
+
+        Assert.Contains(expectedTitle, titles);
+        Assert.DoesNotContain("Heat", titles);
+    }
+
+    [Theory]
     [InlineData("100%", "100% Wolf")]
     [InlineData("a_b", "a_b")]
     [InlineData(@"AC\DC", @"AC\DC")]

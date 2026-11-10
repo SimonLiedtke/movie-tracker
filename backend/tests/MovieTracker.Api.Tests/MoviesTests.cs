@@ -175,6 +175,36 @@ public sealed class MoviesTests(ApiFactory factory) : ApiTestBase(factory)
     }
 
     [Theory]
+    [InlineData("o briain")]
+    [InlineData("Ó BRIAIN")]
+    [InlineData("ó briain")]
+    public async Task List_search_ignores_accents_and_case(string search)
+    {
+        await CreateMovieAsync("Dara Ó Briain: Voice of Reason");
+        await CreateMovieAsync("Heat");
+
+        var result = await GetAsync<PagedResponse<MovieSummaryResponse>>($"/api/movies?search={Uri.EscapeDataString(search)}");
+
+        Assert.Equal(["Dara Ó Briain: Voice of Reason"], result.Items.Select(movie => movie.Title));
+    }
+
+    [Fact]
+    public async Task List_search_finds_unaccented_titles_with_accents_and_in_the_original_title()
+    {
+        await CreateMovieAsync("Amelie");
+        await CreateMovieAsync("Spirited Away", originalTitle: "Sen to Chihiro no Kamikakushi");
+        await CreateMovieAsync("Die Straße");
+
+        var amelie = await GetAsync<PagedResponse<MovieSummaryResponse>>($"/api/movies?search={Uri.EscapeDataString("amélie")}");
+        var strasse = await GetAsync<PagedResponse<MovieSummaryResponse>>("/api/movies?search=strasse");
+        var original = await GetAsync<PagedResponse<MovieSummaryResponse>>($"/api/movies?search={Uri.EscapeDataString("Kamikakúshi")}");
+
+        Assert.Equal(["Amelie"], amelie.Items.Select(movie => movie.Title));
+        Assert.Equal(["Die Straße"], strasse.Items.Select(movie => movie.Title));
+        Assert.Equal(["Spirited Away"], original.Items.Select(movie => movie.Title));
+    }
+
+    [Theory]
     [InlineData("100%", "100% Wolf")]
     [InlineData("a_b", "a_b")]
     [InlineData(@"AC\DC", @"AC\DC")]
