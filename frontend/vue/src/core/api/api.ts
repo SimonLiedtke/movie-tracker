@@ -124,6 +124,7 @@ function createWatchlistApi(http: Http) {
       addedTo,
       runtimeFrom,
       runtimeTo,
+      search,
       ...paging
     }: WatchlistQuery = {}): Promise<WatchlistPage> {
       const filtered = genreIds !== undefined && genreIds.length > 0;
@@ -139,6 +140,7 @@ function createWatchlistApi(http: Http) {
             addedTo,
             runtimeFrom,
             runtimeTo,
+            search: search?.trim(),
           }),
         }),
       );

@@ -668,6 +668,102 @@ describe('Watchlist genre filter', () => {
     });
   });
 
+  describe('title search', () => {
+    const field = () => page().querySelector<HTMLInputElement>('#search')!;
+    const clearButton = () =>
+      Array.from(page().querySelectorAll<HTMLButtonElement>('button')).find(
+        (b) => b.textContent!.trim() === 'Clear filter',
+      );
+
+    /** Types the text, and waits until the debounce time has passed. */
+    async function type(value: string) {
+      await typeWithoutWaiting(value);
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      await harness.fixture.whenStable();
+    }
+
+    async function typeWithoutWaiting(value: string) {
+      field().value = value;
+      field().dispatchEvent(new Event('input'));
+      await harness.fixture.whenStable();
+    }
+
+    it('lists the movies with the text in their title, once the user has stopped typing', async () => {
+      await open();
+
+      await typeWithoutWaiting('al');
+      await typeWithoutWaiting('ali');
+      await typeWithoutWaiting('alien');
+      // Nothing yet: the user may still be typing.
+      expect(url()).toBe('/watchlist');
+
+      await vi.waitFor(() => expect(url()).toBe('/watchlist?search=alien'));
+      listRequest('&search=alien').flush(paged([ALIEN], { unfilteredCount: 52 }));
+      await harness.fixture.whenStable();
+      expect(text()).toContain('1 of 52 movies to watch matching "alien"');
+      expect(field().value).toBe('alien');
+      expect(clearButton()).toBeDefined();
+    });
+
+    it('starts again at page 1, and keeps the other filters', async () => {
+      await open(
+        '/watchlist?genreId=27&page=2',
+        '&genreId=27&genreMatch=any',
+        paged([HEAT], { page: 2, totalCount: 45 }),
+      );
+
+      await type('heat');
+
+      expect(url()).toBe('/watchlist?genreId=27&search=heat');
+      listRequest('&genreId=27&genreMatch=any&search=heat').flush(paged([HEAT]));
+    });
+
+    it('shows the search of the URL, and sends it without the spaces around it', async () => {
+      await open('/watchlist?search=alien%20', '&search=alien', paged([ALIEN]));
+
+      expect(field().value).toBe('alien ');
+      expect(text()).toContain('1 of 1 movie to watch matching "alien"');
+    });
+
+    it('does not filter by spaces only, and removes the search from the URL when emptied', async () => {
+      await open();
+
+      await type('   ');
+      expect(url()).toBe('/watchlist');
+      expect(clearButton()).toBeUndefined();
+
+      await type('alien');
+      listRequest('&search=alien').flush(paged([ALIEN]));
+      await harness.fixture.whenStable();
+      await type('');
+
+      expect(url()).toBe('/watchlist');
+      listRequest().flush(paged([ALIEN, HEAT]));
+    });
+
+    it('is cleared with the other filters, and says when no title matches', async () => {
+      await open('/watchlist?search=zzz', '&search=zzz', paged([], { unfilteredCount: 3 }));
+      expect(text()).toContain('0 of 3 movies to watch matching "zzz"');
+      expect(text()).toContain('No movie on your watchlist matches the filter.');
+
+      await click(clearButton()!, '/watchlist', '', paged([ALIEN, HEAT]));
+
+      expect(field().value).toBe('');
+    });
+
+    it('is combined with the genres in the description', async () => {
+      await open(
+        '/watchlist?search=alien&genreId=27',
+        '&genreId=27&genreMatch=any&search=alien',
+        paged([ALIEN], { unfilteredCount: 9 }),
+      );
+
+      expect(text()).toContain(
+        '1 of 9 movies to watch matching "alien", with any of the selected genres',
+      );
+    });
+  });
+
   describe('runtime of a movie', () => {
     const line = (article: Element) =>
       article.querySelector('.is-size-7.has-text-grey')!.textContent!.replace(/\s+/g, ' ').trim();

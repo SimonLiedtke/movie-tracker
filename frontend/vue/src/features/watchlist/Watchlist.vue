@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useRouter, type RouteLocationRaw } from 'vue-router';
 import { useApi } from '../../core/api/api';
 import { toApiError, type ApiError } from '../../core/api/api-error';
@@ -19,6 +19,7 @@ import Poster from '../../shared/Poster.vue';
 import { mergeQuery } from '../../shared/query';
 
 const PAGE_SIZE = 20;
+const SEARCH_DEBOUNCE_MS = 300;
 
 const MATCH_OPTIONS: { value: GenreMatch; label: string }[] = [
   { value: 'any', label: 'Any of them' },
@@ -45,6 +46,7 @@ const props = defineProps<{
   addedTo?: string;
   runtimeFrom?: string;
   runtimeTo?: string;
+  search?: string;
   page?: string;
 }>();
 
@@ -67,6 +69,8 @@ const query = computed<WatchlistQuery>(() => ({
   addedTo: props.addedTo || undefined,
   runtimeFrom: minutes(props.runtimeFrom),
   runtimeTo: minutes(props.runtimeTo),
+  // Not trimmed: the field shows the URL's value, and trimming would eat spaces while typing.
+  search: props.search?.trim() ? props.search : undefined,
   page: Number(props.page) || 1,
   pageSize: PAGE_SIZE,
 }));
@@ -79,7 +83,8 @@ const filtered = computed(
     !!query.value.addedFrom ||
     !!query.value.addedTo ||
     !!query.value.runtimeFrom ||
-    !!query.value.runtimeTo,
+    !!query.value.runtimeTo ||
+    !!query.value.search,
 );
 
 /** E.g. "released from May 25, 1979 to November 3, 1989" or "added until ..."; undefined without dates. */
@@ -112,12 +117,21 @@ function describeRuntime(from?: number, to?: number): string | undefined {
 
 /** What the filter selects, e.g. "with any of the selected genres, released from May 25, 1979". */
 const filterDescription = computed(() => {
-  const { genreMatch, releasedFrom, releasedTo, addedFrom, addedTo, runtimeFrom, runtimeTo } =
-    query.value;
+  const {
+    genreMatch,
+    releasedFrom,
+    releasedTo,
+    addedFrom,
+    addedTo,
+    runtimeFrom,
+    runtimeTo,
+    search,
+  } = query.value;
   const genreText = hasGenres.value
     ? `with ${genreMatch === 'all' ? 'all' : 'any'} of the selected genres`
     : undefined;
   return [
+    search ? `matching "${search.trim()}"` : undefined,
     genreText,
     describeRuntime(runtimeFrom, runtimeTo),
     describePeriod('released', releasedFrom, releasedTo),
@@ -173,11 +187,15 @@ async function load(): Promise<void> {
 }
 
 /**
- * What the request depends on. The match mode means nothing without genres, so changing it then
- * must not load the same list again.
+ * What the request depends on. The match mode means nothing without genres, and spaces around the
+ * search text do not matter, so changing them must not load the same list again.
  */
 const requestKey = computed(() =>
-  JSON.stringify({ ...query.value, genreMatch: hasGenres.value ? query.value.genreMatch : null }),
+  JSON.stringify({
+    ...query.value,
+    genreMatch: hasGenres.value ? query.value.genreMatch : null,
+    search: query.value.search?.trim(),
+  }),
 );
 
 watch(requestKey, load, { immediate: true });
@@ -238,13 +256,38 @@ function clearFilter(): void {
     addedTo: undefined,
     runtimeFrom: undefined,
     runtimeTo: undefined,
+    search: undefined,
   });
 }
 
-function updateFilter(changes: Parameters<typeof mergeQuery>[1]): void {
-  router.push({
-    query: mergeQuery(router.currentRoute.value.query, { ...changes, page: undefined }),
-  });
+function updateFilter(changes: Parameters<typeof mergeQuery>[1], replace = false): void {
+  const merged = mergeQuery(router.currentRoute.value.query, { ...changes, page: undefined });
+  if (replace) {
+    router.replace({ query: merged });
+  } else {
+    router.push({ query: merged });
+  }
+}
+
+// The field shows the URL's value, but keeps what the user types until the URL has caught up.
+const searchText = ref(query.value.search ?? '');
+watch(
+  () => query.value.search,
+  (search) => (searchText.value = search ?? ''),
+);
+
+let searchTimer: ReturnType<typeof setTimeout> | undefined;
+
+onBeforeUnmount(() => clearTimeout(searchTimer));
+
+function onSearch(value: string): void {
+  searchText.value = value;
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    if (value !== (props.search ?? '')) {
+      updateFilter({ search: value.trim() ? value : undefined }, true);
+    }
+  }, SEARCH_DEBOUNCE_MS);
 }
 
 /** Adds the movie at the top of the list (the newest come first). Already on it: nothing changes. */
@@ -317,6 +360,19 @@ async function remove(item: WatchlistItem): Promise<void> {
   </div>
 
   <div class="box">
+    <div class="field">
+      <label class="label" for="search">Title</label>
+      <div class="control">
+        <input
+          id="search"
+          class="input is-small"
+          type="search"
+          placeholder="Title or original title"
+          :value="searchText"
+          @input="onSearch(($event.target as HTMLInputElement).value)"
+        />
+      </div>
+    </div>
     <div class="field">
       <label class="label" id="genre-label">Genres</label>
       <div class="buttons are-small" role="group" aria-labelledby="genre-label">

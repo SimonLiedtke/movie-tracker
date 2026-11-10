@@ -472,6 +472,63 @@ public sealed class WatchlistTests(ApiFactory factory) : ApiTestBase(factory)
         Assert.Contains("addedTo", problem.Errors.Keys);
     }
 
+    private async Task PutOnTheWatchlistAsync(params (string Title, string? OriginalTitle, int[] GenreIds)[] movies)
+    {
+        foreach (var (title, originalTitle, genreIds) in movies)
+        {
+            var movie = await CreateMovieAsync(title, originalTitle: originalTitle, genreIds: genreIds);
+            await Client.PutAsJsonAsync($"/api/watchlist/{movie.Id}", new { }, Ct);
+        }
+    }
+
+    [Fact]
+    public async Task List_with_search_returns_the_movies_whose_title_or_original_title_contains_the_text_in_any_case()
+    {
+        await PutOnTheWatchlistAsync(
+            ("Alien", null, [Horror]),
+            ("Aliens", null, [Horror]),
+            ("Spirited Away", "Sen to Chihiro no Kamikakushi", [Drama]),
+            ("Heat", null, [Drama]));
+
+        Assert.Equal(["Alien", "Aliens"], await ListTitlesAsync("?search=ALI"));
+        Assert.Equal(["Spirited Away"], await ListTitlesAsync("?search=chihiro"));
+        Assert.Equal(["Alien", "Aliens"], await ListTitlesAsync("?search=%20%20alien%20"));
+        Assert.Empty(await ListTitlesAsync("?search=zzz"));
+    }
+
+    [Theory]
+    [InlineData("100%", "100% Wolf")]
+    [InlineData("a_b", "a_b")]
+    [InlineData(@"AC\DC", @"AC\DC")]
+    public async Task List_with_search_treats_wildcards_literally(string search, string expectedTitle)
+    {
+        await PutOnTheWatchlistAsync(
+            ("100% Wolf", null, []), ("1000 Wolves", null, []), ("a_b", null, []), ("axb", null, []), (@"AC\DC", null, []));
+
+        Assert.Equal([expectedTitle], await ListTitlesAsync($"?search={Uri.EscapeDataString(search)}"));
+    }
+
+    [Fact]
+    public async Task List_ignores_a_blank_search_and_combines_it_with_the_other_filters()
+    {
+        await PutOnTheWatchlistAsync(
+            ("Alien", null, [Horror]), ("Aliens", null, [Horror, ScienceFiction]), ("Heat", null, [Drama]));
+
+        Assert.Equal(["Alien", "Aliens", "Heat"], await ListTitlesAsync("?search=%20%20"));
+        Assert.Equal(["Aliens"], await ListTitlesAsync($"?search=alien&genreId={ScienceFiction}"));
+        var result = await GetAsync<WatchlistPageResponse>("/api/watchlist?search=heat");
+        Assert.Equal((1, 3), (result.TotalCount, result.UnfilteredCount));
+    }
+
+    [Fact]
+    public async Task List_rejects_a_search_longer_than_200_characters()
+    {
+        var response = await Client.GetAsync($"/api/watchlist?search={new string('a', 201)}", Ct);
+
+        var problem = await ReadValidationProblemAsync(response);
+        Assert.Contains("search", problem.Errors.Keys);
+    }
+
     [Fact]
     public async Task List_rejects_a_release_period_that_ends_before_it_starts()
     {

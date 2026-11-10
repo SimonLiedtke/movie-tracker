@@ -149,6 +149,8 @@ export interface WatchlistQuery extends PageQuery {
   runtimeFrom?: number;
   /** Only movies that are at most this many minutes long; movies without runtime are left out. */
   runtimeTo?: number;
+  /** Only movies whose title or original title contains this text. */
+  search?: string;
 }
 
 export interface User {

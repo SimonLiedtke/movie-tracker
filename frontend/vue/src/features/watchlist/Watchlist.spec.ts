@@ -1,5 +1,5 @@
 import { flushPromises, type VueWrapper } from '@vue/test-utils';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApi } from '../../core/api/api';
 import { createHttp } from '../../core/api/http';
 import type { Movie, WatchlistPage, WatchlistItem } from '../../core/api/models';
@@ -163,6 +163,117 @@ describe('Watchlist', () => {
     listRequest(3).flush(paged([ALIEN], { page: 3, totalCount: 45 }));
     await flushPromises();
     expect(page.findAll('article')).toHaveLength(1);
+  });
+
+  describe('title search', () => {
+    const field = (page: VueWrapper) => page.get<HTMLInputElement>('#search');
+
+    /** Types the text, and lets the debounce time pass. */
+    async function type(page: VueWrapper, value: string) {
+      await field(page).setValue(value);
+      await vi.advanceTimersByTimeAsync(350);
+      await flushPromises();
+    }
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    });
+
+    it('lists the movies with the text in their title, once the user has stopped typing', async () => {
+      const { page, router } = await openWith([HEAT, ALIEN]);
+
+      await field(page).setValue('al');
+      await vi.advanceTimersByTimeAsync(100);
+      await field(page).setValue('ali');
+      await vi.advanceTimersByTimeAsync(100);
+      await field(page).setValue('alien');
+      // Nothing yet: the user may still be typing.
+      expect(router.currentRoute.value.fullPath).toBe('/watchlist');
+
+      await vi.advanceTimersByTimeAsync(350);
+      await flushPromises();
+
+      expect(router.currentRoute.value.fullPath).toBe('/watchlist?search=alien');
+      listRequest(1, '&search=alien').flush(paged([ALIEN], { unfilteredCount: 52 }));
+      await flushPromises();
+      expect(text(page)).toContain('1 of 52 movies to watch matching "alien"');
+      expect(field(page).element.value).toBe('alien');
+      expect(buttonOf(page, 'Clear filter')).toBeDefined();
+    });
+
+    it('starts again at page 1, and keeps the other filters', async () => {
+      const { page, router } = await openWith(
+        [HEAT],
+        '/watchlist?genreId=27&page=2',
+        paged([HEAT], { page: 2, totalCount: 45 }),
+        '&genreId=27&genreMatch=any',
+      );
+      // The request above is for page 2; the search starts at page 1.
+      await type(page, 'heat');
+
+      expect(router.currentRoute.value.fullPath).toBe('/watchlist?genreId=27&search=heat');
+      listRequest(1, '&genreId=27&genreMatch=any&search=heat').flush(paged([HEAT]));
+    });
+
+    it('shows the search of the URL, and sends it without the spaces around it', async () => {
+      const { page } = await openWith(
+        [ALIEN],
+        '/watchlist?search=alien%20',
+        paged([ALIEN]),
+        '&search=alien',
+      );
+
+      expect(field(page).element.value).toBe('alien ');
+      expect(text(page)).toContain('1 of 1 movie to watch matching "alien"');
+    });
+
+    it('does not filter by spaces only, and removes the search from the URL when emptied', async () => {
+      const { page, router } = await openWith([HEAT, ALIEN]);
+
+      await type(page, '   ');
+      expect(router.currentRoute.value.fullPath).toBe('/watchlist');
+      expect(buttonOf(page, 'Clear filter')).toBeUndefined();
+
+      await type(page, 'alien');
+      listRequest(1, '&search=alien').flush(paged([ALIEN]));
+      await flushPromises();
+      await type(page, '');
+
+      expect(router.currentRoute.value.fullPath).toBe('/watchlist');
+      listRequest().flush(paged([HEAT, ALIEN]));
+    });
+
+    it('is cleared with the other filters, and says when no title matches', async () => {
+      const { page, router } = await openWith(
+        [],
+        '/watchlist?search=zzz',
+        paged([], { unfilteredCount: 3 }),
+        '&search=zzz',
+      );
+      expect(text(page)).toContain('0 of 3 movies to watch matching "zzz"');
+      expect(text(page)).toContain('No movie on your watchlist matches the filter.');
+
+      await buttonOf(page, 'Clear filter').trigger('click');
+      await flushPromises();
+
+      expect(router.currentRoute.value.fullPath).toBe('/watchlist');
+      listRequest().flush(paged([HEAT, ALIEN]));
+      await flushPromises();
+      expect(field(page).element.value).toBe('');
+    });
+
+    it('is combined with the genres in the description', async () => {
+      const { page } = await openWith(
+        [ALIEN],
+        '/watchlist?search=alien&genreId=27',
+        paged([ALIEN], { unfilteredCount: 9 }),
+        '&genreId=27&genreMatch=any&search=alien',
+      );
+
+      expect(text(page)).toContain(
+        '1 of 9 movies to watch matching "alien", with any of the selected genres',
+      );
+    });
   });
 
   describe('runtime of a movie', () => {

@@ -79,6 +79,12 @@ describe('API services', () => {
     http.expectOne('/api/watchlist?page=1&runtimeFrom=23&runtimeTo=148').flush({});
   });
 
+  it('lists the watchlist filtered by title, without the spaces around the text', () => {
+    TestBed.inject(WatchlistApi).list({ search: ' alien ', page: 1 }).subscribe();
+
+    http.expectOne('/api/watchlist?page=1&search=alien').flush({});
+  });
+
   it('matches any genre by default, and sends no match mode without genres', () => {
     const api = TestBed.inject(WatchlistApi);
     api.list({ genreIds: [27] }).subscribe();

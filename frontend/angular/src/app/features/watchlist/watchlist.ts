@@ -4,6 +4,7 @@ import { ActivatedRoute, ParamMap, Params, Router, RouterLink } from '@angular/r
 import {
   Subject,
   catchError,
+  debounceTime,
   distinctUntilChanged,
   map,
   of,
@@ -28,6 +29,7 @@ import { Pagination } from '../../shared/pagination';
 import { Poster } from '../../shared/poster';
 
 const PAGE_SIZE = 20;
+const SEARCH_DEBOUNCE_MS = 300;
 
 const MATCH_OPTIONS: { value: GenreMatch; label: string }[] = [
   { value: 'any', label: 'Any of them' },
@@ -81,11 +83,15 @@ function describePeriod(what: string, from?: string, to?: string): string | unde
 }
 
 /**
- * What the request depends on. The match mode means nothing without genres, so changing it then
- * must not load the same list again.
+ * What the request depends on. The match mode means nothing without genres, and spaces around the
+ * search text do not matter, so changing them must not load the same list again.
  */
 function requestKey(query: WatchlistQuery): string {
-  return JSON.stringify({ ...query, genreMatch: query.genreIds?.length ? query.genreMatch : null });
+  return JSON.stringify({
+    ...query,
+    genreMatch: query.genreIds?.length ? query.genreMatch : null,
+    search: query.search?.trim(),
+  });
 }
 
 function parseQuery(params: ParamMap): WatchlistQuery {
@@ -99,6 +105,8 @@ function parseQuery(params: ParamMap): WatchlistQuery {
     addedTo: params.get('addedTo') || undefined,
     runtimeFrom: parseMinutes(params.get('runtimeFrom')),
     runtimeTo: parseMinutes(params.get('runtimeTo')),
+    // Not trimmed: the field shows the URL's value, and trimming would eat spaces while typing.
+    search: params.get('search')?.trim() ? params.get('search')! : undefined,
     page: Number(params.get('page')) || 1,
     pageSize: PAGE_SIZE,
   };
@@ -128,20 +136,30 @@ export class Watchlist {
   });
   private readonly hasGenres = computed(() => (this.query().genreIds?.length ?? 0) > 0);
   protected readonly filtered = computed(() => {
-    const { releasedFrom, releasedTo, addedFrom, addedTo, runtimeFrom, runtimeTo } = this.query();
+    const { releasedFrom, releasedTo, addedFrom, addedTo, runtimeFrom, runtimeTo, search } =
+      this.query();
     return (
       this.hasGenres() ||
-      !!(releasedFrom || releasedTo || addedFrom || addedTo || runtimeFrom || runtimeTo)
+      !!(releasedFrom || releasedTo || addedFrom || addedTo || runtimeFrom || runtimeTo || search)
     );
   });
   /** What the filter selects, e.g. "with any of the selected genres, released from May 25, 1979". */
   protected readonly filterDescription = computed(() => {
-    const { genreMatch, releasedFrom, releasedTo, addedFrom, addedTo, runtimeFrom, runtimeTo } =
-      this.query();
+    const {
+      genreMatch,
+      releasedFrom,
+      releasedTo,
+      addedFrom,
+      addedTo,
+      runtimeFrom,
+      runtimeTo,
+      search,
+    } = this.query();
     const genreText = this.hasGenres()
       ? `with ${genreMatch === 'all' ? 'all' : 'any'} of the selected genres`
       : undefined;
     return [
+      search ? `matching "${search.trim()}"` : undefined,
       genreText,
       describeRuntime(runtimeFrom, runtimeTo),
       describePeriod('released', releasedFrom, releasedTo),
@@ -159,8 +177,17 @@ export class Watchlist {
   protected readonly saving = signal(false);
 
   private readonly reload = new Subject<void>();
+  private readonly searchInput = new Subject<string>();
 
   constructor() {
+    this.searchInput
+      .pipe(debounceTime(SEARCH_DEBOUNCE_MS), takeUntilDestroyed())
+      .subscribe((value) => {
+        if (value !== (this.query().search ?? '')) {
+          this.updateFilter({ search: value.trim() ? value : undefined }, true);
+        }
+      });
+
     this.route.queryParamMap
       .pipe(
         map(parseQuery),
@@ -216,6 +243,10 @@ export class Watchlist {
     this.updateFilter({ genreMatch: match === 'all' ? 'all' : undefined });
   }
 
+  protected onSearch(value: string): void {
+    this.searchInput.next(value);
+  }
+
   protected onRuntime(key: 'runtimeFrom' | 'runtimeTo', value: string): void {
     this.updateFilter({ [key]: value || undefined });
   }
@@ -250,14 +281,16 @@ export class Watchlist {
       addedTo: undefined,
       runtimeFrom: undefined,
       runtimeTo: undefined,
+      search: undefined,
     });
   }
 
   /** Changing the filter starts again at page 1. */
-  private updateFilter(changes: Params): void {
+  private updateFilter(changes: Params, replaceUrl = false): void {
     this.router.navigate([], {
       queryParams: { ...changes, page: undefined },
       queryParamsHandling: 'merge',
+      replaceUrl,
     });
   }
 

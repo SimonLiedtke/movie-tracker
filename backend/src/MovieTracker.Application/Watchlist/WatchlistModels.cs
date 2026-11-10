@@ -27,6 +27,9 @@ public enum GenreMatch
 /// <summary>
 /// Only items that match every part of the filter; a part that is not set does not restrict.
 /// </summary>
+/// <param name="Search">
+/// Movies whose title or original title contains this text, in any case. Blank: no restriction.
+/// </param>
 /// <param name="GenreIds">
 /// Movies with these genres, see <paramref name="GenreMatch"/>. Genres that no movie has are not an error; they match
 /// nothing with <see cref="GenreMatch.All"/> and are ignored with <see cref="GenreMatch.Any"/>.
@@ -45,7 +48,8 @@ public sealed record WatchlistFilter(
     DateOnly? AddedFrom = null,
     DateOnly? AddedTo = null,
     int? RuntimeFrom = null,
-    int? RuntimeTo = null)
+    int? RuntimeTo = null,
+    string? Search = null)
 {
     public static WatchlistFilter None { get; } = new([], GenreMatch.Any);
 
@@ -54,7 +58,8 @@ public sealed record WatchlistFilter(
         GenreIds.Count == 0
         && ReleasedFrom is null && ReleasedTo is null
         && AddedFrom is null && AddedTo is null
-        && RuntimeFrom is null && RuntimeTo is null;
+        && RuntimeFrom is null && RuntimeTo is null
+        && string.IsNullOrWhiteSpace(Search);
 }
 
 public enum PutWatchlistItemStatus

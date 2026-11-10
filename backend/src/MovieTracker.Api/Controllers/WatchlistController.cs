@@ -19,7 +19,8 @@ public sealed class WatchlistController(WatchlistService watchlist) : Controller
     /// <paramref name="releasedTo"/>, only movies released in this period, with <paramref name="addedFrom"/> and
     /// <paramref name="addedTo"/>, only items added in this period (both ends included, UTC days).
     /// With <paramref name="runtimeFrom"/> and <paramref name="runtimeTo"/>, only movies that are this many minutes
-    /// long (both ends included); movies without a runtime are left out.
+    /// long (both ends included); movies without a runtime are left out. With <paramref name="search"/>, only movies
+    /// whose title or original title contains the text.
     /// </summary>
     [HttpGet(Name = "listWatchlist")]
     [ProducesResponseType<WatchlistPageResponse>(StatusCodes.Status200OK)]
@@ -33,6 +34,7 @@ public sealed class WatchlistController(WatchlistService watchlist) : Controller
         [FromQuery] DateOnly? addedTo = null,
         [FromQuery, Range(1, 1500)] int? runtimeFrom = null,
         [FromQuery, Range(1, 1500)] int? runtimeTo = null,
+        [FromQuery, StringLength(200)] string? search = null,
         [FromQuery, Range(1, int.MaxValue)] int page = 1,
         [FromQuery, Range(1, 100)] int pageSize = 20,
         CancellationToken cancellationToken = default)
@@ -63,7 +65,8 @@ public sealed class WatchlistController(WatchlistService watchlist) : Controller
             addedFrom,
             addedTo,
             runtimeFrom,
-            runtimeTo);
+            runtimeTo,
+            search);
         var result = await watchlist.ListAsync(User.GetUserId(), filter, page, pageSize, cancellationToken);
         return result.ToResponse();
     }

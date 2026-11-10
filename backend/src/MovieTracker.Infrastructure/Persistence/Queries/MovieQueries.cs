@@ -34,7 +34,7 @@ internal static class MovieQueries
             return movies;
         }
 
-        var pattern = $"%{EscapeLikePattern(search.Trim())}%";
+        var pattern = ContainsPattern(search);
         // The escape character must be passed explicitly: without it, Npgsql generates ESCAPE '' and the
         // backslashes added by EscapeLikePattern would be matched literally.
         return movies.Where(movie =>
@@ -45,6 +45,16 @@ internal static class MovieQueries
     /// <summary>Watchlist items that match the filter.</summary>
     public static IQueryable<WatchlistItem> Matching(this IQueryable<WatchlistItem> items, WatchlistFilter filter)
     {
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            // Like the search in the movie list: title or original title, any case, wildcards taken literally.
+            var pattern = ContainsPattern(filter.Search);
+            items = items.Where(item =>
+                EF.Functions.ILike(item.Movie.Title, pattern, LikeEscapeCharacter) ||
+                (item.Movie.OriginalTitle != null &&
+                 EF.Functions.ILike(item.Movie.OriginalTitle, pattern, LikeEscapeCharacter)));
+        }
+
         var genreIds = filter.GenreIds.Distinct().ToList();
         if (genreIds.Count > 0)
         {
@@ -143,6 +153,9 @@ internal static class MovieQueries
                 .Where(entry => entry.MovieId == movie.Id && entry.UserId == userId)
                 .Max(entry => (DateOnly?)entry.WatchedOn),
             movie.CreatedAt));
+
+    /// <summary>The LIKE pattern for "contains the (trimmed) text, taken literally".</summary>
+    private static string ContainsPattern(string search) => $"%{EscapeLikePattern(search.Trim())}%";
 
     private static string EscapeLikePattern(string value) => value
         .Replace(@"\", @"\\")
