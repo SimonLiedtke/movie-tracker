@@ -69,6 +69,5 @@ internal sealed class DiaryRepository(MovieTrackerDbContext db) : IDiaryReposito
 
     public void Add(DiaryEntry entry) => db.DiaryEntries.Add(entry);
 
-    public async Task<bool> DeleteAsync(Guid userId, Guid entryId, CancellationToken cancellationToken) =>
-        await OwnEntries(userId).Where(entry => entry.Id == entryId).ExecuteDeleteAsync(cancellationToken) > 0;
+    public void Remove(DiaryEntry entry) => db.DiaryEntries.Remove(entry);
 }

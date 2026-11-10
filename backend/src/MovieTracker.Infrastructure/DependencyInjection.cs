@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MovieTracker.Application;
+using MovieTracker.Application.Activity;
 using MovieTracker.Application.Diary;
 using MovieTracker.Application.Genres;
 using MovieTracker.Application.Letterboxd;
@@ -33,6 +34,7 @@ public static class DependencyInjection
         services.AddDataProtection().PersistKeysToDbContext<MovieTrackerDbContext>();
 
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
+        services.AddScoped<IActivityLogRepository, ActivityLogRepository>();
         services.AddScoped<IDiaryRepository, DiaryRepository>();
         services.AddScoped<IGenreRepository, GenreRepository>();
         services.AddScoped<IMovieRepository, MovieRepository>();

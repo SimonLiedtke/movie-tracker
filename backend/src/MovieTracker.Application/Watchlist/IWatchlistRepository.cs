@@ -19,7 +19,4 @@ public interface IWatchlistRepository
 
     /// <summary>For removing an item found with <see cref="FindAsync"/>: saved with <see cref="IUnitOfWork"/>.</summary>
     void Remove(WatchlistItem item);
-
-    /// <summary>Deletes immediately. False if the movie was not on the watchlist.</summary>
-    Task<bool> RemoveAsync(Guid userId, Guid movieId, CancellationToken cancellationToken);
 }

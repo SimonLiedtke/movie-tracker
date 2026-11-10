@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { LetterboxdImportApi, MoviesApi, WatchlistApi } from './api';
+import { ActivityLogApi, LetterboxdImportApi, MoviesApi, WatchlistApi } from './api';
 
 describe('API services', () => {
   let http: HttpTestingController;
@@ -92,6 +92,12 @@ describe('API services', () => {
 
     http.expectOne('/api/watchlist?genreId=27&genreMatch=any').flush({});
     http.expectOne('/api/watchlist').flush({});
+  });
+
+  it('lists the activity log page by page', () => {
+    TestBed.inject(ActivityLogApi).list({ page: 3, pageSize: 50 }).subscribe();
+
+    http.expectOne('/api/activity-log?page=3&pageSize=50').flush({});
   });
 
   it('puts a movie on the watchlist with a note', () => {

@@ -90,6 +90,15 @@ dotnet run --project src/MovieTracker.Api
 The API listens on http://localhost:5080. The OpenAPI document generated from the code
 is available at http://localhost:5080/openapi/v1.json.
 
+## Activity log
+
+The **Activity** page of the frontend (`/activity`, `GET /api/activity-log`) lists what the signed-in user did that
+modified the database, most recent first and with the time: logging, changing and deleting viewings (including
+rating changes), putting movies on the watchlist, changing their notes and removing them, adding, changing, importing
+and deleting movies, and Letterboxd imports (one line per import). The use cases write each line in the same save
+as the change itself. Saving something unchanged (e.g. the same note again) is not logged. The log keeps the movie's
+title, so a line about a deleted movie still reads well. Nothing is logged for actions that happened before the log was added.
+
 ## Signing in with Google
 
 Users sign in with their Google account. Every user has their own diary, watchlist and manually

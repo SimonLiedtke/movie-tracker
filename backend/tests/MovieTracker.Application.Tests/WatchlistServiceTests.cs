@@ -13,6 +13,7 @@ public sealed class WatchlistServiceTests
 
     private readonly FakeMovieRepository _movies = new();
     private readonly FakeWatchlistRepository _watchlist;
+    private readonly FakeActivityLogRepository _log = new();
     private readonly FakeUnitOfWork _unitOfWork = new();
     private readonly TestClock _clock = new(Start);
     private readonly WatchlistService _service;
@@ -20,7 +21,7 @@ public sealed class WatchlistServiceTests
     public WatchlistServiceTests()
     {
         _watchlist = new FakeWatchlistRepository(_movies);
-        _service = new WatchlistService(_watchlist, _movies, _unitOfWork, _clock);
+        _service = new WatchlistService(_watchlist, _movies, _log, _unitOfWork, _clock);
     }
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;

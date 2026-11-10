@@ -57,6 +57,9 @@ public sealed class FakeMovieRepository : IMovieRepository
     public Task<bool> ExistsAsync(Guid userId, Guid movieId, CancellationToken cancellationToken) =>
         Task.FromResult(Visible(userId, movieId) is not null);
 
+    public Task<string?> GetTitleAsync(Guid userId, Guid movieId, CancellationToken cancellationToken) =>
+        Task.FromResult(Visible(userId, movieId)?.Title);
+
     public Task<Movie?> FindAsync(Guid userId, Guid movieId, CancellationToken cancellationToken) =>
         Task.FromResult(Visible(userId, movieId));
 
@@ -79,11 +82,7 @@ public sealed class FakeMovieRepository : IMovieRepository
     public Task<bool> HasDiaryEntriesAsync(Guid movieId, CancellationToken cancellationToken) =>
         Task.FromResult(MoviesInDiary.Contains(movieId));
 
-    public Task DeleteAsync(Guid movieId, CancellationToken cancellationToken)
-    {
-        Movies.RemoveAll(movie => movie.Id == movieId);
-        return Task.CompletedTask;
-    }
+    public void Remove(Movie movie) => Movies.Remove(movie);
 
     private Movie? Visible(Guid userId, Guid movieId) =>
         Movies.FirstOrDefault(movie => movie.Id == movieId && movie.IsVisibleTo(userId));

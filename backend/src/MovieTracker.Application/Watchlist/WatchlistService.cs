@@ -1,10 +1,16 @@
+using MovieTracker.Application.Activity;
 using MovieTracker.Application.Movies;
+using MovieTracker.Domain.Activity;
 using MovieTracker.Domain.Watchlist;
 
 namespace MovieTracker.Application.Watchlist;
 
 public sealed class WatchlistService(
-    IWatchlistRepository watchlist, IMovieRepository movies, IUnitOfWork unitOfWork, TimeProvider timeProvider)
+    IWatchlistRepository watchlist,
+    IMovieRepository movies,
+    IActivityLogRepository activityLog,
+    IUnitOfWork unitOfWork,
+    TimeProvider timeProvider)
 {
     public Task<WatchlistPage> ListAsync(
         Guid userId, WatchlistFilter filter, int page, int pageSize, CancellationToken cancellationToken) =>
@@ -14,27 +20,51 @@ public sealed class WatchlistService(
     public async Task<PutWatchlistItemResult> PutAsync(
         Guid userId, Guid movieId, string? note, CancellationToken cancellationToken)
     {
+        var now = timeProvider.GetUtcNow();
         var item = await watchlist.FindAsync(userId, movieId, cancellationToken);
         if (item is not null)
         {
+            // Putting the same note again changes nothing, so there is nothing to log.
+            if (item.Note != note)
+            {
+                var title = await movies.GetTitleAsync(userId, movieId, cancellationToken) ?? "Unknown movie";
+                activityLog.Add(ActivityLogEntry.ForMovie(
+                    userId, ActivityType.WatchlistNoteChanged, now, movieId, title, ActivityDetails.NoteChange(note)));
+            }
+
             item.UpdateNote(note);
             await unitOfWork.SaveChangesAsync(cancellationToken);
             return new PutWatchlistItemResult(
                 PutWatchlistItemStatus.Updated, await watchlist.GetAsync(userId, movieId, cancellationToken));
         }
 
-        if (!await movies.ExistsAsync(userId, movieId, cancellationToken))
+        if (await movies.GetTitleAsync(userId, movieId, cancellationToken) is not { } movieTitle)
         {
             return new PutWatchlistItemResult(PutWatchlistItemStatus.NotFound);
         }
 
-        watchlist.Add(new WatchlistItem(userId, movieId, note, timeProvider.GetUtcNow()));
+        watchlist.Add(new WatchlistItem(userId, movieId, note, now));
+        activityLog.Add(ActivityLogEntry.ForMovie(
+            userId, ActivityType.WatchlistItemAdded, now, movieId, movieTitle, ActivityDetails.Note(note)));
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return new PutWatchlistItemResult(
             PutWatchlistItemStatus.Added, await watchlist.GetAsync(userId, movieId, cancellationToken));
     }
 
     /// <summary>False if the movie was not on the watchlist.</summary>
-    public Task<bool> RemoveAsync(Guid userId, Guid movieId, CancellationToken cancellationToken) =>
-        watchlist.RemoveAsync(userId, movieId, cancellationToken);
+    public async Task<bool> RemoveAsync(Guid userId, Guid movieId, CancellationToken cancellationToken)
+    {
+        var item = await watchlist.FindAsync(userId, movieId, cancellationToken);
+        if (item is null)
+        {
+            return false;
+        }
+
+        var title = await movies.GetTitleAsync(userId, movieId, cancellationToken) ?? "Unknown movie";
+        watchlist.Remove(item);
+        activityLog.Add(ActivityLogEntry.ForMovie(
+            userId, ActivityType.WatchlistItemRemoved, timeProvider.GetUtcNow(), movieId, title));
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+        return true;
+    }
 }

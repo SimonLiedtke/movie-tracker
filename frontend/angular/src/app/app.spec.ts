@@ -29,6 +29,7 @@ describe('App', () => {
       'My movies',
       'Diary',
       'Watchlist',
+      'Activity',
       'Import',
     ]);
     expect(page.querySelector('.navbar-end')?.textContent).toContain('Alice');

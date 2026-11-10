@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { formatDate, formatDay, formatMonth, todayIso, yearOf } from './dates';
+import { formatDate, formatDateTime, formatDay, formatMonth, todayIso, yearOf } from './dates';
 
 describe('date formatting', () => {
   it('formats the month', () => {
     expect(formatMonth('2026-11-07')).toBe('November 2026');
+  });
+
+  it('formats a point in time with date and time in the local time zone', () => {
+    // Noon UTC is on the same day in every time zone from UTC-12 to UTC+11.
+    expect(formatDateTime('2026-11-07T12:00:00Z')).toMatch(
+      /^Nov (6|7|8), 2026, \d{1,2}:\d{2}\s?[AP]M$/,
+    );
   });
 
   it('formats the day with its weekday', () => {

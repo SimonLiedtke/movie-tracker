@@ -21,6 +21,7 @@ public sealed class MovieServiceTests
 
     private readonly FakeMovieRepository _movies = new();
     private readonly FakeGenreRepository _genres = new();
+    private readonly FakeActivityLogRepository _log = new();
     private readonly FakeUnitOfWork _unitOfWork = new();
     private readonly StubTmdbClient _tmdb = new();
     private readonly TestClock _clock = new(Start);
@@ -28,7 +29,7 @@ public sealed class MovieServiceTests
 
     public MovieServiceTests()
     {
-        _service = new MovieService(_movies, _genres, _unitOfWork, _tmdb, _clock, NullLogger<MovieService>.Instance);
+        _service = new MovieService(_movies, _genres, _log, _unitOfWork, _tmdb, _clock, NullLogger<MovieService>.Instance);
     }
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;

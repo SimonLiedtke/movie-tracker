@@ -1,5 +1,7 @@
+using MovieTracker.Application.Activity;
 using MovieTracker.Application.Movies;
 using MovieTracker.Application.Watchlist;
+using MovieTracker.Domain.Activity;
 using MovieTracker.Domain.Diary;
 
 namespace MovieTracker.Application.Diary;
@@ -8,6 +10,7 @@ public sealed class DiaryService(
     IDiaryRepository diary,
     IWatchlistRepository watchlist,
     IMovieRepository movies,
+    IActivityLogRepository activityLog,
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider)
 {
@@ -32,7 +35,7 @@ public sealed class DiaryService(
 
     /// <summary>
     /// Logs the viewing. The movie has been watched, so it is taken off the user's watchlist, in the same save: either
-    /// the viewing is logged and the movie is off the watchlist, or nothing changes.
+    /// the viewing is logged and the movie is off the watchlist, or nothing changes. The activity log says so.
     /// </summary>
     public async Task<SaveDiaryEntryResult> CreateAsync(
         Guid userId, DiaryEntryDetails details, CancellationToken cancellationToken)
@@ -42,18 +45,27 @@ public sealed class DiaryService(
             return new SaveDiaryEntryResult(SaveDiaryEntryStatus.FutureDate);
         }
 
-        if (!await movies.ExistsAsync(userId, details.MovieId, cancellationToken))
+        if (await movies.GetTitleAsync(userId, details.MovieId, cancellationToken) is not { } title)
         {
             return new SaveDiaryEntryResult(SaveDiaryEntryStatus.UnknownMovie);
         }
 
-        var entry = new DiaryEntry(userId, details, timeProvider.GetUtcNow());
+        var now = timeProvider.GetUtcNow();
+        var entry = new DiaryEntry(userId, details, now);
         diary.Add(entry);
-        if (await watchlist.FindAsync(userId, details.MovieId, cancellationToken) is { } watchlistItem)
+        var watchlistItem = await watchlist.FindAsync(userId, details.MovieId, cancellationToken);
+        if (watchlistItem is not null)
         {
             watchlist.Remove(watchlistItem);
         }
 
+        activityLog.Add(ActivityLogEntry.ForMovie(
+            userId,
+            ActivityType.DiaryEntryAdded,
+            now,
+            details.MovieId,
+            title,
+            ActivityDetails.Viewing(details, removedFromWatchlist: watchlistItem is not null)));
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new SaveDiaryEntryResult(SaveDiaryEntryStatus.Saved, await diary.GetAsync(userId, entry.Id, cancellationToken));
@@ -73,20 +85,50 @@ public sealed class DiaryService(
             return new SaveDiaryEntryResult(SaveDiaryEntryStatus.FutureDate);
         }
 
-        if (!await movies.ExistsAsync(userId, details.MovieId, cancellationToken))
+        if (await movies.GetTitleAsync(userId, details.MovieId, cancellationToken) is not { } title)
         {
             return new SaveDiaryEntryResult(SaveDiaryEntryStatus.UnknownMovie);
         }
 
+        var before = ToDetails(entry);
         entry.Update(details);
+        // Saving the same data again changes nothing, so there is nothing to log.
+        if (ActivityDetails.DiaryEntryChanges(before, details) is { } changes)
+        {
+            activityLog.Add(ActivityLogEntry.ForMovie(
+                userId, ActivityType.DiaryEntryUpdated, timeProvider.GetUtcNow(), details.MovieId, title, changes));
+        }
+
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new SaveDiaryEntryResult(SaveDiaryEntryStatus.Saved, await diary.GetAsync(userId, entryId, cancellationToken));
     }
 
     /// <summary>False if there is no such entry.</summary>
-    public Task<bool> DeleteAsync(Guid userId, Guid entryId, CancellationToken cancellationToken) =>
-        diary.DeleteAsync(userId, entryId, cancellationToken);
+    public async Task<bool> DeleteAsync(Guid userId, Guid entryId, CancellationToken cancellationToken)
+    {
+        var entry = await diary.FindAsync(userId, entryId, cancellationToken);
+        if (entry is null)
+        {
+            return false;
+        }
+
+        // The movie is always visible to the owner of an entry; the fallback only keeps the deletion from failing.
+        var title = await movies.GetTitleAsync(userId, entry.MovieId, cancellationToken) ?? "Unknown movie";
+        diary.Remove(entry);
+        activityLog.Add(ActivityLogEntry.ForMovie(
+            userId,
+            ActivityType.DiaryEntryDeleted,
+            timeProvider.GetUtcNow(),
+            entry.MovieId,
+            title,
+            $"Watched on {entry.WatchedOn:yyyy-MM-dd}"));
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    private static DiaryEntryDetails ToDetails(DiaryEntry entry) =>
+        new(entry.MovieId, entry.WatchedOn, entry.Rating, entry.Review, entry.IsRewatch, entry.Liked);
 
     private bool IsInFuture(DateOnly watchedOn)
     {

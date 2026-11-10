@@ -124,6 +124,33 @@ export interface WatchlistPage extends PagedResponse<WatchlistItem> {
   unfilteredCount: number;
 }
 
+export type ActivityType =
+  | 'diaryEntryAdded'
+  | 'diaryEntryUpdated'
+  | 'diaryEntryDeleted'
+  | 'watchlistItemAdded'
+  | 'watchlistNoteChanged'
+  | 'watchlistItemRemoved'
+  | 'movieImported'
+  | 'movieAdded'
+  | 'movieUpdated'
+  | 'movieDeleted'
+  | 'letterboxdImported';
+
+/** Something the user did that modified the database. */
+export interface ActivityLogEntry {
+  id: string;
+  type: ActivityType;
+  /** When it happened (date and time, UTC). */
+  occurredAt: string;
+  /** The movie it was about. Null if it was not about one movie, or the movie was deleted since. */
+  movieId: string | null;
+  /** The movie's title when it happened. Null if it was not about one movie. */
+  movieTitle: string | null;
+  /** What exactly happened, in a few words (e.g. the rating or the note). */
+  detail: string | null;
+}
+
 export interface PageQuery {
   page?: number;
   pageSize?: number;

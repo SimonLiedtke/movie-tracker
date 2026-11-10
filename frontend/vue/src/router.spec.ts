@@ -25,6 +25,7 @@ const PAGES: [url: string, title: string][] = [
   ['/diary/new', 'Log a viewing · Movie Tracker'],
   ['/diary/42/edit', 'Edit diary entry · Movie Tracker'],
   ['/watchlist', 'Watchlist · Movie Tracker'],
+  ['/activity', 'Activity log · Movie Tracker'],
   ['/import', 'Import from Letterboxd · Movie Tracker'],
 ];
 

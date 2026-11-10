@@ -94,6 +94,13 @@ internal sealed class MovieRepository(MovieTrackerDbContext db) : IMovieReposito
     public async Task<bool> ExistsAsync(Guid userId, Guid movieId, CancellationToken cancellationToken) =>
         await db.Movies.VisibleTo(userId).AnyAsync(movie => movie.Id == movieId, cancellationToken);
 
+    public async Task<string?> GetTitleAsync(Guid userId, Guid movieId, CancellationToken cancellationToken) =>
+        await db.Movies
+            .VisibleTo(userId)
+            .Where(movie => movie.Id == movieId)
+            .Select(movie => movie.Title)
+            .SingleOrDefaultAsync(cancellationToken);
+
     public async Task<Movie?> FindAsync(Guid userId, Guid movieId, CancellationToken cancellationToken) =>
         await db.Movies
             .VisibleTo(userId)
@@ -122,7 +129,6 @@ internal sealed class MovieRepository(MovieTrackerDbContext db) : IMovieReposito
     public async Task<bool> HasDiaryEntriesAsync(Guid movieId, CancellationToken cancellationToken) =>
         await db.DiaryEntries.AnyAsync(entry => entry.MovieId == movieId, cancellationToken);
 
-    public async Task DeleteAsync(Guid movieId, CancellationToken cancellationToken) =>
-        // Watchlist items and genre assignments are removed by ON DELETE CASCADE in the database.
-        await db.Movies.Where(movie => movie.Id == movieId).ExecuteDeleteAsync(cancellationToken);
+    // Watchlist items and genre assignments are removed by ON DELETE CASCADE in the database.
+    public void Remove(Movie movie) => db.Movies.Remove(movie);
 }

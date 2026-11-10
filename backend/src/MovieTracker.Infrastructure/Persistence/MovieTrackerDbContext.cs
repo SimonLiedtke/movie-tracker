@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using MovieTracker.Domain.Activity;
 using MovieTracker.Domain.Diary;
 using MovieTracker.Domain.Movies;
 using MovieTracker.Domain.Users;
@@ -18,6 +19,8 @@ public sealed class MovieTrackerDbContext(DbContextOptions<MovieTrackerDbContext
     public DbSet<WatchlistItem> WatchlistItems => Set<WatchlistItem>();
 
     public DbSet<User> Users => Set<User>();
+
+    public DbSet<ActivityLogEntry> ActivityLogEntries => Set<ActivityLogEntry>();
 
     /// <summary>ASP.NET Core data protection keys, which encrypt the session cookies.</summary>
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();

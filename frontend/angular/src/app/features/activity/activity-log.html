@@ -1,0 +1,70 @@
+<h1 class="title">Activity log</h1>
+<p class="subtitle is-6 has-text-grey">
+  Everything you did that changed your data, most recent first.
+</p>
+
+<app-error-notification [error]="error()" (dismiss)="error.set(null)" />
+
+@if (result(); as result) {
+  <p class="mb-4 has-text-grey">
+    {{ result.totalCount }} {{ result.totalCount === 1 ? 'action' : 'actions' }}
+    @if (loading()) {
+      <span class="ml-2">· loading…</span>
+    }
+  </p>
+
+  @if (result.items.length) {
+    <div class="table-container">
+      <table class="table is-fullwidth is-hoverable">
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Action</th>
+            <th>Movie</th>
+            <th class="is-hidden-mobile">Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (entry of result.items; track entry.id) {
+            <tr>
+              <td class="is-nowrap">
+                <time [attr.datetime]="entry.occurredAt">{{
+                  formatDateTime(entry.occurredAt)
+                }}</time>
+              </td>
+              <td>
+                {{ label(entry.type) }}
+                @if (entry.detail) {
+                  <span class="is-hidden-tablet is-block is-size-7 has-text-grey">{{
+                    entry.detail
+                  }}</span>
+                }
+              </td>
+              <td>
+                @if (entry.movieId) {
+                  <a [routerLink]="['/movies', entry.movieId]" class="has-text-weight-semibold">{{
+                    entry.movieTitle
+                  }}</a>
+                } @else if (entry.movieTitle) {
+                  <span class="has-text-weight-semibold">{{ entry.movieTitle }}</span>
+                }
+              </td>
+              <td class="is-hidden-mobile">{{ entry.detail }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  } @else {
+    <div class="notification">Nothing yet. Log a viewing or add a movie to your watchlist.</div>
+  }
+
+  <app-pagination
+    [page]="result.page"
+    [pageSize]="result.pageSize"
+    [totalCount]="result.totalCount"
+    (pageChange)="goToPage($event)"
+  />
+} @else if (loading()) {
+  <progress class="progress is-small is-primary" max="100"></progress>
+}

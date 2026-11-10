@@ -39,6 +39,13 @@ describe('API clients', () => {
     await result;
   });
 
+  it('lists the activity log page by page', async () => {
+    const result = api().activityLog.list({ page: 3, pageSize: 50 });
+
+    backend.expectOne('/api/activity-log?page=3&pageSize=50').flush({});
+    await result;
+  });
+
   it('puts a movie on the watchlist with a note', async () => {
     const result = api().watchlist.put('42', "Director's cut");
 

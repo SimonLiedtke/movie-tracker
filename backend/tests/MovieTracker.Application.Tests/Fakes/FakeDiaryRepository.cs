@@ -38,8 +38,7 @@ public sealed class FakeDiaryRepository(FakeMovieRepository movies) : IDiaryRepo
 
     public void Add(DiaryEntry entry) => Entries.Add(entry);
 
-    public Task<bool> DeleteAsync(Guid userId, Guid entryId, CancellationToken cancellationToken) =>
-        Task.FromResult(Own(userId, entryId) is { } entry && Entries.Remove(entry));
+    public void Remove(DiaryEntry entry) => Entries.Remove(entry);
 
     private DiaryEntry? Own(Guid userId, Guid entryId) =>
         Entries.FirstOrDefault(entry => entry.UserId == userId && entry.Id == entryId);

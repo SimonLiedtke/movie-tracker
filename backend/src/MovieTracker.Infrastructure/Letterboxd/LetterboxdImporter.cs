@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MovieTracker.Application.Letterboxd;
+using MovieTracker.Domain.Activity;
 using MovieTracker.Domain.Diary;
 using MovieTracker.Domain.Movies;
 using MovieTracker.Domain.Watchlist;
@@ -56,6 +57,16 @@ public sealed class LetterboxdImporter(
         var now = timeProvider.GetUtcNow();
         var diary = await AddDiaryEntriesAsync(userId, export.Diary, movies.MovieIds, now, cancellationToken);
         var watchlist = await AddWatchlistItemsAsync(userId, export.Watchlist, movies.MovieIds, cancellationToken);
+        if (diary.Imported + watchlist.Imported > 0)
+        {
+            // One line for the whole import instead of one per viewing.
+            db.ActivityLogEntries.Add(ActivityLogEntry.General(
+                userId,
+                ActivityType.LetterboxdImported,
+                now,
+                $"Diary: {diary.Imported} imported, {diary.Skipped} skipped · Watchlist: {watchlist.Imported} imported, {watchlist.Skipped} skipped"));
+        }
+
         // One SaveChanges is one transaction: either the whole diary and watchlist is imported or nothing.
         await db.SaveChangesAsync(cancellationToken);
 
