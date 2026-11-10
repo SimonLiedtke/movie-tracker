@@ -73,6 +73,12 @@ describe('API services', () => {
     http.expectOne('/api/watchlist?page=1&addedFrom=2026-11-01&addedTo=2026-11-05').flush({});
   });
 
+  it('lists the watchlist filtered by the runtime', () => {
+    TestBed.inject(WatchlistApi).list({ runtimeFrom: 23, runtimeTo: 148, page: 1 }).subscribe();
+
+    http.expectOne('/api/watchlist?page=1&runtimeFrom=23&runtimeTo=148').flush({});
+  });
+
   it('matches any genre by default, and sends no match mode without genres', () => {
     const api = TestBed.inject(WatchlistApi);
     api.list({ genreIds: [27] }).subscribe();

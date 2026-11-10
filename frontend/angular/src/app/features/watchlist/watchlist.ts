@@ -25,6 +25,38 @@ const MATCH_OPTIONS: { value: GenreMatch; label: string }[] = [
   { value: 'all', label: 'All of them' },
 ];
 
+/**
+ * Quick picks for the runtime, so that the usual questions need one click. They do not overlap:
+ * "Under 90 min" is up to 89 minutes, "Over 120 min" from 121.
+ */
+const RUNTIME_PRESETS: { label: string; from?: number; to?: number }[] = [
+  { label: 'Under 90 min', to: 89 },
+  { label: '90 to 120 min', from: 90, to: 120 },
+  { label: 'Over 120 min', from: 121 },
+];
+
+type RuntimePreset = (typeof RUNTIME_PRESETS)[number];
+
+/** A whole number of minutes; anything else (e.g. from a hand-edited URL) is left out. */
+function parseMinutes(value: string | null): number | undefined {
+  const number = Number(value);
+  return Number.isInteger(number) && number > 0 ? number : undefined;
+}
+
+/** E.g. "runtime of at least 90 minutes"; undefined without runtime. */
+function describeRuntime(from?: number, to?: number): string | undefined {
+  if (from && to) {
+    return `runtime of ${from} to ${to} minutes`;
+  }
+  if (from) {
+    return `runtime of at least ${from} minutes`;
+  }
+  if (to) {
+    return `runtime of at most ${to} minutes`;
+  }
+  return undefined;
+}
+
 /** E.g. "released from May 25, 1979 to November 3, 1989" or "added until ..."; undefined without dates. */
 function describePeriod(what: string, from?: string, to?: string): string | undefined {
   if (from && to) {
@@ -48,6 +80,8 @@ function parseQuery(params: ParamMap): WatchlistQuery {
     releasedTo: params.get('releasedTo') || undefined,
     addedFrom: params.get('addedFrom') || undefined,
     addedTo: params.get('addedTo') || undefined,
+    runtimeFrom: parseMinutes(params.get('runtimeFrom')),
+    runtimeTo: parseMinutes(params.get('runtimeTo')),
     page: Number(params.get('page')) || 1,
     pageSize: PAGE_SIZE,
   };
@@ -77,23 +111,29 @@ export class Watchlist {
   });
   private readonly hasGenres = computed(() => (this.query().genreIds?.length ?? 0) > 0);
   protected readonly filtered = computed(() => {
-    const { releasedFrom, releasedTo, addedFrom, addedTo } = this.query();
-    return this.hasGenres() || !!(releasedFrom || releasedTo || addedFrom || addedTo);
+    const { releasedFrom, releasedTo, addedFrom, addedTo, runtimeFrom, runtimeTo } = this.query();
+    return (
+      this.hasGenres() ||
+      !!(releasedFrom || releasedTo || addedFrom || addedTo || runtimeFrom || runtimeTo)
+    );
   });
   /** What the filter selects, e.g. "with any of the selected genres, released from May 25, 1979". */
   protected readonly filterDescription = computed(() => {
-    const { genreMatch, releasedFrom, releasedTo, addedFrom, addedTo } = this.query();
+    const { genreMatch, releasedFrom, releasedTo, addedFrom, addedTo, runtimeFrom, runtimeTo } =
+      this.query();
     const genreText = this.hasGenres()
       ? `with ${genreMatch === 'all' ? 'all' : 'any'} of the selected genres`
       : undefined;
     return [
       genreText,
+      describeRuntime(runtimeFrom, runtimeTo),
       describePeriod('released', releasedFrom, releasedTo),
       describePeriod('added', addedFrom, addedTo),
     ]
       .filter((part) => part !== undefined)
       .join(', ');
   });
+  protected readonly runtimePresets = RUNTIME_PRESETS;
   protected readonly result = signal<WatchlistPage | null>(null);
   protected readonly loading = signal(true);
   protected readonly error = signal<ApiError | null>(null);
@@ -158,6 +198,23 @@ export class Watchlist {
     this.updateFilter({ genreMatch: match === 'all' ? 'all' : undefined });
   }
 
+  protected onRuntime(key: 'runtimeFrom' | 'runtimeTo', value: string): void {
+    this.updateFilter({ [key]: value || undefined });
+  }
+
+  protected isRuntimePreset(preset: RuntimePreset): boolean {
+    return this.query().runtimeFrom === preset.from && this.query().runtimeTo === preset.to;
+  }
+
+  /** Sets the runtime to the quick pick, or removes it if it is selected already. */
+  protected toggleRuntimePreset(preset: RuntimePreset): void {
+    const selected = this.isRuntimePreset(preset);
+    this.updateFilter({
+      runtimeFrom: selected ? undefined : preset.from,
+      runtimeTo: selected ? undefined : preset.to,
+    });
+  }
+
   protected onDate(
     key: 'releasedFrom' | 'releasedTo' | 'addedFrom' | 'addedTo',
     value: string,
@@ -173,6 +230,8 @@ export class Watchlist {
       releasedTo: undefined,
       addedFrom: undefined,
       addedTo: undefined,
+      runtimeFrom: undefined,
+      runtimeTo: undefined,
     });
   }
 

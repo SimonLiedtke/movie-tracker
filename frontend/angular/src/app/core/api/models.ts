@@ -143,6 +143,10 @@ export interface WatchlistQuery extends PageQuery {
   addedFrom?: string;
   /** Only movies put on the watchlist on or before this day ("YYYY-MM-DD", UTC). */
   addedTo?: string;
+  /** Only movies that are at least this many minutes long; movies without runtime are left out. */
+  runtimeFrom?: number;
+  /** Only movies that are at most this many minutes long; movies without runtime are left out. */
+  runtimeTo?: number;
 }
 
 export interface User {

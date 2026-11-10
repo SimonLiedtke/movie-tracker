@@ -115,6 +115,8 @@ export class WatchlistApi {
     releasedTo,
     addedFrom,
     addedTo,
+    runtimeFrom,
+    runtimeTo,
     ...paging
   }: WatchlistQuery = {}): Observable<WatchlistPage> {
     const filtered = genreIds !== undefined && genreIds.length > 0;
@@ -127,6 +129,8 @@ export class WatchlistApi {
         releasedTo,
         addedFrom,
         addedTo,
+        runtimeFrom,
+        runtimeTo,
       }),
     });
   }

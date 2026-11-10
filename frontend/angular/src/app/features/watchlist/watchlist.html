@@ -45,7 +45,59 @@
       }
     </div>
   </div>
+  <div class="field">
+    <label class="label" id="runtime-label">Runtime</label>
+    <div class="buttons are-small mb-0" role="group" aria-labelledby="runtime-label">
+      @for (preset of runtimePresets; track preset.label) {
+        <button
+          type="button"
+          class="button"
+          [class.is-link]="isRuntimePreset(preset)"
+          [attr.aria-pressed]="isRuntimePreset(preset)"
+          (click)="toggleRuntimePreset(preset)"
+        >
+          {{ preset.label }}
+        </button>
+      }
+    </div>
+  </div>
   <div class="columns is-mobile is-multiline is-align-items-flex-end mb-0">
+    <div class="column is-half-mobile is-3-tablet">
+      <div class="field">
+        <label class="label" for="runtime-from">Runtime from (min)</label>
+        <div class="control">
+          <input
+            id="runtime-from"
+            class="input is-small"
+            type="number"
+            min="1"
+            max="1500"
+            step="1"
+            placeholder="Any"
+            [value]="query().runtimeFrom ?? ''"
+            (change)="onRuntime('runtimeFrom', $any($event.target).value)"
+          />
+        </div>
+      </div>
+    </div>
+    <div class="column is-half-mobile is-3-tablet">
+      <div class="field">
+        <label class="label" for="runtime-to">Runtime until (min)</label>
+        <div class="control">
+          <input
+            id="runtime-to"
+            class="input is-small"
+            type="number"
+            min="1"
+            max="1500"
+            step="1"
+            placeholder="Any"
+            [value]="query().runtimeTo ?? ''"
+            (change)="onRuntime('runtimeTo', $any($event.target).value)"
+          />
+        </div>
+      </div>
+    </div>
     <div class="column is-half-mobile is-3-tablet">
       <div class="field">
         <label class="label" for="released-from">Released from</label>

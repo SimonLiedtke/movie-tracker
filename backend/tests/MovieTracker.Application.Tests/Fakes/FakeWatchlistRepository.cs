@@ -53,7 +53,10 @@ public sealed class FakeWatchlistRepository(FakeMovieRepository movies) : IWatch
         var addedDay = DateOnly.FromDateTime(item.AddedAt.UtcDateTime);
         var addedFromMatches = filter.AddedFrom is null || addedDay >= filter.AddedFrom;
         var addedToMatches = filter.AddedTo is null || addedDay <= filter.AddedTo;
-        return genresMatch && releasedFromMatches && releasedToMatches && addedFromMatches && addedToMatches;
+        var runtimeFromMatches = filter.RuntimeFrom is null || movie.RuntimeMinutes >= filter.RuntimeFrom;
+        var runtimeToMatches = filter.RuntimeTo is null || movie.RuntimeMinutes <= filter.RuntimeTo;
+        return genresMatch && releasedFromMatches && releasedToMatches && addedFromMatches && addedToMatches
+            && runtimeFromMatches && runtimeToMatches;
     }
 
     private WatchlistItem? Own(Guid userId, Guid movieId) =>

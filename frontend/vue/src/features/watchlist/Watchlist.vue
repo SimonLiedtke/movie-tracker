@@ -25,6 +25,16 @@ const MATCH_OPTIONS: { value: GenreMatch; label: string }[] = [
   { value: 'all', label: 'All of them' },
 ];
 
+/**
+ * Quick picks for the runtime, so that the usual questions need one click. They do not overlap:
+ * "Under 90 min" is up to 89 minutes, "Over 120 min" from 121.
+ */
+const RUNTIME_PRESETS: { label: string; from?: number; to?: number }[] = [
+  { label: 'Under 90 min', to: 89 },
+  { label: '90 to 120 min', from: 90, to: 120 },
+  { label: 'Over 120 min', from: 121 },
+];
+
 /** The filter and the page, from the route's query parameters. */
 const props = defineProps<{
   genreId?: string[];
@@ -33,11 +43,19 @@ const props = defineProps<{
   releasedTo?: string;
   addedFrom?: string;
   addedTo?: string;
+  runtimeFrom?: string;
+  runtimeTo?: string;
   page?: string;
 }>();
 
 const router = useRouter();
 const api = useApi();
+
+/** A whole number of minutes; anything else (e.g. from a hand-edited URL) is left out. */
+const minutes = (value: string | undefined) => {
+  const number = Number(value);
+  return Number.isInteger(number) && number > 0 ? number : undefined;
+};
 
 const query = computed<WatchlistQuery>(() => ({
   // Whatever is not a genre ID (e.g. from a hand-edited URL) is left out.
@@ -47,6 +65,8 @@ const query = computed<WatchlistQuery>(() => ({
   releasedTo: props.releasedTo || undefined,
   addedFrom: props.addedFrom || undefined,
   addedTo: props.addedTo || undefined,
+  runtimeFrom: minutes(props.runtimeFrom),
+  runtimeTo: minutes(props.runtimeTo),
   page: Number(props.page) || 1,
   pageSize: PAGE_SIZE,
 }));
@@ -57,7 +77,9 @@ const filtered = computed(
     !!query.value.releasedFrom ||
     !!query.value.releasedTo ||
     !!query.value.addedFrom ||
-    !!query.value.addedTo,
+    !!query.value.addedTo ||
+    !!query.value.runtimeFrom ||
+    !!query.value.runtimeTo,
 );
 
 /** E.g. "released from May 25, 1979 to November 3, 1989" or "added until ..."; undefined without dates. */
@@ -74,14 +96,30 @@ function describePeriod(what: string, from?: string, to?: string): string | unde
   return undefined;
 }
 
+/** E.g. "runtime of at least 90 minutes"; undefined without runtime. */
+function describeRuntime(from?: number, to?: number): string | undefined {
+  if (from && to) {
+    return `runtime of ${from} to ${to} minutes`;
+  }
+  if (from) {
+    return `runtime of at least ${from} minutes`;
+  }
+  if (to) {
+    return `runtime of at most ${to} minutes`;
+  }
+  return undefined;
+}
+
 /** What the filter selects, e.g. "with any of the selected genres, released from May 25, 1979". */
 const filterDescription = computed(() => {
-  const { genreMatch, releasedFrom, releasedTo, addedFrom, addedTo } = query.value;
+  const { genreMatch, releasedFrom, releasedTo, addedFrom, addedTo, runtimeFrom, runtimeTo } =
+    query.value;
   const genreText = hasGenres.value
     ? `with ${genreMatch === 'all' ? 'all' : 'any'} of the selected genres`
     : undefined;
   return [
     genreText,
+    describeRuntime(runtimeFrom, runtimeTo),
     describePeriod('released', releasedFrom, releasedTo),
     describePeriod('added', addedFrom, addedTo),
   ]
@@ -161,6 +199,23 @@ function genreFilterLink(genre: Genre): RouteLocationRaw {
   };
 }
 
+function onRuntime(key: 'runtimeFrom' | 'runtimeTo', value: string): void {
+  updateFilter({ [key]: value || undefined });
+}
+
+function isRuntimePreset(preset: (typeof RUNTIME_PRESETS)[number]): boolean {
+  return query.value.runtimeFrom === preset.from && query.value.runtimeTo === preset.to;
+}
+
+/** Sets the runtime to the quick pick, or removes it if it is selected already. */
+function toggleRuntimePreset(preset: (typeof RUNTIME_PRESETS)[number]): void {
+  const selected = isRuntimePreset(preset);
+  updateFilter({
+    runtimeFrom: selected ? undefined : preset.from,
+    runtimeTo: selected ? undefined : preset.to,
+  });
+}
+
 function onDate(key: 'releasedFrom' | 'releasedTo' | 'addedFrom' | 'addedTo', value: string): void {
   updateFilter({ [key]: value || undefined });
 }
@@ -173,6 +228,8 @@ function clearFilter(): void {
     releasedTo: undefined,
     addedFrom: undefined,
     addedTo: undefined,
+    runtimeFrom: undefined,
+    runtimeTo: undefined,
   });
 }
 
@@ -288,7 +345,59 @@ async function remove(item: WatchlistItem): Promise<void> {
         </button>
       </div>
     </div>
+    <div class="field">
+      <label class="label" id="runtime-label">Runtime</label>
+      <div class="buttons are-small mb-0" role="group" aria-labelledby="runtime-label">
+        <button
+          v-for="preset in RUNTIME_PRESETS"
+          :key="preset.label"
+          type="button"
+          class="button"
+          :class="{ 'is-link': isRuntimePreset(preset) }"
+          :aria-pressed="isRuntimePreset(preset)"
+          @click="toggleRuntimePreset(preset)"
+        >
+          {{ preset.label }}
+        </button>
+      </div>
+    </div>
     <div class="columns is-mobile is-multiline is-align-items-flex-end mb-0">
+      <div class="column is-half-mobile is-3-tablet">
+        <div class="field">
+          <label class="label" for="runtime-from">Runtime from (min)</label>
+          <div class="control">
+            <input
+              id="runtime-from"
+              class="input is-small"
+              type="number"
+              min="1"
+              max="1500"
+              step="1"
+              placeholder="Any"
+              :value="query.runtimeFrom ?? ''"
+              @change="onRuntime('runtimeFrom', ($event.target as HTMLInputElement).value)"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="column is-half-mobile is-3-tablet">
+        <div class="field">
+          <label class="label" for="runtime-to">Runtime until (min)</label>
+          <div class="control">
+            <input
+              id="runtime-to"
+              class="input is-small"
+              type="number"
+              min="1"
+              max="1500"
+              step="1"
+              placeholder="Any"
+              :value="query.runtimeTo ?? ''"
+              @change="onRuntime('runtimeTo', ($event.target as HTMLInputElement).value)"
+            />
+          </div>
+        </div>
+      </div>
       <div class="column is-half-mobile is-3-tablet">
         <div class="field">
           <label class="label" for="released-from">Released from</label>

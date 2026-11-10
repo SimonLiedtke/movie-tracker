@@ -361,6 +361,82 @@ public sealed class WatchlistTests(ApiFactory factory) : ApiTestBase(factory)
         Assert.Equal((1, 5), (result.TotalCount, result.UnfilteredCount));
     }
 
+    /// <summary>Short 23 min, Heat 170 min, Alien 117 min, Unknown: no runtime.</summary>
+    private async Task PutMoviesOfDifferentLengthOnTheWatchlistAsync()
+    {
+        foreach (var (title, minutes) in new (string, int?)[]
+        {
+            ("Short", 23),
+            ("Heat", 170),
+            ("Alien", 117),
+            ("Unknown", null),
+        })
+        {
+            var movie = await CreateMovieAsync(title, runtimeMinutes: minutes);
+            await Client.PutAsJsonAsync($"/api/watchlist/{movie.Id}", new { }, Ct);
+        }
+    }
+
+    [Fact]
+    public async Task List_with_runtimeFrom_returns_the_movies_that_are_at_least_that_long()
+    {
+        await PutMoviesOfDifferentLengthOnTheWatchlistAsync();
+
+        Assert.Equal(["Alien", "Heat"], await ListTitlesAsync("?runtimeFrom=117"));
+        Assert.Equal(["Heat"], await ListTitlesAsync("?runtimeFrom=118"));
+    }
+
+    [Fact]
+    public async Task List_with_runtimeTo_returns_the_movies_that_are_at_most_that_long()
+    {
+        await PutMoviesOfDifferentLengthOnTheWatchlistAsync();
+
+        Assert.Equal(["Alien", "Short"], await ListTitlesAsync("?runtimeTo=117"));
+        Assert.Equal(["Short"], await ListTitlesAsync("?runtimeTo=116"));
+    }
+
+    [Fact]
+    public async Task List_with_both_runtimes_returns_the_movies_in_between_and_not_those_without_runtime()
+    {
+        await PutMoviesOfDifferentLengthOnTheWatchlistAsync();
+
+        Assert.Equal(["Alien", "Short"], await ListTitlesAsync("?runtimeFrom=23&runtimeTo=148"));
+        Assert.Equal(["Short"], await ListTitlesAsync("?runtimeFrom=23&runtimeTo=23"));
+        Assert.Contains("Unknown", await ListTitlesAsync(""));
+    }
+
+    [Fact]
+    public async Task List_combines_the_runtime_with_the_other_filters_and_counts_all_items_as_unfiltered()
+    {
+        await PutMoviesOfDifferentLengthOnTheWatchlistAsync();
+
+        Assert.Equal(["Alien", "Short"], await ListTitlesAsync($"?genreId={Horror}&runtimeTo=148"));
+        Assert.Empty(await ListTitlesAsync($"?genreId={Drama}&runtimeTo=148"));
+        var result = await GetAsync<WatchlistPageResponse>("/api/watchlist?runtimeFrom=150");
+        Assert.Equal((1, 4), (result.TotalCount, result.UnfilteredCount));
+    }
+
+    [Theory]
+    [InlineData("runtimeFrom=0")]
+    [InlineData("runtimeTo=-5")]
+    [InlineData("runtimeFrom=1501")]
+    [InlineData("runtimeTo=abc")]
+    public async Task List_rejects_an_invalid_runtime(string query)
+    {
+        var response = await Client.GetAsync($"/api/watchlist?{query}", Ct);
+
+        await ReadValidationProblemAsync(response);
+    }
+
+    [Fact]
+    public async Task List_rejects_a_runtime_range_that_ends_before_it_starts()
+    {
+        var response = await Client.GetAsync("/api/watchlist?runtimeFrom=148&runtimeTo=23", Ct);
+
+        var problem = await ReadValidationProblemAsync(response);
+        Assert.Contains("runtimeFrom", problem.Errors.Keys);
+    }
+
     [Fact]
     public async Task List_rejects_an_added_period_that_ends_before_it_starts()
     {

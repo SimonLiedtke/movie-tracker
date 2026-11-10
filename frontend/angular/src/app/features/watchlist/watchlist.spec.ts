@@ -279,9 +279,11 @@ describe('Watchlist genre filter', () => {
     );
   });
 
-  describe('date filters', () => {
-    const input = (id: 'released-from' | 'released-to' | 'added-from' | 'added-to') =>
-      page().querySelector<HTMLInputElement>(`#${id}`)!;
+  describe('runtime and date filters', () => {
+    const input = (
+      id:
+        'released-from' | 'released-to' | 'added-from' | 'added-to' | 'runtime-from' | 'runtime-to',
+    ) => page().querySelector<HTMLInputElement>(`#${id}`)!;
     const clearButton = () =>
       Array.from(page().querySelectorAll<HTMLButtonElement>('button')).find(
         (b) => b.textContent!.trim() === 'Clear filter',
@@ -289,7 +291,8 @@ describe('Watchlist genre filter', () => {
 
     /** Enters the date, and answers the request that follows. */
     async function enter(
-      id: 'released-from' | 'released-to' | 'added-from' | 'added-to',
+      id:
+        'released-from' | 'released-to' | 'added-from' | 'added-to' | 'runtime-from' | 'runtime-to',
       value: string,
       expectedUrl: string,
       filter: string,
@@ -473,6 +476,146 @@ describe('Watchlist genre filter', () => {
 
       expect(input('added-from').value).toBe('');
       expect(input('added-to').value).toBe('');
+    });
+
+    describe('runtime', () => {
+      const presetButtons = () =>
+        Array.from(
+          page().querySelectorAll<HTMLButtonElement>('[aria-labelledby=runtime-label] button'),
+        );
+      const preset = (label: string) =>
+        presetButtons().find((b) => b.textContent!.trim() === label)!;
+      const pressed = () =>
+        presetButtons()
+          .filter((b) => b.getAttribute('aria-pressed') === 'true')
+          .map((b) => b.textContent!.trim());
+
+      it('offers quick picks for the usual lengths, and fields for any other, none set to begin with', async () => {
+        await open();
+
+        expect(presetButtons().map((b) => b.textContent!.trim())).toEqual([
+          'Under 90 min',
+          '90 to 120 min',
+          'Over 120 min',
+        ]);
+        expect(pressed()).toEqual([]);
+        expect(input('runtime-from').value).toBe('');
+        expect(input('runtime-to').value).toBe('');
+        expect(input('runtime-from').min).toBe('1');
+      });
+
+      it('lists the movies of exactly the entered length range, and says so', async () => {
+        await open();
+
+        await enter(
+          'runtime-from',
+          '23',
+          '/watchlist?runtimeFrom=23',
+          '&runtimeFrom=23',
+          paged([ALIEN], { unfilteredCount: 52 }),
+        );
+        expect(text()).toContain('1 of 52 movies to watch runtime of at least 23 minutes');
+
+        await enter(
+          'runtime-to',
+          '148',
+          '/watchlist?runtimeFrom=23&runtimeTo=148',
+          '&runtimeFrom=23&runtimeTo=148',
+          paged([ALIEN], { unfilteredCount: 52 }),
+        );
+        expect(text()).toContain('1 of 52 movies to watch runtime of 23 to 148 minutes');
+        expect(pressed()).toEqual([]);
+      });
+
+      it('lists the movies that are at most as long as entered', async () => {
+        await open();
+
+        await enter(
+          'runtime-to',
+          '148',
+          '/watchlist?runtimeTo=148',
+          '&runtimeTo=148',
+          paged([ALIEN], { unfilteredCount: 52 }),
+        );
+
+        expect(text()).toContain('1 of 52 movies to watch runtime of at most 148 minutes');
+      });
+
+      it('selects a quick pick, and deselects it with a second click', async () => {
+        await open();
+
+        await click(
+          preset('Under 90 min'),
+          '/watchlist?runtimeTo=89',
+          '&runtimeTo=89',
+          paged([ALIEN]),
+        );
+        expect(pressed()).toEqual(['Under 90 min']);
+        expect(input('runtime-to').value).toBe('89');
+        expect(input('runtime-from').value).toBe('');
+
+        await click(preset('Under 90 min'), '/watchlist', '', paged([HEAT]));
+        expect(pressed()).toEqual([]);
+        expect(input('runtime-to').value).toBe('');
+      });
+
+      it('replaces the runtime of another quick pick or of the fields', async () => {
+        await open(
+          '/watchlist?runtimeFrom=23&runtimeTo=148',
+          '&runtimeFrom=23&runtimeTo=148',
+          paged([ALIEN]),
+        );
+
+        await click(
+          preset('90 to 120 min'),
+          '/watchlist?runtimeFrom=90&runtimeTo=120',
+          '&runtimeFrom=90&runtimeTo=120',
+          paged([ALIEN]),
+        );
+        expect(pressed()).toEqual(['90 to 120 min']);
+
+        // "Over 120 min" has no upper end: the old one is removed.
+        await click(
+          preset('Over 120 min'),
+          '/watchlist?runtimeFrom=121',
+          '&runtimeFrom=121',
+          paged([HEAT]),
+        );
+        expect(pressed()).toEqual(['Over 120 min']);
+        expect(input('runtime-to').value).toBe('');
+      });
+
+      it('highlights the quick pick if the fields have the same values', async () => {
+        await open(
+          '/watchlist?runtimeFrom=90&runtimeTo=120',
+          '&runtimeFrom=90&runtimeTo=120',
+          paged([ALIEN]),
+        );
+
+        expect(pressed()).toEqual(['90 to 120 min']);
+      });
+
+      it('ignores what is not a number of minutes in the URL', async () => {
+        await open('/watchlist?runtimeFrom=abc&runtimeTo=-5', '', paged([ALIEN]));
+
+        expect(input('runtime-from').value).toBe('');
+        expect(clearButton()).toBeUndefined();
+      });
+
+      it('keeps it with the other filters, and clears it with them', async () => {
+        await open(
+          '/watchlist?genreId=27&runtimeFrom=90&releasedTo=1989-12-31',
+          '&genreId=27&genreMatch=any&releasedTo=1989-12-31&runtimeFrom=90',
+          paged([ALIEN], { unfilteredCount: 9 }),
+        );
+        expect(text()).toContain(
+          '1 of 9 movies to watch with any of the selected genres, runtime of at least 90 minutes, released until December 31, 1989',
+        );
+
+        await click(clearButton()!, '/watchlist', '', paged([ALIEN, HEAT]));
+
+        expect(input('runtime-from').value).toBe('');
+      });
     });
 
     it('says when no movie was released in the period', async () => {

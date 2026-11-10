@@ -353,6 +353,7 @@ paths:
         With `genreId`, only movies that have any or all of these genres are listed (see `genreMatch`).
         With `releasedFrom` and/or `releasedTo`, only movies released in this period are listed.
         With `addedFrom` and/or `addedTo`, only items added to the watchlist in this period are listed.
+        With `runtimeFrom` and/or `runtimeTo`, only movies of this length in minutes are listed.
         All filters apply together.
         `totalCount` counts the matching items only; `unfilteredCount` all items.
       parameters:
@@ -395,6 +396,16 @@ paths:
           in: query
           description: Only items put on the watchlist on or before this day (inclusive, UTC). Must not be before `addedFrom`.
           schema: { type: string, format: date }
+        - name: runtimeFrom
+          in: query
+          description: |
+            Only movies that are at least this many minutes long (inclusive).
+            Movies without a runtime are left out when `runtimeFrom` or `runtimeTo` is set.
+          schema: { type: integer, format: int32, minimum: 1, maximum: 1500 }
+        - name: runtimeTo
+          in: query
+          description: Only movies that are at most this many minutes long (inclusive). Must not be less than `runtimeFrom`.
+          schema: { type: integer, format: int32, minimum: 1, maximum: 1500 }
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PageSize'
       responses:

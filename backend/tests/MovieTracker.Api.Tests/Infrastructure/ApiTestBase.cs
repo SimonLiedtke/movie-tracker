@@ -52,14 +52,15 @@ public abstract class ApiTestBase(ApiFactory factory) : IAsyncLifetime
         string? releaseDate = "1979-05-25",
         string? originalTitle = null,
         int[]? genreIds = null,
-        HttpClient? client = null)
+        HttpClient? client = null,
+        int? runtimeMinutes = 117)
     {
         var response = await (client ?? Client).PostAsJsonAsync("/api/movies", new
         {
             title,
             originalTitle,
             releaseDate,
-            runtimeMinutes = 117,
+            runtimeMinutes,
             genreIds = genreIds ?? [Horror, ScienceFiction],
         }, Ct);
         return await ReadAsync<MovieResponse>(response, HttpStatusCode.Created);

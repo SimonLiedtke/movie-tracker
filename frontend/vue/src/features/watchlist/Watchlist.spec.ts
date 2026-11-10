@@ -214,17 +214,19 @@ describe('Watchlist', () => {
     });
   });
 
-  describe('date filters', () => {
+  describe('runtime and date filters', () => {
     const input = (
       page: VueWrapper,
-      id: 'released-from' | 'released-to' | 'added-from' | 'added-to',
+      id:
+        'released-from' | 'released-to' | 'added-from' | 'added-to' | 'runtime-from' | 'runtime-to',
     ) => page.get<HTMLInputElement>(`#${id}`);
 
     /** Enters the date, and answers the request that follows. */
     async function enter(
       page: VueWrapper,
       router: { currentRoute: { value: { fullPath: string } } },
-      id: 'released-from' | 'released-to' | 'added-from' | 'added-to',
+      id:
+        'released-from' | 'released-to' | 'added-from' | 'added-to' | 'runtime-from' | 'runtime-to',
       value: string,
       expected: { url: string; filter: string },
       response: WatchlistPage,
@@ -444,6 +446,181 @@ describe('Watchlist', () => {
       await flushPromises();
       expect(input(page, 'added-from').element.value).toBe('');
       expect(input(page, 'added-to').element.value).toBe('');
+    });
+
+    describe('runtime', () => {
+      const presetButtons = (page: VueWrapper) =>
+        page.findAll('[aria-labelledby=runtime-label] button');
+      const preset = (page: VueWrapper, label: string) =>
+        presetButtons(page).find((b) => b.text() === label)!;
+      const pressed = (page: VueWrapper) =>
+        presetButtons(page)
+          .filter((b) => b.attributes('aria-pressed') === 'true')
+          .map((b) => b.text());
+
+      async function pick(
+        page: VueWrapper,
+        router: { currentRoute: { value: { fullPath: string } } },
+        label: string,
+        expected: { url: string; filter: string },
+        response: WatchlistPage,
+      ) {
+        await preset(page, label).trigger('click');
+        await flushPromises();
+        expect(router.currentRoute.value.fullPath).toBe(expected.url);
+        listRequest(1, expected.filter).flush(response);
+        await flushPromises();
+      }
+
+      it('offers quick picks for the usual lengths, and fields for any other, none set to begin with', async () => {
+        const { page } = await openWith([HEAT]);
+
+        expect(presetButtons(page).map((b) => b.text())).toEqual([
+          'Under 90 min',
+          '90 to 120 min',
+          'Over 120 min',
+        ]);
+        expect(pressed(page)).toEqual([]);
+        expect(input(page, 'runtime-from').element.value).toBe('');
+        expect(input(page, 'runtime-to').element.value).toBe('');
+        expect(input(page, 'runtime-from').attributes('min')).toBe('1');
+      });
+
+      it('lists the movies of exactly the entered length range, and says so', async () => {
+        const { page, router } = await openWith([HEAT, ALIEN]);
+
+        await enter(
+          page,
+          router,
+          'runtime-from',
+          '23',
+          { url: '/watchlist?runtimeFrom=23', filter: '&runtimeFrom=23' },
+          paged([ALIEN], { unfilteredCount: 52 }),
+        );
+        expect(text(page)).toContain('1 of 52 movies to watch runtime of at least 23 minutes');
+
+        await enter(
+          page,
+          router,
+          'runtime-to',
+          '148',
+          {
+            url: '/watchlist?runtimeFrom=23&runtimeTo=148',
+            filter: '&runtimeFrom=23&runtimeTo=148',
+          },
+          paged([ALIEN], { unfilteredCount: 52 }),
+        );
+        expect(text(page)).toContain('1 of 52 movies to watch runtime of 23 to 148 minutes');
+        expect(pressed(page)).toEqual([]);
+      });
+
+      it('lists the movies that are at most as long as entered', async () => {
+        const { page, router } = await openWith([HEAT, ALIEN]);
+
+        await enter(
+          page,
+          router,
+          'runtime-to',
+          '148',
+          { url: '/watchlist?runtimeTo=148', filter: '&runtimeTo=148' },
+          paged([ALIEN], { unfilteredCount: 52 }),
+        );
+
+        expect(text(page)).toContain('1 of 52 movies to watch runtime of at most 148 minutes');
+      });
+
+      it('selects a quick pick, and deselects it with a second click', async () => {
+        const { page, router } = await openWith([HEAT, ALIEN]);
+
+        await pick(
+          page,
+          router,
+          'Under 90 min',
+          { url: '/watchlist?runtimeTo=89', filter: '&runtimeTo=89' },
+          paged([ALIEN]),
+        );
+        expect(pressed(page)).toEqual(['Under 90 min']);
+        expect(input(page, 'runtime-to').element.value).toBe('89');
+        expect(input(page, 'runtime-from').element.value).toBe('');
+
+        await pick(page, router, 'Under 90 min', { url: '/watchlist', filter: '' }, paged([HEAT]));
+        expect(pressed(page)).toEqual([]);
+        expect(input(page, 'runtime-to').element.value).toBe('');
+      });
+
+      it('replaces the runtime of another quick pick or of the fields', async () => {
+        const { page, router } = await openWith(
+          [ALIEN],
+          '/watchlist?runtimeFrom=23&runtimeTo=148',
+          paged([ALIEN]),
+          '&runtimeFrom=23&runtimeTo=148',
+        );
+
+        await pick(
+          page,
+          router,
+          '90 to 120 min',
+          {
+            url: '/watchlist?runtimeFrom=90&runtimeTo=120',
+            filter: '&runtimeFrom=90&runtimeTo=120',
+          },
+          paged([ALIEN]),
+        );
+        expect(pressed(page)).toEqual(['90 to 120 min']);
+
+        // "Over 120 min" has no upper end: the old one is removed.
+        await pick(
+          page,
+          router,
+          'Over 120 min',
+          { url: '/watchlist?runtimeFrom=121', filter: '&runtimeFrom=121' },
+          paged([HEAT]),
+        );
+        expect(pressed(page)).toEqual(['Over 120 min']);
+        expect(input(page, 'runtime-to').element.value).toBe('');
+      });
+
+      it('highlights the quick pick if the fields have the same values', async () => {
+        const { page } = await openWith(
+          [ALIEN],
+          '/watchlist?runtimeFrom=90&runtimeTo=120',
+          paged([ALIEN]),
+          '&runtimeFrom=90&runtimeTo=120',
+        );
+
+        expect(pressed(page)).toEqual(['90 to 120 min']);
+      });
+
+      it('ignores what is not a number of minutes in the URL', async () => {
+        const { page } = await openWith(
+          [ALIEN],
+          '/watchlist?runtimeFrom=abc&runtimeTo=-5',
+          paged([ALIEN]),
+        );
+
+        expect(input(page, 'runtime-from').element.value).toBe('');
+        expect(buttonOf(page, 'Clear filter')).toBeUndefined();
+      });
+
+      it('keeps it with the other filters, and clears it with them', async () => {
+        const { page, router } = await openWith(
+          [ALIEN],
+          '/watchlist?genreId=27&runtimeFrom=90&releasedTo=1989-12-31',
+          paged([ALIEN], { unfilteredCount: 9 }),
+          '&genreId=27&genreMatch=any&releasedTo=1989-12-31&runtimeFrom=90',
+        );
+        expect(text(page)).toContain(
+          '1 of 9 movies to watch with any of the selected genres, runtime of at least 90 minutes, released until December 31, 1989',
+        );
+
+        await buttonOf(page, 'Clear filter').trigger('click');
+        await flushPromises();
+
+        expect(router.currentRoute.value.fullPath).toBe('/watchlist');
+        listRequest().flush(paged([HEAT, ALIEN]));
+        await flushPromises();
+        expect(input(page, 'runtime-from').element.value).toBe('');
+      });
     });
 
     it('says when no movie was released in the period', async () => {

@@ -65,6 +65,17 @@ internal static class MovieQueries
             items = items.Where(item => item.Movie.ReleaseDate <= to);
         }
 
+        // Like the release date, a missing runtime never compares true.
+        if (filter.RuntimeFrom is { } runtimeFrom)
+        {
+            items = items.Where(item => item.Movie.RuntimeMinutes >= runtimeFrom);
+        }
+
+        if (filter.RuntimeTo is { } runtimeTo)
+        {
+            items = items.Where(item => item.Movie.RuntimeMinutes <= runtimeTo);
+        }
+
         // Days are UTC days, like the date the frontends show for "added".
         if (filter.AddedFrom is { } addedFrom)
         {
