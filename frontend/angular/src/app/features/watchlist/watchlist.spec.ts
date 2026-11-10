@@ -214,6 +214,38 @@ describe('Watchlist genre filter', () => {
     );
   });
 
+  it('does not load the list again when the match mode changes while no genre is selected', async () => {
+    await open();
+
+    buttonLabelled('genre-match-label', 'All of them').click();
+    await harness.fixture.whenStable();
+
+    // The URL and the buttons follow, but the list is the same: no request, no "loading".
+    expect(url()).toBe('/watchlist?genreMatch=all');
+    expect(buttonLabelled('genre-match-label', 'All of them').getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+    expect(text()).not.toContain('loading');
+    expect(titles()).toEqual(['Alien', 'Heat']);
+
+    buttonLabelled('genre-match-label', 'Any of them').click();
+    await harness.fixture.whenStable();
+
+    expect(url()).toBe('/watchlist');
+    expect(text()).not.toContain('loading');
+  });
+
+  it('loads the list again when the match mode changes while genres are selected', async () => {
+    await open('/watchlist?genreId=27', '&genreId=27&genreMatch=any', paged([ALIEN]));
+
+    await click(
+      buttonLabelled('genre-match-label', 'All of them'),
+      '/watchlist?genreId=27&genreMatch=all',
+      '&genreId=27&genreMatch=all',
+      paged([ALIEN]),
+    );
+  });
+
   it('shows the filter of the URL, ignoring what is not a genre ID', async () => {
     await open(
       '/watchlist?genreId=27&genreId=abc&genreId=27&genreId=878&genreMatch=all',

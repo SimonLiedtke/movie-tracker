@@ -807,6 +807,42 @@ describe('Watchlist', () => {
       expect(matchButton(page, 'Any of them').attributes('aria-pressed')).toBe('true');
     });
 
+    it('does not load the list again when the match mode changes while no genre is selected', async () => {
+      const { page, router } = await openWith([HEAT, ALIEN]);
+
+      await matchButton(page, 'All of them').trigger('click');
+      await flushPromises();
+
+      // The URL and the buttons follow, but the list is the same: no request, no "loading".
+      expect(router.currentRoute.value.fullPath).toBe('/watchlist?genreMatch=all');
+      expect(matchButton(page, 'All of them').attributes('aria-pressed')).toBe('true');
+      expect(text(page)).not.toContain('loading');
+      expect(page.findAll('article')).toHaveLength(2);
+
+      await matchButton(page, 'Any of them').trigger('click');
+      await flushPromises();
+
+      expect(router.currentRoute.value.fullPath).toBe('/watchlist');
+      expect(text(page)).not.toContain('loading');
+    });
+
+    it('loads the list again when the match mode changes while genres are selected', async () => {
+      const { page, router } = await openWith(
+        [ALIEN],
+        '/watchlist?genreId=27',
+        paged([ALIEN]),
+        '&genreId=27&genreMatch=any',
+      );
+
+      await click(
+        matchButton(page, 'All of them'),
+        '/watchlist?genreId=27&genreMatch=all',
+        { filter: '&genreId=27&genreMatch=all' },
+        paged([ALIEN]),
+        router,
+      );
+    });
+
     it('shows the filter of the URL', async () => {
       const { page } = await openWith(
         [ALIEN],
