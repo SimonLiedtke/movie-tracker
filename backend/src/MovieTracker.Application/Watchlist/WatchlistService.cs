@@ -16,23 +16,38 @@ public sealed class WatchlistService(
         Guid userId, WatchlistFilter filter, int page, int pageSize, CancellationToken cancellationToken) =>
         watchlist.ListAsync(userId, filter, page, pageSize, cancellationToken);
 
-    /// <summary>Puts the movie on the watchlist, or replaces the note if it is on it already (idempotent).</summary>
+    /// <summary>The different tags on the user's watchlist, alphabetically: what the tag filter can offer.</summary>
+    public Task<IReadOnlyList<string>> ListTagsAsync(Guid userId, CancellationToken cancellationToken) =>
+        watchlist.ListTagsAsync(userId, cancellationToken);
+
+    /// <summary>Puts the movie on the watchlist, or replaces the note and the tags if it is on it already (idempotent).</summary>
     public async Task<PutWatchlistItemResult> PutAsync(
-        Guid userId, Guid movieId, string? note, CancellationToken cancellationToken)
+        Guid userId, Guid movieId, string? note, IReadOnlyList<string>? tags, CancellationToken cancellationToken)
     {
         var now = timeProvider.GetUtcNow();
         var item = await watchlist.FindAsync(userId, movieId, cancellationToken);
         if (item is not null)
         {
-            // Putting the same note again changes nothing, so there is nothing to log.
-            if (item.Note != note)
+            // Putting the same note or tags again changes nothing, so there is nothing to log.
+            var tagChange = ActivityDetails.WatchlistTagChange(item.Tags, tags);
+            if (item.Note != note || tagChange is not null)
             {
                 var title = await movies.GetTitleAsync(userId, movieId, cancellationToken) ?? "Unknown movie";
-                activityLog.Add(ActivityLogEntry.ForMovie(
-                    userId, ActivityType.WatchlistNoteChanged, now, movieId, title, ActivityDetails.NoteChange(note)));
+                if (item.Note != note)
+                {
+                    activityLog.Add(ActivityLogEntry.ForMovie(
+                        userId, ActivityType.WatchlistNoteChanged, now, movieId, title, ActivityDetails.NoteChange(note)));
+                }
+
+                if (tagChange is not null)
+                {
+                    activityLog.Add(ActivityLogEntry.ForMovie(
+                        userId, ActivityType.WatchlistTagsChanged, now, movieId, title, tagChange));
+                }
             }
 
             item.UpdateNote(note);
+            item.UpdateTags(tags);
             await unitOfWork.SaveChangesAsync(cancellationToken);
             return new PutWatchlistItemResult(
                 PutWatchlistItemStatus.Updated, await watchlist.GetAsync(userId, movieId, cancellationToken));
@@ -43,9 +58,9 @@ public sealed class WatchlistService(
             return new PutWatchlistItemResult(PutWatchlistItemStatus.NotFound);
         }
 
-        watchlist.Add(new WatchlistItem(userId, movieId, note, now));
+        watchlist.Add(new WatchlistItem(userId, movieId, note, now, tags));
         activityLog.Add(ActivityLogEntry.ForMovie(
-            userId, ActivityType.WatchlistItemAdded, now, movieId, movieTitle, ActivityDetails.Note(note)));
+            userId, ActivityType.WatchlistItemAdded, now, movieId, movieTitle, ActivityDetails.WatchlistItem(note, tags)));
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return new PutWatchlistItemResult(
             PutWatchlistItemStatus.Added, await watchlist.GetAsync(userId, movieId, cancellationToken));

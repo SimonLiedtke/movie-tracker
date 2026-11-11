@@ -29,6 +29,8 @@ internal sealed class WatchlistItemConfiguration : IEntityTypeConfiguration<Watc
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.Property(item => item.Note).HasMaxLength(500);
+        // A text[] column; the tags are normalized (see TagList), so "tag = ANY(tags)" finds a tag.
+        builder.Property(item => item.Tags).HasColumnType("text[]").HasDefaultValueSql("'{}'");
 
         builder.HasIndex(item => new { item.UserId, item.AddedAt });
         // For the movie side of the foreign key (the primary key starts with user_id).

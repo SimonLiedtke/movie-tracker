@@ -24,6 +24,7 @@ internal static class Mappings
         ActivityType.DiaryEntryDeleted => ActivityLogType.DiaryEntryDeleted,
         ActivityType.WatchlistItemAdded => ActivityLogType.WatchlistItemAdded,
         ActivityType.WatchlistNoteChanged => ActivityLogType.WatchlistNoteChanged,
+        ActivityType.WatchlistTagsChanged => ActivityLogType.WatchlistTagsChanged,
         ActivityType.WatchlistItemRemoved => ActivityLogType.WatchlistItemRemoved,
         ActivityType.MovieImported => ActivityLogType.MovieImported,
         ActivityType.MovieAdded => ActivityLogType.MovieAdded,
@@ -45,10 +46,16 @@ internal static class Mappings
         entry.Review,
         entry.IsRewatch,
         entry.Liked,
+        entry.Tags,
         entry.CreatedAt);
 
     public static WatchlistItemResponse ToResponse(this WatchlistItemView item) => new(
-        item.Movie.ToResponse(), item.AddedAt, item.Note, item.Genres.Select(ToResponse).ToList(), item.RuntimeMinutes);
+        item.Movie.ToResponse(),
+        item.AddedAt,
+        item.Note,
+        item.Tags,
+        item.Genres.Select(ToResponse).ToList(),
+        item.RuntimeMinutes);
 
     public static WatchlistPageResponse ToResponse(this WatchlistPage page) => new(
         page.Items.Select(item => item.ToResponse()).ToList(), page.Page, page.PageSize, page.TotalCount, page.UnfilteredCount);

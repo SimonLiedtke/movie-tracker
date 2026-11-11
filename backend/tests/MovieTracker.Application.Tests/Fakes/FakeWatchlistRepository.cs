@@ -27,6 +27,10 @@ public sealed class FakeWatchlistRepository(FakeMovieRepository movies) : IWatch
         return Task.FromResult(new WatchlistPage(views, page, pageSize, own.Count, all.Count));
     }
 
+    public Task<IReadOnlyList<string>> ListTagsAsync(Guid userId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<string>>(
+            Items.Where(item => item.UserId == userId).SelectMany(item => item.Tags).Distinct().Order().ToList());
+
     public Task<WatchlistItemView?> GetAsync(Guid userId, Guid movieId, CancellationToken cancellationToken) =>
         Task.FromResult(Own(userId, movieId) is { } item ? ToView(item) : null);
 
@@ -55,7 +59,8 @@ public sealed class FakeWatchlistRepository(FakeMovieRepository movies) : IWatch
         var searchMatches = string.IsNullOrWhiteSpace(filter.Search)
             || movie.Title.Contains(filter.Search.Trim(), StringComparison.OrdinalIgnoreCase)
             || (movie.OriginalTitle?.Contains(filter.Search.Trim(), StringComparison.OrdinalIgnoreCase) ?? false);
-        return searchMatches && genresMatch && releasedFromMatches && releasedToMatches && addedFromMatches && addedToMatches
+        var tagMatches = filter.Tag is null || item.Tags.Contains(filter.Tag);
+        return searchMatches && tagMatches && genresMatch && releasedFromMatches && releasedToMatches && addedFromMatches && addedToMatches
             && runtimeFromMatches && runtimeToMatches;
     }
 
@@ -69,6 +74,7 @@ public sealed class FakeWatchlistRepository(FakeMovieRepository movies) : IWatch
             new MovieRef(movie.Id, movie.Title, movie.ReleaseDate, movie.PosterUrl),
             item.AddedAt,
             item.Note,
+            item.Tags,
             movie.Genres.OrderBy(genre => genre.Name).ToList(),
             movie.RuntimeMinutes);
     }

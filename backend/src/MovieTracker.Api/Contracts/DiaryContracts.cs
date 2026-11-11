@@ -12,6 +12,7 @@ public sealed record DiaryEntryResponse(
     string? Review,
     bool IsRewatch,
     bool Liked,
+    IReadOnlyList<string> Tags,
     DateTimeOffset CreatedAt);
 
 public sealed class DiaryEntryRequest
@@ -32,6 +33,10 @@ public sealed class DiaryEntryRequest
 
     public bool Liked { get; init; }
 
+    /// <summary>Free tags. Case and surrounding spaces do not matter; the response has them normalized.</summary>
+    [ValidTags]
+    public string[]? Tags { get; init; }
+
     // MovieId and WatchedOn are guaranteed by [Required] once model validation has passed.
     public DiaryEntryDetails ToDetails() => new(
         MovieId!.Value,
@@ -39,5 +44,6 @@ public sealed class DiaryEntryRequest
         Rating is { } halfStars ? new DomainRating(halfStars) : (DomainRating?)null,
         Review,
         IsRewatch,
-        Liked);
+        Liked,
+        Tags);
 }

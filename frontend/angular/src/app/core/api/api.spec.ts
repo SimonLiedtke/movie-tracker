@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { ActivityLogApi, LetterboxdImportApi, MoviesApi, WatchlistApi } from './api';
+import { ActivityLogApi, DiaryApi, LetterboxdImportApi, MoviesApi, WatchlistApi } from './api';
 
 describe('API services', () => {
   let http: HttpTestingController;
@@ -105,8 +105,34 @@ describe('API services', () => {
 
     const request = http.expectOne('/api/watchlist/42');
     expect(request.request.method).toBe('PUT');
-    expect(request.request.body).toEqual({ note: "Director's cut" });
+    expect(request.request.body).toEqual({ note: "Director's cut", tags: [] });
     request.flush({});
+  });
+
+  it('puts a movie on the watchlist with tags', () => {
+    TestBed.inject(WatchlistApi).put('42', null, ['horror', 'cinema']).subscribe();
+
+    const request = http.expectOne('/api/watchlist/42');
+    expect(request.request.body).toEqual({ note: null, tags: ['horror', 'cinema'] });
+    request.flush({});
+  });
+
+  it('lists the tags of the watchlist', () => {
+    let tags: string[] | undefined;
+    TestBed.inject(WatchlistApi)
+      .tags()
+      .subscribe((result) => (tags = result));
+
+    http.expectOne('/api/watchlist/tags').flush(['horror', 'weekend']);
+    expect(tags).toEqual(['horror', 'weekend']);
+  });
+
+  it('filters the watchlist and the diary by tag', () => {
+    TestBed.inject(WatchlistApi).list({ tag: ' horror ' }).subscribe();
+    TestBed.inject(DiaryApi).list({ tag: 'horror' }).subscribe();
+
+    http.expectOne('/api/watchlist?tag=horror').flush({});
+    http.expectOne('/api/diary-entries?tag=horror').flush({});
   });
 
   it('uploads a Letterboxd export as a file in a multipart form', () => {

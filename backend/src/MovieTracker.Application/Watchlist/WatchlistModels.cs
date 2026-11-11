@@ -3,10 +3,16 @@ using MovieTracker.Domain.Movies;
 
 namespace MovieTracker.Application.Watchlist;
 
+/// <param name="Tags">The item's tags, alphabetically.</param>
 /// <param name="Genres">The movie's genres, alphabetically.</param>
 /// <param name="RuntimeMinutes">The movie's runtime; null if unknown.</param>
 public sealed record WatchlistItemView(
-    MovieRef Movie, DateTimeOffset AddedAt, string? Note, IReadOnlyList<Genre> Genres, int? RuntimeMinutes);
+    MovieRef Movie,
+    DateTimeOffset AddedAt,
+    string? Note,
+    IReadOnlyList<string> Tags,
+    IReadOnlyList<Genre> Genres,
+    int? RuntimeMinutes);
 
 /// <summary>A page of the items matching a <see cref="WatchlistFilter"/>.</summary>
 /// <param name="TotalCount">The number of items matching the filter.</param>
@@ -40,6 +46,7 @@ public enum GenreMatch
 /// <param name="AddedTo">Items put on the watchlist on or before this day (UTC).</param>
 /// <param name="RuntimeFrom">Movies that are at least this many minutes long. Movies without a runtime do not match.</param>
 /// <param name="RuntimeTo">Movies that are at most this many minutes long. Movies without a runtime do not match.</param>
+/// <param name="Tag">Items with this tag, in its normalized form (<see cref="Domain.Tags.TagList"/>). Null: no restriction.</param>
 public sealed record WatchlistFilter(
     IReadOnlyList<int> GenreIds,
     GenreMatch GenreMatch,
@@ -49,7 +56,8 @@ public sealed record WatchlistFilter(
     DateOnly? AddedTo = null,
     int? RuntimeFrom = null,
     int? RuntimeTo = null,
-    string? Search = null)
+    string? Search = null,
+    string? Tag = null)
 {
     public static WatchlistFilter None { get; } = new([], GenreMatch.Any);
 
@@ -59,7 +67,8 @@ public sealed record WatchlistFilter(
         && ReleasedFrom is null && ReleasedTo is null
         && AddedFrom is null && AddedTo is null
         && RuntimeFrom is null && RuntimeTo is null
-        && string.IsNullOrWhiteSpace(Search);
+        && string.IsNullOrWhiteSpace(Search)
+        && Tag is null;
 }
 
 public enum PutWatchlistItemStatus
@@ -67,7 +76,7 @@ public enum PutWatchlistItemStatus
     /// <summary>The movie was put on the watchlist now.</summary>
     Added,
 
-    /// <summary>The movie was on the watchlist already; its note was replaced, the date added stays.</summary>
+    /// <summary>The movie was on the watchlist already; its note and tags were replaced, the date added stays.</summary>
     Updated,
 
     /// <summary>The movie does not exist, or belongs to another user.</summary>

@@ -205,7 +205,7 @@ describe('MovieForm', () => {
     await flushPromises();
     const put = backend.expectOne('/api/watchlist/m9');
     expect(put.method).toBe('PUT');
-    expect(put.json).toEqual({ note: null });
+    expect(put.json).toEqual({ note: null, tags: [] });
     put.flush({});
     await flushPromises();
 

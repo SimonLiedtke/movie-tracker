@@ -60,6 +60,76 @@ public sealed class DiaryServiceTests
     private static DiaryEntryDetails Details(Movie movie, string watchedOn = "2026-10-31", int? rating = 8, string? review = "Great") =>
         new(movie.Id, DateOnly.Parse(watchedOn), rating is { } halfStars ? new Rating(halfStars) : null, review, IsRewatch: false, Liked: true);
 
+    // --- Tags
+
+    [Fact]
+    public async Task Create_saves_the_tags_normalized()
+    {
+        var movie = AddTmdbMovie();
+
+        var result = await _service.CreateAsync(Alice, Details(movie) with { Tags = [" Date Night", "horror", "HORROR"] }, Ct);
+
+        Assert.Equal(["date night", "horror"], Assert.Single(_diary.Entries).Tags);
+        Assert.Equal(["date night", "horror"], result.Entry!.Tags);
+    }
+
+    [Fact]
+    public async Task Create_keeps_the_tags_of_the_watchlist_item_along_with_the_ones_of_the_entry()
+    {
+        var movie = AddTmdbMovie();
+        _watchlist.Items.Add(new WatchlistItem(Alice, movie.Id, null, Start, ["recommended", "horror"]));
+
+        var result = await _service.CreateAsync(Alice, Details(movie) with { Tags = ["Horror", "cinema"] }, Ct);
+
+        Assert.Equal(["cinema", "horror", "recommended"], result.Entry!.Tags);
+        Assert.Empty(_watchlist.Items);
+    }
+
+    [Fact]
+    public async Task Create_keeps_the_tags_of_the_watchlist_item_if_the_entry_has_none()
+    {
+        var movie = AddTmdbMovie();
+        _watchlist.Items.Add(new WatchlistItem(Alice, movie.Id, null, Start, ["recommended"]));
+
+        var result = await _service.CreateAsync(Alice, Details(movie), Ct);
+
+        Assert.Equal(["recommended"], result.Entry!.Tags);
+    }
+
+    [Fact]
+    public async Task Create_does_not_take_over_the_tags_of_the_watchlist_of_another_user()
+    {
+        var movie = AddTmdbMovie();
+        _watchlist.Items.Add(new WatchlistItem(Bob, movie.Id, null, Start, ["bobs tag"]));
+
+        var result = await _service.CreateAsync(Alice, Details(movie), Ct);
+
+        Assert.Empty(result.Entry!.Tags);
+    }
+
+    [Fact]
+    public async Task Update_replaces_the_tags()
+    {
+        var movie = AddTmdbMovie();
+        var entry = AddEntry(Alice, movie);
+
+        var result = await _service.UpdateAsync(Alice, entry.Id, Details(movie) with { Tags = ["b"] }, Ct);
+
+        Assert.Equal(["b"], result.Entry!.Tags);
+    }
+
+    [Fact]
+    public async Task List_filters_by_tag()
+    {
+        var movie = AddTmdbMovie();
+        await _service.CreateAsync(Alice, Details(movie, "2026-10-30") with { Tags = ["horror"] }, Ct);
+        await _service.CreateAsync(Alice, Details(movie, "2026-10-31") with { Tags = ["comedy"] }, Ct);
+
+        var result = await _service.ListAsync(Alice, new DiaryFilter(null, null, null, "horror"), 1, 10, Ct);
+
+        Assert.Equal(new DateOnly(2026, 10, 30), Assert.Single(result.Items).WatchedOn);
+    }
+
     // --- Logging a viewing
 
     [Fact]

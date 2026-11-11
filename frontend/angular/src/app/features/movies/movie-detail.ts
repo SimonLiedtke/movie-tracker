@@ -8,10 +8,11 @@ import { yearOf } from '../../shared/dates';
 import { ErrorNotification } from '../../shared/error-notification';
 import { Poster } from '../../shared/poster';
 import { Rating } from '../../shared/rating';
+import { Tags } from '../../shared/tags';
 
 @Component({
   selector: 'app-movie-detail',
-  imports: [RouterLink, Poster, Rating, ErrorNotification],
+  imports: [RouterLink, Poster, Rating, ErrorNotification, Tags],
   templateUrl: './movie-detail.html',
 })
 export class MovieDetail {

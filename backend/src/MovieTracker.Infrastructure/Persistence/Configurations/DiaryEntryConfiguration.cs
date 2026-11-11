@@ -20,6 +20,8 @@ internal sealed class DiaryEntryConfiguration : IEntityTypeConfiguration<DiaryEn
 
         builder.Property(entry => entry.Rating).HasConversion(new RatingConverter());
         builder.Property(entry => entry.Review).HasMaxLength(20000);
+        // A text[] column; the tags are normalized (see TagList), so "tag = ANY(tags)" finds a tag.
+        builder.Property(entry => entry.Tags).HasColumnType("text[]").HasDefaultValueSql("'{}'");
 
         // Restrict: a movie with diary entries cannot be deleted (API answers with 409).
         builder

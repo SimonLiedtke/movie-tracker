@@ -1,4 +1,5 @@
 using MovieTracker.Domain.Movies;
+using MovieTracker.Domain.Tags;
 
 namespace MovieTracker.Domain.Diary;
 
@@ -36,6 +37,9 @@ public sealed class DiaryEntry
 
     public bool Liked { get; private set; }
 
+    /// <summary>In their normalized form (<see cref="TagList.Normalize"/>).</summary>
+    public string[] Tags { get; private set; } = [];
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public void Update(DiaryEntryDetails details)
@@ -48,5 +52,6 @@ public sealed class DiaryEntry
         Review = details.Review;
         IsRewatch = details.IsRewatch;
         Liked = details.Liked;
+        Tags = TagList.Normalize(details.Tags);
     }
 }

@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc.ModelBinding;
 using MovieTracker.Api.Auth;
 using MovieTracker.Api.Contracts;
 using MovieTracker.Application.Watchlist;
+using MovieTracker.Domain.Tags;
 
 namespace MovieTracker.Api.Controllers;
 
@@ -20,7 +21,8 @@ public sealed class WatchlistController(WatchlistService watchlist) : Controller
     /// <paramref name="addedTo"/>, only items added in this period (both ends included, UTC days).
     /// With <paramref name="runtimeFrom"/> and <paramref name="runtimeTo"/>, only movies that are this many minutes
     /// long (both ends included); movies without a runtime are left out. With <paramref name="search"/>, only movies
-    /// whose title or original title contains the text.
+    /// whose title or original title contains the text. With <paramref name="tag"/>, only items with this tag
+    /// (case does not matter).
     /// </summary>
     [HttpGet(Name = "listWatchlist")]
     [ProducesResponseType<WatchlistPageResponse>(StatusCodes.Status200OK)]
@@ -35,6 +37,7 @@ public sealed class WatchlistController(WatchlistService watchlist) : Controller
         [FromQuery, Range(1, 1500)] int? runtimeFrom = null,
         [FromQuery, Range(1, 1500)] int? runtimeTo = null,
         [FromQuery, StringLength(200)] string? search = null,
+        [FromQuery, StringLength(TagList.MaxTagLength)] string? tag = null,
         [FromQuery, Range(1, int.MaxValue)] int page = 1,
         [FromQuery, Range(1, 100)] int pageSize = 20,
         CancellationToken cancellationToken = default)
@@ -66,10 +69,17 @@ public sealed class WatchlistController(WatchlistService watchlist) : Controller
             addedTo,
             runtimeFrom,
             runtimeTo,
-            search);
+            search,
+            TagList.NormalizeTag(tag) is { Length: > 0 } normalizedTag ? normalizedTag : null);
         var result = await watchlist.ListAsync(User.GetUserId(), filter, page, pageSize, cancellationToken);
         return result.ToResponse();
     }
+
+    /// <summary>The different tags on the watchlist, alphabetically: what the tag filter can offer.</summary>
+    [HttpGet("tags", Name = "listWatchlistTags")]
+    [ProducesResponseType<IReadOnlyList<string>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<string>>> ListWatchlistTags(CancellationToken cancellationToken) =>
+        Ok(await watchlist.ListTagsAsync(User.GetUserId(), cancellationToken));
 
     [HttpPut("{movieId:guid}", Name = "putWatchlistItem")]
     [ProducesResponseType<WatchlistItemResponse>(StatusCodes.Status200OK)]
@@ -81,7 +91,7 @@ public sealed class WatchlistController(WatchlistService watchlist) : Controller
         [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] WatchlistItemRequest? request,
         CancellationToken cancellationToken)
     {
-        var result = await watchlist.PutAsync(User.GetUserId(), movieId, request?.Note, cancellationToken);
+        var result = await watchlist.PutAsync(User.GetUserId(), movieId, request?.Note, request?.Tags, cancellationToken);
 
         return result.Status switch
         {

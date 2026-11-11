@@ -142,7 +142,9 @@
                 }
               </td>
               <td><app-rating [halfStars]="entry.rating" /></td>
-              <td class="pre-wrap">{{ entry.review }}</td>
+              <td class="pre-wrap">
+                {{ entry.review }}<app-tags [tags]="entry.tags" route="/diary" />
+              </td>
               <td class="has-text-right">
                 <div class="buttons is-right are-small">
                   <a class="button" [routerLink]="['/diary', entry.id, 'edit']">Edit</a>

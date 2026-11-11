@@ -8,6 +8,7 @@ public enum ActivityType
     DiaryEntryDeleted,
     WatchlistItemAdded,
     WatchlistNoteChanged,
+    WatchlistTagsChanged,
     WatchlistItemRemoved,
 
     /// <summary>A movie that TMDB knows was made available (imported from TMDB).</summary>

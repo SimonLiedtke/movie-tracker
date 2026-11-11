@@ -120,6 +120,7 @@ export class WatchlistApi {
     runtimeFrom,
     runtimeTo,
     search,
+    tag,
     ...paging
   }: WatchlistQuery = {}): Observable<WatchlistPage> {
     const filtered = genreIds !== undefined && genreIds.length > 0;
@@ -135,13 +136,19 @@ export class WatchlistApi {
         runtimeFrom,
         runtimeTo,
         search: search?.trim(),
+        tag: tag?.trim(),
       }),
     });
   }
 
-  /** Adds the movie to the watchlist, or updates the note if it is already on it. */
-  put(movieId: string, note: string | null): Observable<WatchlistItem> {
-    return this.http.put<WatchlistItem>(`${BASE}/watchlist/${movieId}`, { note });
+  /** The different tags on the watchlist, alphabetically: what the tag filter can offer. */
+  tags(): Observable<string[]> {
+    return this.http.get<string[]>(`${BASE}/watchlist/tags`);
+  }
+
+  /** Adds the movie to the watchlist, or replaces its note and tags if it is already on it. */
+  put(movieId: string, note: string | null, tags: string[] = []): Observable<WatchlistItem> {
+    return this.http.put<WatchlistItem>(`${BASE}/watchlist/${movieId}`, { note, tags });
   }
 
   remove(movieId: string): Observable<void> {

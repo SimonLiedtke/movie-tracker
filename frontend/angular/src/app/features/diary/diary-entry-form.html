@@ -71,6 +71,31 @@
       }
     </div>
 
+    <div class="field">
+      <label class="label" for="tags">Tags</label>
+      <div class="control">
+        <input
+          id="tags"
+          class="input"
+          type="text"
+          autocomplete="off"
+          placeholder="e.g. cinema, date night"
+          formControlName="tags"
+          [class.is-danger]="isInvalid('tags')"
+        />
+      </div>
+      @if (isInvalid('tags')) {
+        <p class="help is-danger">{{ form.controls.tags.errors?.['tags'] }}</p>
+      } @else {
+        <p class="help">
+          Separated by commas.
+          @if (!id()) {
+            Tags the movie has on your watchlist are added automatically.
+          }
+        </p>
+      }
+    </div>
+
     <div class="field is-grouped is-grouped-multiline">
       <div class="control">
         <label class="checkbox"

@@ -133,7 +133,7 @@ public sealed class DiaryEntriesTests(ApiFactory factory) : ApiTestBase(factory)
 
         var entry = await GetAsync<DiaryEntryResponse>($"/api/diary-entries/{created.Id}");
 
-        Assert.Equal(created, entry);
+        Assert.Equivalent(created, entry);
     }
 
     [Fact]
@@ -233,7 +233,7 @@ public sealed class DiaryEntriesTests(ApiFactory factory) : ApiTestBase(factory)
         Assert.Null(updated.Review);
         Assert.True(updated.Liked);
         Assert.Equal(entry.CreatedAt, updated.CreatedAt);
-        Assert.Equal(updated, await GetAsync<DiaryEntryResponse>($"/api/diary-entries/{entry.Id}"));
+        Assert.Equivalent(updated, await GetAsync<DiaryEntryResponse>($"/api/diary-entries/{entry.Id}"));
     }
 
     [Fact]

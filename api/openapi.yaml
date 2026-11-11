@@ -261,6 +261,7 @@ paths:
         - name: movieId
           in: query
           schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/Tag'
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PageSize'
       responses:
@@ -357,6 +358,7 @@ paths:
         With `addedFrom` and/or `addedTo`, only items added to the watchlist in this period are listed.
         With `runtimeFrom` and/or `runtimeTo`, only movies of this length in minutes are listed.
         With `search`, only movies with this text in their title or original title are listed.
+        With `tag`, only items with this tag are listed.
         All filters apply together.
         `totalCount` counts the matching items only; `unfilteredCount` all items.
       parameters:
@@ -413,6 +415,7 @@ paths:
           in: query
           description: Only movies whose title or original title contains this text (any case; blank means no search).
           schema: { type: string, maxLength: 200 }
+        - $ref: '#/components/parameters/Tag'
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PageSize'
       responses:
@@ -423,6 +426,21 @@ paths:
               schema: { $ref: '#/components/schemas/WatchlistItemPage' }
         '400': { $ref: '#/components/responses/ValidationError' }
 
+  /api/watchlist/tags:
+    get:
+      tags: [Watchlist]
+      operationId: listWatchlistTags
+      summary: List the tags on the watchlist
+      description: The different tags of the user's watchlist items, alphabetically. The frontends suggest them in the tag filter.
+      responses:
+        '200':
+          description: The tags (normalized), none if no item has one
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: string }
+
   /api/watchlist/{movieId}:
     parameters:
       - $ref: '#/components/parameters/MovieId'
@@ -431,7 +449,7 @@ paths:
       operationId: putWatchlistItem
       summary: Add a movie to the watchlist (idempotent)
       description: |
-        Creates the entry or updates its note.
+        Creates the entry or updates its note and tags (both are replaced).
         `addedAt` stays unchanged on update.
       requestBody:
         required: false
@@ -564,6 +582,11 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    Tag:
+      name: tag
+      in: query
+      description: Only items with this tag (case does not matter; blank means no filter).
+      schema: { type: string, maxLength: 50 }
     Page:
       name: page
       in: query
@@ -699,7 +722,7 @@ components:
 
     DiaryEntry:
       type: object
-      required: [id, movie, watchedOn, isRewatch, liked, createdAt]
+      required: [id, movie, watchedOn, isRewatch, liked, tags, createdAt]
       properties:
         id: { type: string, format: uuid }
         movie: { $ref: '#/components/schemas/MovieRef' }
@@ -714,6 +737,7 @@ components:
         review: { type: string, nullable: true }
         isRewatch: { type: boolean }
         liked: { type: boolean }
+        tags: { $ref: '#/components/schemas/Tags' }
         createdAt: { type: string, format: date-time }
 
     DiaryEntryInput:
@@ -736,14 +760,16 @@ components:
         review: { type: string, maxLength: 20000, nullable: true }
         isRewatch: { type: boolean, default: false }
         liked: { type: boolean, default: false }
+        tags: { $ref: '#/components/schemas/TagsInput' }
 
     WatchlistItem:
       type: object
-      required: [movie, addedAt, genres]
+      required: [movie, addedAt, tags, genres]
       properties:
         movie: { $ref: '#/components/schemas/MovieRef' }
         addedAt: { type: string, format: date-time }
         note: { type: string, nullable: true }
+        tags: { $ref: '#/components/schemas/Tags' }
         genres:
           type: array
           description: The movie's genres, alphabetically
@@ -755,6 +781,24 @@ components:
       additionalProperties: false
       properties:
         note: { type: string, maxLength: 500, nullable: true }
+        tags: { $ref: '#/components/schemas/TagsInput' }
+
+    Tags:
+      type: array
+      description: |
+        The tags, normalized: trimmed, lower case, without duplicates, in alphabetical order.
+        When a movie is logged in the diary, the tags of its watchlist item are added to the tags of the new
+        diary entry, so no tag gets lost.
+      items: { type: string }
+
+    TagsInput:
+      type: array
+      nullable: true
+      description: |
+        Free tags (none if omitted). Case and spaces around or inside a tag do not matter ("Sci-Fi " and "sci-fi"
+        are the same tag); blank tags are dropped. At most 20 different tags of at most 50 characters each, without
+        commas. The tags replace the existing ones.
+      items: { type: string }
 
     PageMetadata:
       type: object
@@ -797,6 +841,7 @@ components:
             - diaryEntryDeleted
             - watchlistItemAdded
             - watchlistNoteChanged
+            - watchlistTagsChanged
             - watchlistItemRemoved
             - movieImported
             - movieAdded

@@ -57,6 +57,11 @@ internal static class MovieQueries
                  EF.Functions.ILike(EF.Functions.Unaccent(item.Movie.OriginalTitle), EF.Functions.Unaccent(pattern), LikeEscapeCharacter)));
         }
 
+        if (filter.Tag is { } tag)
+        {
+            items = items.Where(item => item.Tags.Contains(tag));
+        }
+
         var genreIds = filter.GenreIds.Distinct().ToList();
         if (genreIds.Count > 0)
         {

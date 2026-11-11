@@ -8,6 +8,7 @@ import { yearOf } from '../../shared/dates';
 import ErrorNotification from '../../shared/ErrorNotification.vue';
 import Poster from '../../shared/Poster.vue';
 import Rating from '../../shared/Rating.vue';
+import TagList from '../../shared/TagList.vue';
 
 const props = defineProps<{
   /** Route parameter. */
@@ -221,7 +222,9 @@ async function run(request: Promise<unknown>, onSuccess: () => unknown): Promise
               <span v-if="entry.liked" class="has-text-danger ml-1" title="Liked">♥</span>
             </td>
             <td><Rating :half-stars="entry.rating" /></td>
-            <td class="pre-wrap">{{ entry.review }}</td>
+            <td class="pre-wrap">
+              {{ entry.review }}<TagList :tags="entry.tags" route="/diary" />
+            </td>
             <td class="has-text-right">
               <div class="buttons is-right are-small">
                 <RouterLink class="button" :to="`/diary/${entry.id}/edit`">Edit</RouterLink>

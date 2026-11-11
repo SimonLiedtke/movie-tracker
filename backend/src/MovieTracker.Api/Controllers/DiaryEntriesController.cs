@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using MovieTracker.Api.Auth;
 using MovieTracker.Api.Contracts;
 using MovieTracker.Application.Diary;
+using MovieTracker.Domain.Tags;
 
 namespace MovieTracker.Api.Controllers;
 
@@ -12,6 +13,7 @@ namespace MovieTracker.Api.Controllers;
 [Tags("Diary")]
 public sealed class DiaryEntriesController(DiaryService diary) : ControllerBase
 {
+    /// <summary>With <paramref name="tag"/>, only entries with this tag (case does not matter).</summary>
     [HttpGet(Name = "listDiaryEntries")]
     [ProducesResponseType<PagedResponse<DiaryEntryResponse>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, MediaTypeNames.Application.ProblemJson)]
@@ -19,6 +21,7 @@ public sealed class DiaryEntriesController(DiaryService diary) : ControllerBase
         [FromQuery(Name = "from")] DateOnly? fromDate,
         [FromQuery(Name = "to")] DateOnly? toDate,
         [FromQuery] Guid? movieId,
+        [FromQuery, StringLength(TagList.MaxTagLength)] string? tag = null,
         [FromQuery, Range(1, int.MaxValue)] int page = 1,
         [FromQuery, Range(1, 100)] int pageSize = 20,
         CancellationToken cancellationToken = default)
@@ -30,7 +33,7 @@ public sealed class DiaryEntriesController(DiaryService diary) : ControllerBase
         }
 
         var result = await diary.ListAsync(
-            User.GetUserId(), new DiaryFilter(fromDate, toDate, movieId), page, pageSize, cancellationToken);
+            User.GetUserId(), new DiaryFilter(fromDate, toDate, movieId, ToFilterTag(tag)), page, pageSize, cancellationToken);
         return result.ToResponse(entry => entry.ToResponse());
     }
 
@@ -94,6 +97,9 @@ public sealed class DiaryEntriesController(DiaryService diary) : ControllerBase
 
         return NoContent();
     }
+
+    /// <summary>The tag in its stored form; null if there is none to look for.</summary>
+    private static string? ToFilterTag(string? tag) => TagList.NormalizeTag(tag) is { Length: > 0 } normalized ? normalized : null;
 
     private ActionResult Failure(SaveDiaryEntryStatus status, DiaryEntryRequest request)
     {

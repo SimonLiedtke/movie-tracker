@@ -88,6 +88,8 @@ export interface DiaryEntry {
   review: string | null;
   isRewatch: boolean;
   liked: boolean;
+  /** Normalized by the server: lower case, alphabetical. */
+  tags: string[];
   createdAt: string;
 }
 
@@ -98,12 +100,15 @@ export interface DiaryEntryRequest {
   review: string | null;
   isRewatch: boolean;
   liked: boolean;
+  tags: string[];
 }
 
 export interface DiaryQuery {
   from?: string;
   to?: string;
   movieId?: string;
+  /** Only entries with this tag (case does not matter). */
+  tag?: string;
   page?: number;
   pageSize?: number;
 }
@@ -112,6 +117,8 @@ export interface WatchlistItem {
   movie: MovieRef;
   addedAt: string;
   note: string | null;
+  /** Normalized by the server: lower case, alphabetical. */
+  tags: string[];
   /** The movie's genres, alphabetically. */
   genres: Genre[];
   /** The movie's runtime in minutes; null if unknown. */
@@ -130,6 +137,7 @@ export type ActivityType =
   | 'diaryEntryDeleted'
   | 'watchlistItemAdded'
   | 'watchlistNoteChanged'
+  | 'watchlistTagsChanged'
   | 'watchlistItemRemoved'
   | 'movieImported'
   | 'movieAdded'
@@ -178,6 +186,8 @@ export interface WatchlistQuery extends PageQuery {
   runtimeTo?: number;
   /** Only movies whose title or original title contains this text. */
   search?: string;
+  /** Only movies with this tag (case does not matter). */
+  tag?: string;
 }
 
 export interface User {

@@ -21,6 +21,7 @@ internal static class DiaryEntryQueries
             entry.Review,
             entry.IsRewatch,
             entry.Liked,
+            entry.Tags,
             entry.CreatedAt));
 }
 
@@ -33,7 +34,8 @@ internal sealed record DiaryEntryRow(
     string? Review,
     bool IsRewatch,
     bool Liked,
+    string[] Tags,
     DateTimeOffset CreatedAt)
 {
-    public DiaryEntryView ToModel() => new(Id, Movie, WatchedOn, Rating, Review, IsRewatch, Liked, CreatedAt);
+    public DiaryEntryView ToModel() => new(Id, Movie, WatchedOn, Rating, Review, IsRewatch, Liked, Tags, CreatedAt);
 }

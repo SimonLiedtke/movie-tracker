@@ -8,6 +8,7 @@ import { todayIso } from '../../shared/dates';
 import ErrorNotification from '../../shared/ErrorNotification.vue';
 import MoviePicker from '../../shared/MoviePicker.vue';
 import { RATING_OPTIONS } from '../../shared/rating-format';
+import { formatTags, parseTags, tagsError } from '../../shared/tags';
 
 const props = defineProps<{
   /** Route parameter; not set when logging a new viewing. */
@@ -32,18 +33,24 @@ const form = reactive({
   review: '',
   isRewatch: false,
   liked: false,
+  tags: '',
 });
 
-type Field = 'watchedOn' | 'review';
+type Field = 'watchedOn' | 'review' | 'tags';
 
 /** What is wrong with the fields. */
 const invalid = computed<Record<Field, boolean>>(() => ({
   watchedOn: form.watchedOn === '',
   review: form.review.length > 20000,
+  tags: tagsError(form.tags) !== null,
 }));
 
 /** The fields the user has been in, or has failed to fill in by trying to save. */
-const touched = reactive<Record<Field, boolean>>({ watchedOn: false, review: false });
+const touched = reactive<Record<Field, boolean>>({
+  watchedOn: false,
+  review: false,
+  tags: false,
+});
 
 /** Problems are only shown for fields the user has touched, not on a fresh form. */
 const isInvalid = (field: Field) => invalid.value[field] && touched[field];
@@ -74,6 +81,7 @@ async function loadEntry(id: string): Promise<void> {
     form.review = entry.review ?? '';
     form.isRewatch = entry.isRewatch;
     form.liked = entry.liked;
+    form.tags = formatTags(entry.tags);
   } catch (failure) {
     error.value = toApiError(failure);
   }
@@ -98,6 +106,7 @@ async function save(): Promise<void> {
   if (Object.values(invalid.value).some(Boolean) || !picked) {
     touched.watchedOn = true;
     touched.review = true;
+    touched.tags = true;
     movieTouched.value = true;
     return;
   }
@@ -109,6 +118,7 @@ async function save(): Promise<void> {
     review: form.review.trim() || null,
     isRewatch: form.isRewatch,
     liked: form.liked,
+    tags: parseTags(form.tags),
   };
 
   saving.value = true;
@@ -195,6 +205,30 @@ async function save(): Promise<void> {
         ></textarea>
       </div>
       <p v-if="isInvalid('review')" class="help is-danger">At most 20,000 characters.</p>
+    </div>
+
+    <div class="field">
+      <label class="label" for="tags">Tags</label>
+      <div class="control">
+        <input
+          id="tags"
+          v-model="form.tags"
+          class="input"
+          type="text"
+          autocomplete="off"
+          placeholder="e.g. cinema, date night"
+          :class="{ 'is-danger': isInvalid('tags') }"
+          @input="touched.tags = true"
+          @blur="touched.tags = true"
+        />
+      </div>
+      <p v-if="isInvalid('tags')" class="help is-danger">{{ tagsError(form.tags) }}</p>
+      <p v-else class="help">
+        Separated by commas.
+        <template v-if="!id"
+          >Tags the movie has on your watchlist are added automatically.</template
+        >
+      </p>
     </div>
 
     <div class="field is-grouped is-grouped-multiline">

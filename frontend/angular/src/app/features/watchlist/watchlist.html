@@ -26,6 +26,26 @@
     </div>
   </div>
   <div class="field">
+    <label class="label" for="tag">Tag</label>
+    <div class="control">
+      <input
+        id="tag"
+        class="input is-small"
+        type="text"
+        autocomplete="off"
+        placeholder="e.g. weekend"
+        list="tag-suggestions"
+        [value]="query().tag ?? ''"
+        (change)="onTag($any($event.target).value)"
+      />
+      <datalist id="tag-suggestions">
+        @for (tag of tagSuggestions(); track tag) {
+          <option [value]="tag"></option>
+        }
+      </datalist>
+    </div>
+  </div>
+  <div class="field">
     <label class="label" id="genre-label">Genres</label>
     <div class="buttons are-small" role="group" aria-labelledby="genre-label">
       @for (genre of genres(); track genre.id) {
@@ -240,36 +260,49 @@
 
         @if (editing() === item.movie.id) {
           <form
-            class="field has-addons mt-2"
-            (submit)="$event.preventDefault(); saveNote(item, note.value)"
+            class="mt-2"
+            (submit)="$event.preventDefault(); saveDetails(item, note.value, tags.value)"
           >
-            <div class="control is-expanded">
+            <div class="field">
               <input
                 #note
                 class="input is-small"
                 maxlength="500"
+                aria-label="Note"
                 placeholder="Why do you want to watch it?"
                 [value]="item.note ?? ''"
                 (keydown.escape)="editing.set(null)"
               />
             </div>
-            <div class="control">
-              <button
-                type="submit"
-                class="button is-small is-primary"
-                [class.is-loading]="saving()"
-              >
+            <div class="field">
+              <input
+                #tags
+                class="input is-small"
+                aria-label="Tags"
+                autocomplete="off"
+                placeholder="Tags, separated by commas"
+                [class.is-danger]="tagsProblem()"
+                [value]="formatTags(item.tags)"
+                (keydown.escape)="editing.set(null)"
+              />
+              @if (tagsProblem(); as problem) {
+                <p class="help is-danger">{{ problem }}</p>
+              }
+            </div>
+            <div class="buttons are-small">
+              <button type="submit" class="button is-primary" [class.is-loading]="saving()">
                 Save
               </button>
-            </div>
-            <div class="control">
-              <button type="button" class="button is-small" (click)="editing.set(null)">
-                Cancel
-              </button>
+              <button type="button" class="button" (click)="editing.set(null)">Cancel</button>
             </div>
           </form>
-        } @else if (item.note) {
-          <p class="mt-2 pre-wrap">{{ item.note }}</p>
+        } @else {
+          @if (item.note) {
+            <p class="mt-2 pre-wrap">{{ item.note }}</p>
+          }
+          <div class="mt-2">
+            <app-tags [tags]="item.tags" route="/watchlist" [active]="query().tag" />
+          </div>
         }
       </div>
       <div class="media-right">
@@ -281,8 +314,8 @@
           >
             Log a viewing
           </a>
-          <button class="button" (click)="editing.set(item.movie.id)">
-            {{ item.note ? 'Edit note' : 'Add note' }}
+          <button class="button" (click)="edit(item)">
+            {{ item.note || item.tags.length ? 'Edit note and tags' : 'Add note or tags' }}
           </button>
           <button class="button is-danger is-outlined" (click)="remove(item)">Remove</button>
         </div>

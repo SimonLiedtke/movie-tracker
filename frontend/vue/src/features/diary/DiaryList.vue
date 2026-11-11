@@ -9,6 +9,7 @@ import ErrorNotification from '../../shared/ErrorNotification.vue';
 import Pagination from '../../shared/Pagination.vue';
 import { mergeQuery } from '../../shared/query';
 import Rating from '../../shared/Rating.vue';
+import TagList from '../../shared/TagList.vue';
 
 const PAGE_SIZE = 25;
 
@@ -23,6 +24,7 @@ interface MonthGroup {
 const props = defineProps<{
   from?: string;
   to?: string;
+  tag?: string;
   page?: string;
 }>();
 
@@ -32,6 +34,7 @@ const api = useApi();
 const query = computed<DiaryQuery>(() => ({
   from: props.from,
   to: props.to,
+  tag: props.tag?.trim() || undefined,
   page: Number(props.page) || 1,
   pageSize: PAGE_SIZE,
 }));
@@ -87,7 +90,7 @@ async function load(): Promise<void> {
 
 watch(query, load, { immediate: true });
 
-function onFilter(key: 'from' | 'to', value: string): void {
+function onFilter(key: 'from' | 'to' | 'tag', value: string): void {
   router.push({
     query: mergeQuery(router.currentRoute.value.query, {
       [key]: value || undefined,
@@ -164,7 +167,22 @@ async function deleteEntry(entry: DiaryEntry): Promise<void> {
           </div>
         </div>
       </div>
-      <div v-if="query.from || query.to" class="column is-narrow">
+      <div class="column is-half-mobile is-3-tablet">
+        <div class="field">
+          <label class="label" for="tag">Tag</label>
+          <div class="control">
+            <input
+              id="tag"
+              class="input"
+              type="text"
+              autocomplete="off"
+              :value="query.tag ?? ''"
+              @change="onFilter('tag', ($event.target as HTMLInputElement).value.trim())"
+            />
+          </div>
+        </div>
+      </div>
+      <div v-if="query.from || query.to || query.tag" class="column is-narrow">
         <button class="button is-light" @click="clearFilters">Clear</button>
       </div>
     </div>
@@ -204,6 +222,7 @@ async function deleteEntry(entry: DiaryEntry): Promise<void> {
               >
               <span v-if="entry.isRewatch" class="tag is-light ml-1" title="Rewatch">↻</span>
               <span v-if="entry.liked" class="has-text-danger ml-1" title="Liked">♥</span>
+              <TagList :tags="entry.tags" route="/diary" :active="query.tag" />
             </td>
             <td><Rating :half-stars="entry.rating" /></td>
             <td class="is-hidden-mobile pre-wrap">{{ entry.review }}</td>
@@ -221,7 +240,8 @@ async function deleteEntry(entry: DiaryEntry): Promise<void> {
     </div>
     <div v-else class="notification">
       No diary entries
-      <template v-if="query.from || query.to">in this period.</template>
+      <template v-if="query.tag">for this filter.</template>
+      <template v-else-if="query.from || query.to">in this period.</template>
       <template v-else
         >yet. <RouterLink to="/diary/new">Log your first viewing</RouterLink>.</template
       >
