@@ -117,6 +117,16 @@ describe('API services', () => {
     request.flush({});
   });
 
+  it('lists the tags of the watchlist', () => {
+    let tags: string[] | undefined;
+    TestBed.inject(WatchlistApi)
+      .tags()
+      .subscribe((result) => (tags = result));
+
+    http.expectOne('/api/watchlist/tags').flush(['horror', 'weekend']);
+    expect(tags).toEqual(['horror', 'weekend']);
+  });
+
   it('filters the watchlist and the diary by tag', () => {
     TestBed.inject(WatchlistApi).list({ tag: ' horror ' }).subscribe();
     TestBed.inject(DiaryApi).list({ tag: 'horror' }).subscribe();
