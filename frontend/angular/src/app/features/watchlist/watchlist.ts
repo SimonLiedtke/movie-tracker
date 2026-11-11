@@ -27,6 +27,7 @@ import { ErrorNotification } from '../../shared/error-notification';
 import { MoviePicker } from '../../shared/movie-picker';
 import { Pagination } from '../../shared/pagination';
 import { Poster } from '../../shared/poster';
+import { Tags } from '../../shared/tags';
 
 const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -107,6 +108,7 @@ function parseQuery(params: ParamMap): WatchlistQuery {
     runtimeTo: parseMinutes(params.get('runtimeTo')),
     // Not trimmed: the field shows the URL's value, and trimming would eat spaces while typing.
     search: params.get('search')?.trim() ? params.get('search')! : undefined,
+    tag: params.get('tag')?.trim() || undefined,
     page: Number(params.get('page')) || 1,
     pageSize: PAGE_SIZE,
   };
@@ -114,7 +116,7 @@ function parseQuery(params: ParamMap): WatchlistQuery {
 
 @Component({
   selector: 'app-watchlist',
-  imports: [RouterLink, Poster, Pagination, ErrorNotification, MoviePicker],
+  imports: [RouterLink, Poster, Pagination, ErrorNotification, MoviePicker, Tags],
   templateUrl: './watchlist.html',
 })
 export class Watchlist {
@@ -136,11 +138,20 @@ export class Watchlist {
   });
   private readonly hasGenres = computed(() => (this.query().genreIds?.length ?? 0) > 0);
   protected readonly filtered = computed(() => {
-    const { releasedFrom, releasedTo, addedFrom, addedTo, runtimeFrom, runtimeTo, search } =
+    const { releasedFrom, releasedTo, addedFrom, addedTo, runtimeFrom, runtimeTo, search, tag } =
       this.query();
     return (
       this.hasGenres() ||
-      !!(releasedFrom || releasedTo || addedFrom || addedTo || runtimeFrom || runtimeTo || search)
+      !!(
+        releasedFrom ||
+        releasedTo ||
+        addedFrom ||
+        addedTo ||
+        runtimeFrom ||
+        runtimeTo ||
+        search ||
+        tag
+      )
     );
   });
   /** What the filter selects, e.g. "with any of the selected genres, released from May 25, 1979". */
@@ -154,12 +165,14 @@ export class Watchlist {
       runtimeFrom,
       runtimeTo,
       search,
+      tag,
     } = this.query();
     const genreText = this.hasGenres()
       ? `with ${genreMatch === 'all' ? 'all' : 'any'} of the selected genres`
       : undefined;
     return [
       search ? `matching "${search.trim()}"` : undefined,
+      tag ? `tagged "${tag}"` : undefined,
       genreText,
       describeRuntime(runtimeFrom, runtimeTo),
       describePeriod('released', releasedFrom, releasedTo),
@@ -247,6 +260,10 @@ export class Watchlist {
     this.searchInput.next(value);
   }
 
+  protected onTag(value: string): void {
+    this.updateFilter({ tag: value.trim() || undefined });
+  }
+
   protected onRuntime(key: 'runtimeFrom' | 'runtimeTo', value: string): void {
     this.updateFilter({ [key]: value || undefined });
   }
@@ -282,6 +299,7 @@ export class Watchlist {
       runtimeFrom: undefined,
       runtimeTo: undefined,
       search: undefined,
+      tag: undefined,
     });
   }
 
@@ -312,7 +330,7 @@ export class Watchlist {
 
   protected saveNote(item: WatchlistItem, note: string): void {
     this.saving.set(true);
-    this.watchlistApi.put(item.movie.id, note.trim() || null).subscribe({
+    this.watchlistApi.put(item.movie.id, note.trim() || null, item.tags).subscribe({
       next: (updated) => {
         this.saving.set(false);
         this.editing.set(null);

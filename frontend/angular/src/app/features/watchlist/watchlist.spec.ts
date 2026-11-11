@@ -826,6 +826,48 @@ describe('Watchlist genre filter', () => {
     });
   });
 
+  describe('tags', () => {
+    const TAGGED: WatchlistItem = { ...ALIEN, tags: ['horror', 'weekend'] };
+
+    it('shows the tags of a movie, linking to the list filtered by the tag', async () => {
+      await open('/watchlist', '', paged([TAGGED, HEAT]));
+
+      const links = Array.from(
+        page().querySelectorAll<HTMLAnchorElement>('article:first-of-type app-tags a'),
+      );
+      expect(links.map((a) => a.textContent!.trim())).toEqual(['horror', 'weekend']);
+      expect(links[1].getAttribute('href')).toBe('/watchlist?tag=weekend');
+      expect(page().querySelectorAll('article:nth-of-type(2) app-tags a')).toHaveLength(0);
+    });
+
+    it('filters by the tag in the URL, and says so', async () => {
+      await open('/watchlist?tag=weekend', '&tag=weekend', paged([TAGGED], { unfilteredCount: 5 }));
+
+      expect(text()).toContain('1 of 5 movies to watch tagged "weekend"');
+      expect((page().querySelector('#tag') as HTMLInputElement).value).toBe('weekend');
+      const highlighted = page().querySelector('article app-tags a:not(.is-light)');
+      expect(highlighted?.textContent!.trim()).toBe('weekend');
+    });
+
+    it('filters by the tag that is typed, and clears it with the filter', async () => {
+      await open();
+
+      const input = page().querySelector('#tag') as HTMLInputElement;
+      input.value = ' Weekend ';
+      input.dispatchEvent(new Event('change'));
+      await harness.fixture.whenStable();
+      expect(url()).toBe('/watchlist?tag=Weekend');
+      listRequest('&tag=Weekend').flush(paged([TAGGED], { unfilteredCount: 2 }));
+      await harness.fixture.whenStable();
+
+      const clear = Array.from(page().querySelectorAll('button')).find(
+        (b) => b.textContent!.trim() === 'Clear filter',
+      )!;
+      await click(clear, '/watchlist', '', paged([ALIEN, HEAT]));
+      expect(input.value).toBe('');
+    });
+  });
+
   it('still shows the watchlist if the genres cannot be loaded', async () => {
     await harness.navigateByUrl('/watchlist', Watchlist);
     http.expectOne('/api/genres').error(new ProgressEvent('error'));

@@ -26,6 +26,20 @@
     </div>
   </div>
   <div class="field">
+    <label class="label" for="tag">Tag</label>
+    <div class="control">
+      <input
+        id="tag"
+        class="input is-small"
+        type="text"
+        autocomplete="off"
+        placeholder="e.g. weekend"
+        [value]="query().tag ?? ''"
+        (change)="onTag($any($event.target).value)"
+      />
+    </div>
+  </div>
+  <div class="field">
     <label class="label" id="genre-label">Genres</label>
     <div class="buttons are-small" role="group" aria-labelledby="genre-label">
       @for (genre of genres(); track genre.id) {
@@ -268,8 +282,13 @@
               </button>
             </div>
           </form>
-        } @else if (item.note) {
-          <p class="mt-2 pre-wrap">{{ item.note }}</p>
+        } @else {
+          @if (item.note) {
+            <p class="mt-2 pre-wrap">{{ item.note }}</p>
+          }
+          <div class="mt-2">
+            <app-tags [tags]="item.tags" route="/watchlist" [active]="query().tag" />
+          </div>
         }
       </div>
       <div class="media-right">
