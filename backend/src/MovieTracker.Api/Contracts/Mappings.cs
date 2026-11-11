@@ -24,6 +24,7 @@ internal static class Mappings
         ActivityType.DiaryEntryDeleted => ActivityLogType.DiaryEntryDeleted,
         ActivityType.WatchlistItemAdded => ActivityLogType.WatchlistItemAdded,
         ActivityType.WatchlistNoteChanged => ActivityLogType.WatchlistNoteChanged,
+        ActivityType.WatchlistTagsChanged => ActivityLogType.WatchlistTagsChanged,
         ActivityType.WatchlistItemRemoved => ActivityLogType.WatchlistItemRemoved,
         ActivityType.MovieImported => ActivityLogType.MovieImported,
         ActivityType.MovieAdded => ActivityLogType.MovieAdded,

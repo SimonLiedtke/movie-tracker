@@ -21,6 +21,9 @@ public enum ActivityLogType
     [JsonStringEnumMemberName("watchlistNoteChanged")]
     WatchlistNoteChanged,
 
+    [JsonStringEnumMemberName("watchlistTagsChanged")]
+    WatchlistTagsChanged,
+
     [JsonStringEnumMemberName("watchlistItemRemoved")]
     WatchlistItemRemoved,
 

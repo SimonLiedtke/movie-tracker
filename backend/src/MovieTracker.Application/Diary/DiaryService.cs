@@ -132,7 +132,7 @@ public sealed class DiaryService(
     }
 
     private static DiaryEntryDetails ToDetails(DiaryEntry entry) =>
-        new(entry.MovieId, entry.WatchedOn, entry.Rating, entry.Review, entry.IsRewatch, entry.Liked);
+        new(entry.MovieId, entry.WatchedOn, entry.Rating, entry.Review, entry.IsRewatch, entry.Liked, entry.Tags);
 
     private bool IsInFuture(DateOnly watchedOn)
     {

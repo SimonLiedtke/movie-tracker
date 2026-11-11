@@ -90,6 +90,31 @@ public sealed class ActivityLogTests
     }
 
     [Fact]
+    public async Task Logging_a_viewing_names_its_tags_including_the_ones_of_the_watchlist_item()
+    {
+        var movie = AddTmdbMovie();
+        await _watchlistService.PutAsync(Alice, movie.Id, null, ["recommended"], Ct);
+        _log.Entries.Clear();
+
+        await _diaryService.CreateAsync(Alice, Details(movie, rating: null) with { Tags = ["Horror"] }, Ct);
+
+        var entry = Single(_log.Entries, ActivityType.DiaryEntryAdded);
+        Assert.Equal("Watched on 2026-10-31 · tagged horror, recommended · removed from the watchlist", entry.Detail);
+    }
+
+    [Fact]
+    public async Task Changing_the_tags_of_a_viewing_is_logged()
+    {
+        var movie = AddTmdbMovie();
+        var created = await _diaryService.CreateAsync(Alice, Details(movie) with { Tags = ["a", "b"] }, Ct);
+        _log.Entries.Clear();
+
+        await _diaryService.UpdateAsync(Alice, created.Entry!.Id, Details(movie) with { Tags = ["b", "c"] }, Ct);
+
+        Assert.Equal("Tags added: c · tags removed: a", Single(_log.Entries, ActivityType.DiaryEntryUpdated).Detail);
+    }
+
+    [Fact]
     public async Task A_refused_viewing_is_not_logged()
     {
         var movie = AddTmdbMovie();
@@ -176,6 +201,42 @@ public sealed class ActivityLogTests
 
         var entry = Single(_log.Entries, ActivityType.WatchlistItemAdded);
         Assert.Equal((Alice, movie.Id, "Alien", "Note: Director's cut"), (entry.UserId, entry.MovieId, entry.MovieTitle, entry.Detail));
+    }
+
+    [Fact]
+    public async Task Putting_a_movie_on_the_watchlist_with_tags_logs_them()
+    {
+        var movie = AddTmdbMovie();
+
+        await _watchlistService.PutAsync(Alice, movie.Id, "Director's cut", ["Horror", "cinema"], Ct);
+
+        Assert.Equal(
+            "Note: Director's cut · tagged cinema, horror", Single(_log.Entries, ActivityType.WatchlistItemAdded).Detail);
+    }
+
+    [Fact]
+    public async Task Changing_the_tags_of_a_watchlist_item_is_logged()
+    {
+        var movie = AddTmdbMovie();
+        await _watchlistService.PutAsync(Alice, movie.Id, null, ["a", "b"], Ct);
+        _log.Entries.Clear();
+
+        await _watchlistService.PutAsync(Alice, movie.Id, null, ["b", "c"], Ct);
+
+        var entry = Assert.Single(_log.Entries);
+        Assert.Equal((ActivityType.WatchlistTagsChanged, "Tags added: c · tags removed: a"), (entry.Type, entry.Detail));
+    }
+
+    [Fact]
+    public async Task Putting_the_same_tags_again_logs_nothing()
+    {
+        var movie = AddTmdbMovie();
+        await _watchlistService.PutAsync(Alice, movie.Id, null, ["a", "b"], Ct);
+        _log.Entries.Clear();
+
+        await _watchlistService.PutAsync(Alice, movie.Id, null, ["B", " a"], Ct);
+
+        Assert.Empty(_log.Entries);
     }
 
     [Fact]

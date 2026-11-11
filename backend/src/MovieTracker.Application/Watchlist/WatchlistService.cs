@@ -24,12 +24,22 @@ public sealed class WatchlistService(
         var item = await watchlist.FindAsync(userId, movieId, cancellationToken);
         if (item is not null)
         {
-            // Putting the same note again changes nothing, so there is nothing to log.
-            if (item.Note != note)
+            // Putting the same note or tags again changes nothing, so there is nothing to log.
+            var tagChange = ActivityDetails.WatchlistTagChange(item.Tags, tags);
+            if (item.Note != note || tagChange is not null)
             {
                 var title = await movies.GetTitleAsync(userId, movieId, cancellationToken) ?? "Unknown movie";
-                activityLog.Add(ActivityLogEntry.ForMovie(
-                    userId, ActivityType.WatchlistNoteChanged, now, movieId, title, ActivityDetails.NoteChange(note)));
+                if (item.Note != note)
+                {
+                    activityLog.Add(ActivityLogEntry.ForMovie(
+                        userId, ActivityType.WatchlistNoteChanged, now, movieId, title, ActivityDetails.NoteChange(note)));
+                }
+
+                if (tagChange is not null)
+                {
+                    activityLog.Add(ActivityLogEntry.ForMovie(
+                        userId, ActivityType.WatchlistTagsChanged, now, movieId, title, tagChange));
+                }
             }
 
             item.UpdateNote(note);
@@ -46,7 +56,7 @@ public sealed class WatchlistService(
 
         watchlist.Add(new WatchlistItem(userId, movieId, note, now, tags));
         activityLog.Add(ActivityLogEntry.ForMovie(
-            userId, ActivityType.WatchlistItemAdded, now, movieId, movieTitle, ActivityDetails.Note(note)));
+            userId, ActivityType.WatchlistItemAdded, now, movieId, movieTitle, ActivityDetails.WatchlistItem(note, tags)));
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return new PutWatchlistItemResult(
             PutWatchlistItemStatus.Added, await watchlist.GetAsync(userId, movieId, cancellationToken));
