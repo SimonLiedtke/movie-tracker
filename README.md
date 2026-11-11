@@ -94,10 +94,28 @@ is available at http://localhost:5080/openapi/v1.json.
 
 The **Activity** page of the frontend (`/activity`, `GET /api/activity-log`) lists what the signed-in user did that
 modified the database, most recent first and with the time: logging, changing and deleting viewings (including
-rating changes), putting movies on the watchlist, changing their notes and removing them, adding, changing, importing
+rating changes), putting movies on the watchlist, changing their notes and tags and removing them, adding, changing, importing
 and deleting movies, and Letterboxd imports (one line per import). The use cases write each line in the same save
 as the change itself. Saving something unchanged (e.g. the same note again) is not logged. The log keeps the movie's
 title, so a line about a deleted movie still reads well. Nothing is logged for actions that happened before the log was added.
+
+## Tags
+
+Diary entries and watchlist items can be tagged with free text, e.g. `cinema`, `date night` or `recommended by Alice`.
+In the frontends, the tags are a comma-separated field of the diary form and of the watchlist's note editor
+("Edit note and tags"). A tag is shown as a small label next to its entry; clicking it lists everything with this tag
+(`?tag=…` on the diary and the watchlist, where a field filters by tag as well).
+
+- Tags are stored trimmed, in lower case, without duplicates and in alphabetical order: `Sci-Fi ` and `sci-fi` are the
+  same tag. An entry has at most 20 different tags of at most 50 characters each, without commas.
+- Putting a movie on the watchlist again, or editing a diary entry, replaces its tags, like its other fields.
+- Logging a movie that is on the watchlist moves it to the diary, and its watchlist tags move along: the new entry gets
+  them in addition to the tags that were entered when logging. Nothing gets lost, so a tag of the watchlist cannot be
+  left off the entry.
+- The API has `tag` as query parameter of `GET /api/diary-entries` and `GET /api/watchlist`; the diary entries and the
+  watchlist items have a `tags` array, see `api/openapi.yaml`. Tag changes are in the activity log. The tags are a
+  `text[]` column of `diary_entries` and `watchlist_items`.
+- The Letterboxd import does not read Letterboxd's tags.
 
 ## Signing in with Google
 
