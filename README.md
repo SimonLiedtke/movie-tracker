@@ -202,6 +202,20 @@ dotnet test
   The local development database is not touched.
 - `tests/MovieTracker.TestSupport`: helpers shared by the test projects (a plain library, no tests).
 
+### Test coverage
+
+```bash
+cd backend
+dotnet test --coverage --coverage-output-format cobertura --results-directory coverage/raw
+dotnet tool restore
+dotnet reportgenerator "-reports:coverage/raw/**/*.cobertura.xml" "-targetdir:coverage/report" \
+  "-reporttypes:Html" "-assemblyfilters:+MovieTracker.*;-MovieTracker.*.Tests;-MovieTracker.TestSupport" \
+  "-classfilters:-MovieTracker.Infrastructure.Persistence.Migrations.*;-Microsoft.AspNetCore.OpenApi.Generated"
+```
+
+Open `backend/coverage/report/index.html`. GitHub Actions does the same on every push: the coverage summary is on the
+workflow run's summary page, and the full HTML report is attached to it as the `backend-coverage` artifact.
+
 ## Adding a migration
 
 ```bash

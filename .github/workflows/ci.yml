@@ -35,7 +35,29 @@ jobs:
       # The API integration tests start PostgreSQL 17 with Testcontainers,
       # which uses the Docker daemon available on ubuntu-latest runners.
       - name: Test
-        run: dotnet test --no-build
+        run: >
+          dotnet test --no-build
+          --coverage --coverage-output-format cobertura
+          --results-directory coverage/raw
+
+      # Merges the coverage of the three test projects (production code only: no tests, no
+      # EF migrations, no generated OpenAPI glue) and shows it on the workflow run's summary page.
+      - name: Coverage report
+        run: |
+          dotnet tool restore
+          dotnet reportgenerator \
+            "-reports:coverage/raw/**/*.cobertura.xml" \
+            "-targetdir:coverage/report" \
+            "-reporttypes:MarkdownSummaryGithub;HtmlInline_AzurePipelines;Cobertura" \
+            "-assemblyfilters:+MovieTracker.*;-MovieTracker.*.Tests;-MovieTracker.TestSupport" \
+            "-classfilters:-MovieTracker.Infrastructure.Persistence.Migrations.*;-Microsoft.AspNetCore.OpenApi.Generated"
+          cat coverage/report/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v5
+        with:
+          name: backend-coverage
+          path: backend/coverage/report
 
       # Room for a later step: compare the generated OpenAPI document
       # (/openapi/v1.json) with api/openapi.yaml.

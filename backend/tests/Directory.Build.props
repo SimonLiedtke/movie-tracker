@@ -8,6 +8,8 @@
 
   <ItemGroup>
     <PackageReference Include="xunit.v3" />
+    <!-- Enables the coverage option of "dotnet test" (see README, "Test coverage"). -->
+    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
   </ItemGroup>
 
   <ItemGroup>
