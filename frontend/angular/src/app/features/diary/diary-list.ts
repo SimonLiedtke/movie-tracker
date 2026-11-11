@@ -9,6 +9,7 @@ import { formatDate, formatDay, formatMonth, yearOf } from '../../shared/dates';
 import { ErrorNotification } from '../../shared/error-notification';
 import { Pagination } from '../../shared/pagination';
 import { Rating } from '../../shared/rating';
+import { Tags } from '../../shared/tags';
 
 const PAGE_SIZE = 25;
 
@@ -16,6 +17,7 @@ function parseQuery(params: ParamMap): DiaryQuery {
   return {
     from: params.get('from') ?? undefined,
     to: params.get('to') ?? undefined,
+    tag: params.get('tag')?.trim() || undefined,
     page: Number(params.get('page')) || 1,
     pageSize: PAGE_SIZE,
   };
@@ -30,7 +32,7 @@ interface MonthGroup {
 
 @Component({
   selector: 'app-diary-list',
-  imports: [RouterLink, Rating, Pagination, ErrorNotification],
+  imports: [RouterLink, Rating, Pagination, ErrorNotification, Tags],
   templateUrl: './diary-list.html',
 })
 export class DiaryList {
@@ -96,7 +98,7 @@ export class DiaryList {
       });
   }
 
-  protected onFilter(key: 'from' | 'to', value: string): void {
+  protected onFilter(key: 'from' | 'to' | 'tag', value: string): void {
     this.router.navigate([], {
       queryParams: { [key]: value || undefined, page: undefined },
       queryParamsHandling: 'merge',

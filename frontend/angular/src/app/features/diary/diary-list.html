@@ -39,7 +39,22 @@
         </div>
       </div>
     </div>
-    @if (query().from || query().to) {
+    <div class="column is-half-mobile is-3-tablet">
+      <div class="field">
+        <label class="label" for="tag">Tag</label>
+        <div class="control">
+          <input
+            id="tag"
+            class="input"
+            type="text"
+            autocomplete="off"
+            [value]="query().tag ?? ''"
+            (change)="onFilter('tag', $any($event.target).value.trim())"
+          />
+        </div>
+      </div>
+    </div>
+    @if (query().from || query().to || query().tag) {
       <div class="column is-narrow">
         <button class="button is-light" (click)="clearFilters()">Clear</button>
       </div>
@@ -90,6 +105,7 @@
                   @if (entry.liked) {
                     <span class="has-text-danger ml-1" title="Liked">♥</span>
                   }
+                  <app-tags [tags]="entry.tags" route="/diary" [active]="query().tag" />
                 </td>
                 <td><app-rating [halfStars]="entry.rating" /></td>
                 <td class="is-hidden-mobile pre-wrap">{{ entry.review }}</td>
@@ -110,7 +126,9 @@
   } @else {
     <div class="notification">
       No diary entries
-      @if (query().from || query().to) {
+      @if (query().tag) {
+        for this filter.
+      } @else if (query().from || query().to) {
         in this period.
       } @else {
         yet. <a routerLink="/diary/new">Log your first viewing</a>.
