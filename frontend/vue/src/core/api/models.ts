@@ -100,7 +100,7 @@ export interface DiaryEntryRequest {
   review: string | null;
   isRewatch: boolean;
   liked: boolean;
-  tags?: string[];
+  tags: string[];
 }
 
 export interface DiaryQuery {

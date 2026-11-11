@@ -166,6 +166,7 @@ describe('DiaryEntryForm', () => {
       review: 'Great, again.',
       isRewatch: false,
       liked: true,
+      tags: [],
     });
     request.flush({ ...ENTRY, id: 'e9' }, { status: 201, statusText: 'Created' });
     await flushPromises();
@@ -186,9 +187,61 @@ describe('DiaryEntryForm', () => {
       review: null,
       isRewatch: false,
       liked: false,
+      tags: [],
     });
     request.flush(ENTRY);
     await flushPromises();
+  });
+
+  describe('tags', () => {
+    it('sends the tags of the field, split at the commas', async () => {
+      const { page } = await openForMovie();
+      await input(page, 'tags').setValue(' Date Night, horror ,, ');
+
+      await submit(page);
+
+      const request = backend.expectOne('/api/diary-entries');
+      expect(request.json).toMatchObject({ tags: ['Date Night', 'horror'] });
+      request.flush(ENTRY);
+      await flushPromises();
+    });
+
+    it('shows the tags of an entry in the field, and sends them back', async () => {
+      const { page } = await openForEntry();
+
+      expect(input(page, 'tags').element.value).toBe('cinema, horror');
+      await input(page, 'tags').setValue('cinema');
+      await submit(page);
+
+      const request = backend.expectOne('/api/diary-entries/e1');
+      expect(request.json).toMatchObject({ tags: ['cinema'] });
+      request.flush(ENTRY);
+      await flushPromises();
+    });
+
+    it('tells that the tags of the watchlist are added, only when logging a new viewing', async () => {
+      const help = (page: VueWrapper) =>
+        page.get('#tags').element.closest('.field')!.querySelector('.help')!.textContent;
+
+      const logging = await openForMovie();
+      expect(help(logging.page)).toContain(
+        'Tags the movie has on your watchlist are added automatically.',
+      );
+
+      const editing = await openForEntry();
+      expect(help(editing.page)).not.toContain('watchlist');
+    });
+
+    it('does not save tags that the server would refuse, and says so', async () => {
+      const { page } = await openForMovie();
+      await input(page, 'tags').setValue('x'.repeat(51));
+      expect(errors(page)).toEqual(['A tag can have at most 50 characters.']);
+
+      await submit(page);
+
+      // No request: the fake backend fails the test if one is left unanswered.
+      expect(errors(page)).toEqual(['A tag can have at most 50 characters.']);
+    });
   });
 
   it('picks the movie to log from a search', async () => {
@@ -291,6 +344,7 @@ describe('DiaryEntryForm', () => {
       review: null,
       isRewatch: true,
       liked: true,
+      tags: ['cinema', 'horror'],
     });
     request.flush(ENTRY);
     await flushPromises();
