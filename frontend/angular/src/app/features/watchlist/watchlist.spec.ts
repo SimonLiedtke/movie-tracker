@@ -87,10 +87,16 @@ describe('Watchlist genre filter', () => {
   const listRequest = (filter = '', pageNumber = 1) =>
     http.expectOne(`/api/watchlist?page=${pageNumber}&pageSize=20${filter}`);
 
-  async function open(target = '/watchlist', filter = '', response = paged([ALIEN, HEAT])) {
+  async function open(
+    target = '/watchlist',
+    filter = '',
+    response = paged([ALIEN, HEAT]),
+    knownTags: string[] = [],
+  ) {
     const navigated = harness.navigateByUrl(target, Watchlist);
     await navigated;
     http.expectOne('/api/genres').flush(GENRES);
+    http.expectOne('/api/watchlist/tags').flush(knownTags);
     listRequest(filter, response.page).flush(response);
     await harness.fixture.whenStable();
   }
@@ -840,6 +846,31 @@ describe('Watchlist genre filter', () => {
       expect(page().querySelectorAll('article:nth-of-type(2) app-tags a')).toHaveLength(0);
     });
 
+    it('suggests the tags of the watchlist in the tag filter, with those of the items shown', async () => {
+      await open('/watchlist', '', paged([{ ...TAGGED, tags: ['horror', 'new tag'] }]), [
+        'weekend',
+        'horror',
+      ]);
+
+      const field = page().querySelector('#tag') as HTMLInputElement;
+      expect(field.getAttribute('list')).toBe('tag-suggestions');
+      const options = Array.from(page().querySelectorAll('#tag-suggestions option')).map(
+        (o) => (o as HTMLOptionElement).value,
+      );
+      expect(options).toEqual(['horror', 'new tag', 'weekend']);
+    });
+
+    it('has no suggestions if the tags cannot be loaded', async () => {
+      await harness.navigateByUrl('/watchlist', Watchlist);
+      http.expectOne('/api/genres').flush(GENRES);
+      http.expectOne('/api/watchlist/tags').error(new ProgressEvent('error'));
+      listRequest().flush(paged([ALIEN]));
+      await harness.fixture.whenStable();
+
+      expect(page().querySelectorAll('#tag-suggestions option')).toHaveLength(0);
+      expect(titles()).toEqual(['Alien']);
+    });
+
     it('filters by the tag in the URL, and says so', async () => {
       await open('/watchlist?tag=weekend', '&tag=weekend', paged([TAGGED], { unfilteredCount: 5 }));
 
@@ -929,6 +960,7 @@ describe('Watchlist genre filter', () => {
   it('still shows the watchlist if the genres cannot be loaded', async () => {
     await harness.navigateByUrl('/watchlist', Watchlist);
     http.expectOne('/api/genres').error(new ProgressEvent('error'));
+    http.expectOne('/api/watchlist/tags').flush([]);
     listRequest().flush(paged([ALIEN]));
     await harness.fixture.whenStable();
 

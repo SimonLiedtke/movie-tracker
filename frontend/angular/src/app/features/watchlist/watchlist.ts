@@ -140,6 +140,17 @@ export class Watchlist {
       .pipe(catchError(() => of([]))),
     { initialValue: [] },
   );
+  /** The tags on the watchlist, which the tag filter suggests. Without them, the filter just has no suggestions. */
+  private readonly knownTags = toSignal(
+    this.watchlistApi.tags().pipe(catchError(() => of([] as string[]))),
+    { initialValue: [] as string[] },
+  );
+  /** The known tags, and those of the items shown, which may be newer. Alphabetically. */
+  protected readonly tagSuggestions = computed(() =>
+    [
+      ...new Set([...this.knownTags(), ...(this.result()?.items ?? []).flatMap((i) => i.tags)]),
+    ].sort(),
+  );
   protected readonly query = toSignal(this.route.queryParamMap.pipe(map(parseQuery)), {
     requireSync: true,
   });

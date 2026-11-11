@@ -34,9 +34,15 @@
         type="text"
         autocomplete="off"
         placeholder="e.g. weekend"
+        list="tag-suggestions"
         [value]="query().tag ?? ''"
         (change)="onTag($any($event.target).value)"
       />
+      <datalist id="tag-suggestions">
+        @for (tag of tagSuggestions(); track tag) {
+          <option [value]="tag"></option>
+        }
+      </datalist>
     </div>
   </div>
   <div class="field">
