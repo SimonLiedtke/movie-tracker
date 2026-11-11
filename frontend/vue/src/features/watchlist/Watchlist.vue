@@ -18,6 +18,7 @@ import Pagination from '../../shared/Pagination.vue';
 import Poster from '../../shared/Poster.vue';
 import { mergeQuery } from '../../shared/query';
 import TagList from '../../shared/TagList.vue';
+import { formatTags, parseTags, tagsError } from '../../shared/tags';
 
 const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -156,9 +157,12 @@ api.genres.list().then(
 const result = ref<WatchlistPage | null>(null);
 const loading = ref(true);
 const error = ref<ApiError | null>(null);
-/** Movie ID of the item whose note is being edited. */
+/** Movie ID of the item whose note and tags are being edited. */
 const editing = ref<string | null>(null);
 const noteDraft = ref('');
+const tagsDraft = ref('');
+/** Why the tags that are being edited are refused; null if they are fine. */
+const tagsProblem = ref<string | null>(null);
 const saving = ref(false);
 
 /** Numbers the requests, so that the answer to an outdated one is ignored. */
@@ -320,16 +324,27 @@ async function add(movie: MovieRef): Promise<void> {
   }
 }
 
-function editNote(item: WatchlistItem): void {
+function edit(item: WatchlistItem): void {
   noteDraft.value = item.note ?? '';
+  tagsDraft.value = formatTags(item.tags);
+  tagsProblem.value = null;
   editing.value = item.movie.id;
 }
 
-async function saveNote(item: WatchlistItem, note: string): Promise<void> {
+/** Saves the note and the tags: the server replaces both, so the one that is not edited is sent along. */
+async function saveDetails(item: WatchlistItem): Promise<void> {
+  tagsProblem.value = tagsError(tagsDraft.value);
+  if (tagsProblem.value) {
+    return;
+  }
   saving.value = true;
   let updated: WatchlistItem;
   try {
-    updated = await api.watchlist.put(item.movie.id, note.trim() || null, item.tags);
+    updated = await api.watchlist.put(
+      item.movie.id,
+      noteDraft.value.trim() || null,
+      parseTags(tagsDraft.value),
+    );
   } catch (failure) {
     saving.value = false;
     error.value = toApiError(failure);
@@ -599,31 +614,34 @@ async function remove(item: WatchlistItem): Promise<void> {
             </RouterLink>
           </div>
 
-          <form
-            v-if="editing === item.movie.id"
-            class="field has-addons mt-2"
-            @submit.prevent="saveNote(item, noteDraft)"
-          >
-            <div class="control is-expanded">
+          <form v-if="editing === item.movie.id" class="mt-2" @submit.prevent="saveDetails(item)">
+            <div class="field">
               <input
                 v-model="noteDraft"
                 class="input is-small"
                 maxlength="500"
+                aria-label="Note"
                 placeholder="Why do you want to watch it?"
                 @keydown.escape="editing = null"
               />
             </div>
-            <div class="control">
-              <button
-                type="submit"
-                class="button is-small is-primary"
-                :class="{ 'is-loading': saving }"
-              >
+            <div class="field">
+              <input
+                v-model="tagsDraft"
+                class="input is-small"
+                aria-label="Tags"
+                autocomplete="off"
+                placeholder="Tags, separated by commas"
+                :class="{ 'is-danger': tagsProblem }"
+                @keydown.escape="editing = null"
+              />
+              <p v-if="tagsProblem" class="help is-danger">{{ tagsProblem }}</p>
+            </div>
+            <div class="buttons are-small">
+              <button type="submit" class="button is-primary" :class="{ 'is-loading': saving }">
                 Save
               </button>
-            </div>
-            <div class="control">
-              <button type="button" class="button is-small" @click="editing = null">Cancel</button>
+              <button type="button" class="button" @click="editing = null">Cancel</button>
             </div>
           </form>
           <template v-else>
@@ -641,8 +659,8 @@ async function remove(item: WatchlistItem): Promise<void> {
             >
               Log a viewing
             </RouterLink>
-            <button class="button" @click="editNote(item)">
-              {{ item.note ? 'Edit note' : 'Add note' }}
+            <button class="button" @click="edit(item)">
+              {{ item.note || item.tags.length ? 'Edit note and tags' : 'Add note or tags' }}
             </button>
             <button class="button is-danger is-outlined" @click="remove(item)">Remove</button>
           </div>

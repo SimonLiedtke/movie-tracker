@@ -135,8 +135,8 @@ describe('Watchlist', () => {
         .findAll('article')
         [index].findAll('.media-right .button')
         .map((b) => b.text());
-    expect(buttons(0)).toEqual(['Log a viewing', 'Edit note', 'Remove']); // It has a note.
-    expect(buttons(1)).toEqual(['Log a viewing', 'Add note', 'Remove']);
+    expect(buttons(0)).toEqual(['Log a viewing', 'Edit note and tags', 'Remove']); // It has a note.
+    expect(buttons(1)).toEqual(['Log a viewing', 'Add note or tags', 'Remove']);
     expect(page.get('.media-right a.button').attributes('href')).toBe('/diary/new?movieId=m1');
   });
 
@@ -1164,7 +1164,7 @@ describe('Watchlist', () => {
     it('edits the note of a movie', async () => {
       const { page } = await openWith([HEAT, ALIEN]);
 
-      await buttonOf(page, 'Edit note').trigger('click');
+      await buttonOf(page, 'Edit note and tags').trigger('click');
       const field = page.get<HTMLInputElement>('article input');
       expect(field.element.value).toBe('Recommended by Alice.');
       expect(field.attributes('maxlength')).toBe('500');
@@ -1189,7 +1189,7 @@ describe('Watchlist', () => {
     it('adds a note to a movie that has none, and removes it with an empty one', async () => {
       const { page } = await openWith([ALIEN]);
 
-      await buttonOf(page, 'Add note').trigger('click');
+      await buttonOf(page, 'Add note or tags').trigger('click');
       expect(page.get<HTMLInputElement>('article input').element.value).toBe('');
       await page.get('article input').setValue('Classic.');
       await page.get('article form').trigger('submit');
@@ -1197,7 +1197,7 @@ describe('Watchlist', () => {
       await flushPromises();
       expect(page.get('.pre-wrap').text()).toBe('Classic.');
 
-      await buttonOf(page, 'Edit note').trigger('click');
+      await buttonOf(page, 'Edit note and tags').trigger('click');
       await page.get('article input').setValue('   ');
       await page.get('article form').trigger('submit');
       const request = backend.expectOne('/api/watchlist/m2');
@@ -1210,8 +1210,8 @@ describe('Watchlist', () => {
     it('edits the note of one movie at a time', async () => {
       const { page } = await openWith([HEAT, ALIEN]);
 
-      await buttonOf(page, 'Edit note').trigger('click');
-      await buttonOf(page, 'Add note').trigger('click');
+      await buttonOf(page, 'Edit note and tags').trigger('click');
+      await buttonOf(page, 'Add note or tags').trigger('click');
 
       expect(page.findAll('article')[0].find('form').exists()).toBe(false);
       expect(page.findAll('article')[1].find('form').exists()).toBe(true);
@@ -1220,12 +1220,12 @@ describe('Watchlist', () => {
     it('stops editing without saving on Cancel or Escape', async () => {
       const { page } = await openWith([HEAT]);
 
-      await buttonOf(page, 'Edit note').trigger('click');
+      await buttonOf(page, 'Edit note and tags').trigger('click');
       await buttonOf(page, 'Cancel').trigger('click');
       expect(page.find('form').exists()).toBe(false);
       expect(page.get('.pre-wrap').text()).toBe('Recommended by Alice.');
 
-      await buttonOf(page, 'Edit note').trigger('click');
+      await buttonOf(page, 'Edit note and tags').trigger('click');
       await page.get('article input').trigger('keydown', { key: 'Escape' });
       expect(page.find('form').exists()).toBe(false);
     });
@@ -1233,7 +1233,7 @@ describe('Watchlist', () => {
     it('shows why a note could not be saved, and keeps the field open', async () => {
       const { page } = await openWith([HEAT]);
 
-      await buttonOf(page, 'Edit note').trigger('click');
+      await buttonOf(page, 'Edit note and tags').trigger('click');
       await page.get('article form').trigger('submit');
       backend
         .expectOne('/api/watchlist/m1')
@@ -1291,6 +1291,59 @@ describe('Watchlist', () => {
       listRequest().flush(paged([TAGGED, HEAT]));
       await flushPromises();
       expect(page.get<HTMLInputElement>('#tag').element.value).toBe('');
+    });
+
+    it('edits the note and the tags together', async () => {
+      const { page } = await openWith([TAGGED, HEAT]);
+
+      await buttonOf(page, 'Edit note and tags').trigger('click');
+      const [note, tags] = page.findAll<HTMLInputElement>('article input');
+      expect(tags.element.value).toBe('horror, weekend');
+      await note.setValue('With Bob');
+      await tags.setValue('weekend, Date Night, ');
+      await page.get('article form').trigger('submit');
+
+      const request = backend.expectOne('/api/watchlist/m3');
+      expect(request.method).toBe('PUT');
+      expect(request.json).toEqual({ note: 'With Bob', tags: ['weekend', 'Date Night'] });
+      request.flush({ ...TAGGED, note: 'With Bob', tags: ['date night', 'weekend'] });
+      await flushPromises();
+
+      expect(page.find('form').exists()).toBe(false);
+      expect(page.get('.pre-wrap').text()).toBe('With Bob');
+      expect(
+        page
+          .findAll('article')[0]
+          .findAll('.tags a')
+          .map((a) => a.text()),
+      ).toEqual(['date night', 'weekend']);
+    });
+
+    it('keeps the tags when only the note is changed', async () => {
+      const { page } = await openWith([TAGGED]);
+
+      await buttonOf(page, 'Edit note and tags').trigger('click');
+      await page.get('article input').setValue('Classic');
+      await page.get('article form').trigger('submit');
+
+      const request = backend.expectOne('/api/watchlist/m3');
+      expect(request.json).toEqual({ note: 'Classic', tags: ['horror', 'weekend'] });
+      request.flush({ ...TAGGED, note: 'Classic' });
+      await flushPromises();
+    });
+
+    it('does not save tags that the server would refuse, and says so', async () => {
+      const { page } = await openWith([HEAT]);
+
+      await buttonOf(page, 'Edit note and tags').trigger('click');
+      await page.get('input[aria-label=Tags]').setValue('x'.repeat(51));
+      await page.get('article form').trigger('submit');
+      await flushPromises();
+
+      // No request: the fake backend fails the test if one is left unanswered.
+      expect(page.get('article .help.is-danger').text()).toBe(
+        'A tag can have at most 50 characters.',
+      );
     });
   });
 
