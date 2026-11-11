@@ -150,6 +150,11 @@ function createWatchlistApi(http: Http) {
       );
     },
 
+    /** The different tags on the watchlist, alphabetically: what the tag filter can offer. */
+    tags(): Promise<string[]> {
+      return body(http.get<string[]>(`${BASE}/watchlist/tags`));
+    },
+
     /** Adds the movie to the watchlist, or replaces its note and tags if it is already on it. */
     put(movieId: string, note: string | null, tags: string[] = []): Promise<WatchlistItem> {
       return body(http.put<WatchlistItem>(`${BASE}/watchlist/${movieId}`, { note, tags }));

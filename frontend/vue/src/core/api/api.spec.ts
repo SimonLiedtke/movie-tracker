@@ -55,6 +55,13 @@ describe('API clients', () => {
     await result;
   });
 
+  it('lists the tags of the watchlist', async () => {
+    const result = createApi(createHttp()).watchlist.tags();
+
+    backend.expectOne('/api/watchlist/tags').flush(['horror', 'weekend']);
+    expect(await result).toEqual(['horror', 'weekend']);
+  });
+
   it('filters the watchlist and the diary by tag', async () => {
     const api = createApi(createHttp());
     const watchlist = api.watchlist.list({ tag: ' horror ' });
