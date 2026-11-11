@@ -29,6 +29,39 @@ public sealed class DiaryEntryTests
     }
 
     [Fact]
+    public void Stores_the_tags_normalized()
+    {
+        var entry = new DiaryEntry(
+            Guid.NewGuid(),
+            new DiaryEntryDetails(Guid.NewGuid(), new DateOnly(2026, 10, 31), null, null, false, false, [" Date Night", "horror", "HORROR"]),
+            CreatedAt);
+
+        Assert.Equal(["date night", "horror"], entry.Tags);
+    }
+
+    [Fact]
+    public void Has_no_tags_by_default()
+    {
+        var entry = new DiaryEntry(
+            Guid.NewGuid(), new DiaryEntryDetails(Guid.NewGuid(), new DateOnly(2026, 10, 31), null, null, false, false), CreatedAt);
+
+        Assert.Empty(entry.Tags);
+    }
+
+    [Fact]
+    public void Update_replaces_the_tags()
+    {
+        var entry = new DiaryEntry(
+            Guid.NewGuid(),
+            new DiaryEntryDetails(Guid.NewGuid(), new DateOnly(2026, 10, 31), null, null, false, false, ["a", "b"]),
+            CreatedAt);
+
+        entry.Update(new DiaryEntryDetails(entry.MovieId, entry.WatchedOn, null, null, false, false, ["c"]));
+
+        Assert.Equal(["c"], entry.Tags);
+    }
+
+    [Fact]
     public void Update_replaces_all_details_but_keeps_the_owner()
     {
         var userId = Guid.NewGuid();
