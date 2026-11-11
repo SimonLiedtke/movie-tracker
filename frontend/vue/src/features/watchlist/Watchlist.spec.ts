@@ -65,13 +65,14 @@ describe('Watchlist', () => {
   ];
 
   /** Opens the page and answers the request for the genres of the filter. */
-  async function open(url = '/watchlist') {
+  async function open(url = '/watchlist', knownTags: string[] = []) {
     const opened = await mountRoute(
       url,
       { path: '/watchlist', component: Watchlist, props: watchlistProps },
       { api: createApi(createHttp()) },
     );
     backend.expectOne('/api/genres').flush(GENRES);
+    backend.expectOne('/api/watchlist/tags').flush(knownTags);
     await flushPromises();
     return opened;
   }
@@ -88,8 +89,9 @@ describe('Watchlist', () => {
     url = '/watchlist',
     response = paged(items),
     filter = '',
+    knownTags: string[] = [],
   ) {
-    const opened = await open(url);
+    const opened = await open(url, knownTags);
     listRequest(response.page, filter).flush(response);
     await flushPromises();
     return opened;
@@ -1054,6 +1056,7 @@ describe('Watchlist', () => {
         { api: createApi(createHttp()) },
       );
       backend.expectOne('/api/genres').networkError();
+      backend.expectOne('/api/watchlist/tags').flush([]);
       listRequest().flush(paged([HEAT]));
       await flushPromises();
 
@@ -1259,6 +1262,36 @@ describe('Watchlist', () => {
       expect(links.map((link) => link.text())).toEqual(['horror', 'weekend']);
       expect(links[1].attributes('href')).toBe('/watchlist?tag=weekend');
       expect(articles[1].find(TAG_LINKS).exists()).toBe(false);
+    });
+
+    it('suggests the tags of the watchlist in the tag filter, with those of the items shown', async () => {
+      const shown = { ...TAGGED, tags: ['horror', 'new tag'] };
+      const { page } = await openWith([shown], '/watchlist', paged([shown]), '', [
+        'weekend',
+        'horror',
+      ]);
+
+      expect(page.get('#tag').attributes('list')).toBe('tag-suggestions');
+      expect(page.findAll('#tag-suggestions option').map((o) => o.attributes('value'))).toEqual([
+        'horror',
+        'new tag',
+        'weekend',
+      ]);
+    });
+
+    it('has no suggestions if the tags cannot be loaded', async () => {
+      const { page } = await mountRoute(
+        '/watchlist',
+        { path: '/watchlist', component: Watchlist, props: watchlistProps },
+        { api: createApi(createHttp()) },
+      );
+      backend.expectOne('/api/genres').flush(GENRES);
+      backend.expectOne('/api/watchlist/tags').networkError();
+      listRequest().flush(paged([HEAT]));
+      await flushPromises();
+
+      expect(page.findAll('#tag-suggestions option')).toHaveLength(0);
+      expect(page.findAll('article')).toHaveLength(1);
     });
 
     it('filters by the tag in the URL, highlights it and says so', async () => {

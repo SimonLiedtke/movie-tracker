@@ -155,6 +155,19 @@ api.genres.list().then(
 );
 
 const result = ref<WatchlistPage | null>(null);
+
+/** The tags on the watchlist, which the tag filter suggests. Without them, the filter just has no suggestions. */
+const knownTags = ref<string[]>([]);
+api.watchlist.tags().then(
+  (loaded) => (knownTags.value = loaded),
+  () => undefined,
+);
+/** The known tags, and those of the items shown, which may be newer. Alphabetically. */
+const tagSuggestions = computed(() =>
+  [
+    ...new Set([...knownTags.value, ...(result.value?.items ?? []).flatMap((item) => item.tags)]),
+  ].sort(),
+);
 const loading = ref(true);
 const error = ref<ApiError | null>(null);
 /** Movie ID of the item whose note and tags are being edited. */
@@ -408,9 +421,13 @@ async function remove(item: WatchlistItem): Promise<void> {
           type="text"
           autocomplete="off"
           placeholder="e.g. weekend"
+          list="tag-suggestions"
           :value="query.tag ?? ''"
           @change="onTag(($event.target as HTMLInputElement).value)"
         />
+        <datalist id="tag-suggestions">
+          <option v-for="tag in tagSuggestions" :key="tag" :value="tag"></option>
+        </datalist>
       </div>
     </div>
     <div class="field">
