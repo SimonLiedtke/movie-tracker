@@ -118,6 +118,54 @@ describe('DiaryList', () => {
     expect(page.find('.notification a').exists()).toBe(false);
   });
 
+  describe('tags', () => {
+    const TAGGED = [
+      entry('e1', '2026-11-07', { tags: ['cinema', 'horror'] }),
+      entry('e2', '2026-11-01'),
+    ];
+
+    it('shows the tags of a viewing, each linking to the diary filtered by it', async () => {
+      const { page } = await openWith(TAGGED);
+
+      const rows = page.findAll('tbody tr:not(.has-background-light)');
+      const links = rows[0].findAll('.tags a');
+      expect(links.map((link) => link.text())).toEqual(['cinema', 'horror']);
+      expect(links[1].attributes('href')).toBe('/diary?tag=horror');
+      expect(rows[1].find('.tags').exists()).toBe(false);
+    });
+
+    it('filters by the tag in the URL, highlights it and says so when nothing matches', async () => {
+      const { page } = await openWith(
+        [],
+        '/diary?tag=horror&page=1',
+        'tag=horror&page=1&pageSize=25',
+      );
+
+      expect(page.get<HTMLInputElement>('#tag').element.value).toBe('horror');
+      expect(text(page)).toContain('No diary entries for this filter.');
+      expect(page.findAll('button').map((button) => button.text())).toContain('Clear');
+    });
+
+    it('highlights the tag of the filter', async () => {
+      const { page } = await openWith(TAGGED, '/diary?tag=horror', 'tag=horror&page=1&pageSize=25');
+
+      const [cinema, horror] = page.findAll('tbody .tags a');
+      expect(cinema.classes()).toContain('is-light');
+      expect(horror.classes()).not.toContain('is-light');
+    });
+
+    it('filters by the tag that is typed, starting again at the first page', async () => {
+      const { page, router } = await openWith(ENTRIES, '/diary?page=3', 'page=3&pageSize=25');
+
+      await page.get('#tag').setValue(' horror ');
+      await flushPromises();
+
+      expect(router.currentRoute.value.query).toEqual({ tag: 'horror' });
+      diaryRequest('tag=horror&page=1&pageSize=25').flush(paged([ENTRIES[0]]));
+      await flushPromises();
+    });
+  });
+
   it('has nothing to clear without a period', async () => {
     const { page } = await openWith(ENTRIES);
 
