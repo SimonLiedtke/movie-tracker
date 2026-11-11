@@ -65,6 +65,20 @@ public sealed class WatchlistServiceTests
         Assert.Equal(["c"], result.Item!.Tags);
     }
 
+    [Fact]
+    public async Task List_filters_by_tag()
+    {
+        var alien = AddTmdbMovie(348, "Alien");
+        var heat = AddTmdbMovie(949, "Heat");
+        await _service.PutAsync(Alice, alien.Id, null, ["horror"], Ct);
+        await _service.PutAsync(Alice, heat.Id, null, ["crime"], Ct);
+
+        var result = await _service.ListAsync(Alice, WatchlistFilter.None with { Tag = "horror" }, 1, 10, Ct);
+
+        Assert.Equal("Alien", Assert.Single(result.Items).Movie.Title);
+        Assert.Equal(2, result.UnfilteredCount);
+    }
+
     // --- Putting a movie on the watchlist
 
     [Fact]

@@ -51,6 +51,44 @@ public sealed class TagsTests(ApiFactory factory) : ApiTestBase(factory)
         Assert.Equal(["c"], (await ReadAsync<DiaryEntryResponse>(response, HttpStatusCode.OK)).Tags);
     }
 
+    [Fact]
+    public async Task Diary_entries_can_be_filtered_by_tag_whatever_its_case()
+    {
+        var movie = await CreateMovieAsync();
+        await CreateDiaryEntryAsync(movie.Id, "2026-10-30", tags: ["horror", "cinema"]);
+        await CreateDiaryEntryAsync(movie.Id, "2026-10-31", tags: ["comedy"]);
+        await CreateDiaryEntryAsync(movie.Id, "2026-11-01");
+
+        var result = await GetAsync<PagedResponse<DiaryEntryResponse>>("/api/diary-entries?tag=%20HORROR");
+
+        var entry = Assert.Single(result.Items);
+        Assert.Equal("2026-10-30", entry.WatchedOn.ToString("yyyy-MM-dd"));
+        Assert.Equal(1, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task A_blank_tag_filter_does_not_filter()
+    {
+        var movie = await CreateMovieAsync();
+        await CreateDiaryEntryAsync(movie.Id, "2026-10-30", tags: ["horror"]);
+        await CreateDiaryEntryAsync(movie.Id, "2026-10-31");
+
+        var result = await GetAsync<PagedResponse<DiaryEntryResponse>>("/api/diary-entries?tag=%20");
+
+        Assert.Equal(2, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task A_tag_filter_does_not_find_the_entries_of_another_user()
+    {
+        var movie = await CreateMovieAsync();
+        await CreateDiaryEntryAsync(movie.Id, tags: ["horror"]);
+
+        var response = await Bob.GetAsync("/api/diary-entries?tag=horror", Ct);
+
+        Assert.Equal(0, (await ReadAsync<PagedResponse<DiaryEntryResponse>>(response, HttpStatusCode.OK)).TotalCount);
+    }
+
     // --- Watchlist
 
     [Fact]
@@ -84,6 +122,22 @@ public sealed class TagsTests(ApiFactory factory) : ApiTestBase(factory)
         var response = await Client.PutAsJsonAsync($"/api/watchlist/{movie.Id}", new { tags = new[] { "c" } }, Ct);
 
         Assert.Equal(["c"], (await ReadAsync<WatchlistItemResponse>(response, HttpStatusCode.OK)).Tags);
+    }
+
+    [Fact]
+    public async Task The_watchlist_can_be_filtered_by_tag_together_with_other_filters()
+    {
+        var alien = await CreateMovieAsync("Alien", genreIds: [Horror]);
+        var aliens = await CreateMovieAsync("Aliens", genreIds: [ScienceFiction]);
+        var heat = await CreateMovieAsync("Heat", genreIds: [Drama]);
+        await PutWatchlistAsync(alien.Id, ["weekend"]);
+        await PutWatchlistAsync(aliens.Id, ["weekend"]);
+        await PutWatchlistAsync(heat.Id, ["later"]);
+
+        var result = await GetAsync<WatchlistPageResponse>($"/api/watchlist?tag=Weekend&genreId={Horror}");
+
+        Assert.Equal(["Alien"], result.Items.Select(item => item.Movie.Title));
+        Assert.Equal(3, result.UnfilteredCount);
     }
 
     // --- From the watchlist to the diary

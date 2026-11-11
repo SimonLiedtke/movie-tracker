@@ -30,6 +30,11 @@ internal sealed class DiaryRepository(MovieTrackerDbContext db) : IDiaryReposito
             entries = entries.Where(entry => entry.MovieId == movieId);
         }
 
+        if (filter.Tag is { } tag)
+        {
+            entries = entries.Where(entry => entry.Tags.Contains(tag));
+        }
+
         var totalCount = await entries.CountAsync(cancellationToken);
         var rows = await entries
             .OrderByNewest()

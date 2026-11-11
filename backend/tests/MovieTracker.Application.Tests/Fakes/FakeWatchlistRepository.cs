@@ -55,7 +55,8 @@ public sealed class FakeWatchlistRepository(FakeMovieRepository movies) : IWatch
         var searchMatches = string.IsNullOrWhiteSpace(filter.Search)
             || movie.Title.Contains(filter.Search.Trim(), StringComparison.OrdinalIgnoreCase)
             || (movie.OriginalTitle?.Contains(filter.Search.Trim(), StringComparison.OrdinalIgnoreCase) ?? false);
-        return searchMatches && genresMatch && releasedFromMatches && releasedToMatches && addedFromMatches && addedToMatches
+        var tagMatches = filter.Tag is null || item.Tags.Contains(filter.Tag);
+        return searchMatches && tagMatches && genresMatch && releasedFromMatches && releasedToMatches && addedFromMatches && addedToMatches
             && runtimeFromMatches && runtimeToMatches;
     }
 

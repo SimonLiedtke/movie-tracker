@@ -118,6 +118,18 @@ public sealed class DiaryServiceTests
         Assert.Equal(["b"], result.Entry!.Tags);
     }
 
+    [Fact]
+    public async Task List_filters_by_tag()
+    {
+        var movie = AddTmdbMovie();
+        await _service.CreateAsync(Alice, Details(movie, "2026-10-30") with { Tags = ["horror"] }, Ct);
+        await _service.CreateAsync(Alice, Details(movie, "2026-10-31") with { Tags = ["comedy"] }, Ct);
+
+        var result = await _service.ListAsync(Alice, new DiaryFilter(null, null, null, "horror"), 1, 10, Ct);
+
+        Assert.Equal(new DateOnly(2026, 10, 30), Assert.Single(result.Items).WatchedOn);
+    }
+
     // --- Logging a viewing
 
     [Fact]

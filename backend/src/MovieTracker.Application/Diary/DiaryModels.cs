@@ -14,8 +14,9 @@ public sealed record DiaryEntryView(
     IReadOnlyList<string> Tags,
     DateTimeOffset CreatedAt);
 
-/// <summary>Only entries watched in the range (both ends included) and, if set, of this movie.</summary>
-public sealed record DiaryFilter(DateOnly? From, DateOnly? To, Guid? MovieId);
+/// <summary>Only entries watched in the range (both ends included) and, if set, of this movie and with this tag.</summary>
+/// <param name="Tag">A tag in its normalized form (<see cref="Domain.Tags.TagList"/>); null: no restriction.</param>
+public sealed record DiaryFilter(DateOnly? From, DateOnly? To, Guid? MovieId, string? Tag = null);
 
 public enum SaveDiaryEntryStatus
 {

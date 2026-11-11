@@ -46,6 +46,7 @@ public enum GenreMatch
 /// <param name="AddedTo">Items put on the watchlist on or before this day (UTC).</param>
 /// <param name="RuntimeFrom">Movies that are at least this many minutes long. Movies without a runtime do not match.</param>
 /// <param name="RuntimeTo">Movies that are at most this many minutes long. Movies without a runtime do not match.</param>
+/// <param name="Tag">Items with this tag, in its normalized form (<see cref="Domain.Tags.TagList"/>). Null: no restriction.</param>
 public sealed record WatchlistFilter(
     IReadOnlyList<int> GenreIds,
     GenreMatch GenreMatch,
@@ -55,7 +56,8 @@ public sealed record WatchlistFilter(
     DateOnly? AddedTo = null,
     int? RuntimeFrom = null,
     int? RuntimeTo = null,
-    string? Search = null)
+    string? Search = null,
+    string? Tag = null)
 {
     public static WatchlistFilter None { get; } = new([], GenreMatch.Any);
 
@@ -65,7 +67,8 @@ public sealed record WatchlistFilter(
         && ReleasedFrom is null && ReleasedTo is null
         && AddedFrom is null && AddedTo is null
         && RuntimeFrom is null && RuntimeTo is null
-        && string.IsNullOrWhiteSpace(Search);
+        && string.IsNullOrWhiteSpace(Search)
+        && Tag is null;
 }
 
 public enum PutWatchlistItemStatus
