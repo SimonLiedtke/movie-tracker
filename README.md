@@ -104,7 +104,8 @@ title, so a line about a deleted movie still reads well. Nothing is logged for a
 Diary entries and watchlist items can be tagged with free text, e.g. `cinema`, `date night` or `recommended by Alice`.
 In the frontends, the tags are a comma-separated field of the diary form and of the watchlist's note editor
 ("Edit note and tags"). A tag is shown as a small label next to its entry; clicking it lists everything with this tag
-(`?tag=…` on the diary and the watchlist, where a field filters by tag as well).
+(`?tag=…` on the diary and the watchlist, where a field filters by tag as well). The watchlist's tag field suggests
+the tags that are on the watchlist (`GET /api/watchlist/tags`).
 
 - Tags are stored trimmed, in lower case, without duplicates and in alphabetical order: `Sci-Fi ` and `sci-fi` are the
   same tag. An entry has at most 20 different tags of at most 50 characters each, without commas.

@@ -426,6 +426,21 @@ paths:
               schema: { $ref: '#/components/schemas/WatchlistItemPage' }
         '400': { $ref: '#/components/responses/ValidationError' }
 
+  /api/watchlist/tags:
+    get:
+      tags: [Watchlist]
+      operationId: listWatchlistTags
+      summary: List the tags on the watchlist
+      description: The different tags of the user's watchlist items, alphabetically. The frontends suggest them in the tag filter.
+      responses:
+        '200':
+          description: The tags (normalized), none if no item has one
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: string }
+
   /api/watchlist/{movieId}:
     parameters:
       - $ref: '#/components/parameters/MovieId'
