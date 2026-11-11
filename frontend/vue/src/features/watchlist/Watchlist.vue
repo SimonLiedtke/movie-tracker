@@ -318,7 +318,7 @@ async function saveNote(item: WatchlistItem, note: string): Promise<void> {
   saving.value = true;
   let updated: WatchlistItem;
   try {
-    updated = await api.watchlist.put(item.movie.id, note.trim() || null);
+    updated = await api.watchlist.put(item.movie.id, note.trim() || null, item.tags);
   } catch (failure) {
     saving.value = false;
     error.value = toApiError(failure);

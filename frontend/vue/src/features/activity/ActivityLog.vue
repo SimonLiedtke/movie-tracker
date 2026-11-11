@@ -23,6 +23,7 @@ const LABELS: Record<ActivityType, string> = {
   diaryEntryDeleted: 'Deleted a viewing',
   watchlistItemAdded: 'Added to the watchlist',
   watchlistNoteChanged: 'Changed a watchlist note',
+  watchlistTagsChanged: 'Changed watchlist tags',
   watchlistItemRemoved: 'Removed from the watchlist',
   movieImported: 'Imported a movie from TMDB',
   movieAdded: 'Added a movie manually',

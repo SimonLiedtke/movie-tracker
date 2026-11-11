@@ -16,6 +16,7 @@ const entry = (id: string, watchedOn: string, changes: Partial<DiaryEntry> = {})
   review: null,
   isRewatch: false,
   liked: false,
+  tags: [],
   createdAt: `${watchedOn}T20:00:00Z`,
   ...changes,
 });

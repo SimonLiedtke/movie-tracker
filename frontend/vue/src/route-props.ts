@@ -35,6 +35,7 @@ export const movieFormProps = (route: RouteLocationNormalized) => ({
 export const diaryListProps = (route: RouteLocationNormalized) => ({
   from: queryString(route.query['from']),
   to: queryString(route.query['to']),
+  tag: queryString(route.query['tag']),
   page: queryString(route.query['page']),
 });
 
@@ -44,7 +45,7 @@ export const diaryEntryFormProps = (route: RouteLocationNormalized) => ({
   movieId: queryString(route.query['movieId']),
 });
 
-/** The filters of the watchlist (genre IDs, any or all of them, release period, period added, runtime, title) and its page. */
+/** The filters of the watchlist (genre IDs, any or all of them, release period, period added, runtime, title, tag) and its page. */
 export const watchlistProps = (route: RouteLocationNormalized) => ({
   genreId: queryStrings(route.query['genreId']),
   genreMatch: queryString(route.query['genreMatch']),
@@ -55,6 +56,7 @@ export const watchlistProps = (route: RouteLocationNormalized) => ({
   runtimeFrom: queryString(route.query['runtimeFrom']),
   runtimeTo: queryString(route.query['runtimeTo']),
   search: queryString(route.query['search']),
+  tag: queryString(route.query['tag']),
   page: queryString(route.query['page']),
 });
 

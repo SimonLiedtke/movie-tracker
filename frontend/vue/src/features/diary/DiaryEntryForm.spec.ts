@@ -34,6 +34,7 @@ const ENTRY: DiaryEntry = {
   review: 'Scary.',
   isRewatch: true,
   liked: true,
+  tags: ['cinema', 'horror'],
   createdAt: '2026-10-31T20:00:00Z',
 };
 

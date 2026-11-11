@@ -52,6 +52,7 @@ const entry = (id: string, changes: Partial<DiaryEntry> = {}): DiaryEntry => ({
   review: null,
   isRewatch: false,
   liked: false,
+  tags: [],
   createdAt: '2026-11-01T20:00:00Z',
   ...changes,
 });
@@ -223,7 +224,7 @@ describe('MovieDetail', () => {
     expect(button(page, 'Add to watchlist').attributes('disabled')).toBeDefined(); // Busy.
     const put = backend.expectOne('/api/watchlist/m1');
     expect(put.method).toBe('PUT');
-    expect(put.json).toEqual({ note: null });
+    expect(put.json).toEqual({ note: null, tags: [] });
     put.flush({});
     await flushPromises();
 

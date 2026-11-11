@@ -46,12 +46,31 @@ describe('API clients', () => {
     await result;
   });
 
+  it('puts a movie on the watchlist with tags', async () => {
+    const result = createApi(createHttp()).watchlist.put('42', null, ['horror', 'cinema']);
+
+    const request = backend.expectOne('/api/watchlist/42');
+    expect(request.json).toEqual({ note: null, tags: ['horror', 'cinema'] });
+    request.flush({});
+    await result;
+  });
+
+  it('filters the watchlist and the diary by tag', async () => {
+    const api = createApi(createHttp());
+    const watchlist = api.watchlist.list({ tag: ' horror ' });
+    const diary = api.diary.list({ tag: 'horror' });
+
+    backend.expectOne('/api/watchlist?tag=horror').flush({});
+    backend.expectOne('/api/diary-entries?tag=horror').flush({});
+    await Promise.all([watchlist, diary]);
+  });
+
   it('puts a movie on the watchlist with a note', async () => {
     const result = api().watchlist.put('42', "Director's cut");
 
     const request = backend.expectOne('/api/watchlist/42');
     expect(request.method).toBe('PUT');
-    expect(request.json).toEqual({ note: "Director's cut" });
+    expect(request.json).toEqual({ note: "Director's cut", tags: [] });
     request.flush({});
     await result;
   });

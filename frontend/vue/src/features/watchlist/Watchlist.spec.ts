@@ -12,6 +12,7 @@ const item = (id: string, title: string, changes: Partial<WatchlistItem> = {}): 
   movie: { id, title, releaseDate: '1995-12-15', posterUrl: null },
   addedAt: '2026-11-05T21:30:00Z',
   note: null,
+  tags: [],
   genres: [],
   runtimeMinutes: null,
   ...changes,
@@ -1105,7 +1106,7 @@ describe('Watchlist', () => {
       await flushPromises();
       const put = backend.expectOne('/api/watchlist/m1');
       expect(put.method).toBe('PUT');
-      expect(put.json).toEqual({ note: null });
+      expect(put.json).toEqual({ note: null, tags: [] });
       put.flush(HEAT);
       await flushPromises();
 
@@ -1175,7 +1176,7 @@ describe('Watchlist', () => {
       expect(page.get('article form button[type=submit]').classes()).toContain('is-loading');
       const request = backend.expectOne('/api/watchlist/m1');
       expect(request.method).toBe('PUT');
-      expect(request.json).toEqual({ note: 'Watch with Bob.' });
+      expect(request.json).toEqual({ note: 'Watch with Bob.', tags: [] });
       request.flush({ ...HEAT, note: 'Watch with Bob.' });
       await flushPromises();
 
@@ -1200,7 +1201,7 @@ describe('Watchlist', () => {
       await page.get('article input').setValue('   ');
       await page.get('article form').trigger('submit');
       const request = backend.expectOne('/api/watchlist/m2');
-      expect(request.json).toEqual({ note: null });
+      expect(request.json).toEqual({ note: null, tags: [] });
       request.flush(ALIEN);
       await flushPromises();
       expect(page.find('.pre-wrap').exists()).toBe(false);
