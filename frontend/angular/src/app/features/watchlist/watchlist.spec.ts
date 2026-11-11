@@ -16,6 +16,7 @@ const item = (id: string, title: string): WatchlistItem => ({
   movie: { id, title, releaseDate: '1979-05-25', posterUrl: null },
   addedAt: '2026-11-05T21:30:00Z',
   note: null,
+  tags: [],
   genres: [],
   runtimeMinutes: null,
 });
