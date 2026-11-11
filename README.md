@@ -216,6 +216,12 @@ dotnet reportgenerator "-reports:coverage/raw/**/*.cobertura.xml" "-targetdir:co
 Open `backend/coverage/report/index.html`. GitHub Actions does the same on every push: the coverage summary is on the
 workflow run's summary page, and the full HTML report is attached to it as the `backend-coverage` artifact.
 
+On pull requests, a comment shows whether the line and branch coverage (in total and per assembly) went up, went down
+or stayed the same compared with the latest run on `main` (kept in the Actions cache). The comment is only
+informational: it never fails the build, however low the coverage is. Pull requests from forks and from Dependabot cannot
+write comments, so they get the comparison on the run's summary page only. The comparison is done by
+`.github/scripts/coverage_comment.py`.
+
 ## Adding a migration
 
 ```bash
