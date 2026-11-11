@@ -1246,6 +1246,54 @@ describe('Watchlist', () => {
     });
   });
 
+  describe('tags', () => {
+    /** The tags of a movie, not its genres, which look alike. */
+    const TAG_LINKS = 'a[title^="Show everything tagged"]';
+    const TAGGED = item('m3', 'Alien', { tags: ['horror', 'weekend'] });
+
+    it('shows the tags of a movie, each linking to the list filtered by it', async () => {
+      const { page } = await openWith([TAGGED, HEAT]);
+
+      const articles = page.findAll('article');
+      const links = articles[0].findAll(TAG_LINKS);
+      expect(links.map((link) => link.text())).toEqual(['horror', 'weekend']);
+      expect(links[1].attributes('href')).toBe('/watchlist?tag=weekend');
+      expect(articles[1].find(TAG_LINKS).exists()).toBe(false);
+    });
+
+    it('filters by the tag in the URL, highlights it and says so', async () => {
+      const { page } = await openWith(
+        [TAGGED],
+        '/watchlist?tag=weekend',
+        paged([TAGGED], { unfilteredCount: 5 }),
+        '&tag=weekend',
+      );
+
+      expect(text(page)).toContain('1 of 5 movies to watch tagged "weekend"');
+      expect(page.get<HTMLInputElement>('#tag').element.value).toBe('weekend');
+      const [horror, weekend] = page.findAll(`article ${TAG_LINKS}`);
+      expect(horror.classes()).toContain('is-light');
+      expect(weekend.classes()).not.toContain('is-light');
+    });
+
+    it('filters by the tag that is typed, and clears it with the filter', async () => {
+      const { page, router } = await openWith([TAGGED, HEAT]);
+
+      await page.get('#tag').setValue(' Weekend ');
+      await flushPromises();
+      expect(router.currentRoute.value.query).toEqual({ tag: 'Weekend' });
+      listRequest(1, '&tag=Weekend').flush(paged([TAGGED], { unfilteredCount: 2 }));
+      await flushPromises();
+
+      await buttonOf(page, 'Clear filter').trigger('click');
+      await flushPromises();
+      expect(router.currentRoute.value.query).toEqual({});
+      listRequest().flush(paged([TAGGED, HEAT]));
+      await flushPromises();
+      expect(page.get<HTMLInputElement>('#tag').element.value).toBe('');
+    });
+  });
+
   describe('removing a movie', () => {
     it('takes the movie off the watchlist, and shows the list again', async () => {
       const { page } = await openWith([HEAT, ALIEN]);

@@ -17,6 +17,7 @@ import MoviePicker from '../../shared/MoviePicker.vue';
 import Pagination from '../../shared/Pagination.vue';
 import Poster from '../../shared/Poster.vue';
 import { mergeQuery } from '../../shared/query';
+import TagList from '../../shared/TagList.vue';
 
 const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -47,6 +48,7 @@ const props = defineProps<{
   runtimeFrom?: string;
   runtimeTo?: string;
   search?: string;
+  tag?: string;
   page?: string;
 }>();
 
@@ -71,6 +73,7 @@ const query = computed<WatchlistQuery>(() => ({
   runtimeTo: minutes(props.runtimeTo),
   // Not trimmed: the field shows the URL's value, and trimming would eat spaces while typing.
   search: props.search?.trim() ? props.search : undefined,
+  tag: props.tag?.trim() || undefined,
   page: Number(props.page) || 1,
   pageSize: PAGE_SIZE,
 }));
@@ -84,7 +87,8 @@ const filtered = computed(
     !!query.value.addedTo ||
     !!query.value.runtimeFrom ||
     !!query.value.runtimeTo ||
-    !!query.value.search,
+    !!query.value.search ||
+    !!query.value.tag,
 );
 
 /** E.g. "released from May 25, 1979 to November 3, 1989" or "added until ..."; undefined without dates. */
@@ -126,12 +130,14 @@ const filterDescription = computed(() => {
     runtimeFrom,
     runtimeTo,
     search,
+    tag,
   } = query.value;
   const genreText = hasGenres.value
     ? `with ${genreMatch === 'all' ? 'all' : 'any'} of the selected genres`
     : undefined;
   return [
     search ? `matching "${search.trim()}"` : undefined,
+    tag ? `tagged "${tag}"` : undefined,
     genreText,
     describeRuntime(runtimeFrom, runtimeTo),
     describePeriod('released', releasedFrom, releasedTo),
@@ -225,6 +231,10 @@ function genreFilterLink(genre: Genre): RouteLocationRaw {
   };
 }
 
+function onTag(value: string): void {
+  updateFilter({ tag: value.trim() || undefined });
+}
+
 function onRuntime(key: 'runtimeFrom' | 'runtimeTo', value: string): void {
   updateFilter({ [key]: value || undefined });
 }
@@ -257,6 +267,7 @@ function clearFilter(): void {
     runtimeFrom: undefined,
     runtimeTo: undefined,
     search: undefined,
+    tag: undefined,
   });
 }
 
@@ -370,6 +381,20 @@ async function remove(item: WatchlistItem): Promise<void> {
           placeholder="Title or original title"
           :value="searchText"
           @input="onSearch(($event.target as HTMLInputElement).value)"
+        />
+      </div>
+    </div>
+    <div class="field">
+      <label class="label" for="tag">Tag</label>
+      <div class="control">
+        <input
+          id="tag"
+          class="input is-small"
+          type="text"
+          autocomplete="off"
+          placeholder="e.g. weekend"
+          :value="query.tag ?? ''"
+          @change="onTag(($event.target as HTMLInputElement).value)"
         />
       </div>
     </div>
@@ -601,7 +626,12 @@ async function remove(item: WatchlistItem): Promise<void> {
               <button type="button" class="button is-small" @click="editing = null">Cancel</button>
             </div>
           </form>
-          <p v-else-if="item.note" class="mt-2 pre-wrap">{{ item.note }}</p>
+          <template v-else>
+            <p v-if="item.note" class="mt-2 pre-wrap">{{ item.note }}</p>
+            <div class="mt-2">
+              <TagList :tags="item.tags" route="/watchlist" :active="query.tag" />
+            </div>
+          </template>
         </div>
         <div class="media-right">
           <div class="buttons are-small is-right">
