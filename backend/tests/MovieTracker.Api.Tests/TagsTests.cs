@@ -176,4 +176,64 @@ public sealed class TagsTests(ApiFactory factory) : ApiTestBase(factory)
 
         Assert.Empty(entry.Tags);
     }
+
+    // --- Validation
+
+    [Theory]
+    [InlineData("diary")]
+    [InlineData("watchlist")]
+    public async Task More_than_20_different_tags_are_rejected(string target)
+    {
+        var movie = await CreateMovieAsync();
+        var tags = Enumerable.Range(1, 21).Select(i => $"tag {i}").ToArray();
+
+        var response = await SendAsync(target, movie.Id, tags);
+
+        var problem = await ReadValidationProblemAsync(response);
+        Assert.Contains("tags", problem.Errors.Keys);
+    }
+
+    [Theory]
+    [InlineData("diary")]
+    [InlineData("watchlist")]
+    public async Task The_same_tag_in_different_cases_counts_once(string target)
+    {
+        var movie = await CreateMovieAsync();
+        var tags = Enumerable.Range(1, 20).Select(i => $"tag {i}").Append("TAG 1").ToArray();
+
+        var response = await SendAsync(target, movie.Id, tags);
+
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync(Ct));
+    }
+
+    [Theory]
+    [InlineData("diary")]
+    [InlineData("watchlist")]
+    public async Task A_tag_longer_than_50_characters_is_rejected(string target)
+    {
+        var movie = await CreateMovieAsync();
+
+        var response = await SendAsync(target, movie.Id, [new string('x', 51)]);
+
+        var problem = await ReadValidationProblemAsync(response);
+        Assert.Contains("tags", problem.Errors.Keys);
+    }
+
+    [Theory]
+    [InlineData("diary")]
+    [InlineData("watchlist")]
+    public async Task A_tag_with_a_comma_is_rejected(string target)
+    {
+        var movie = await CreateMovieAsync();
+
+        var response = await SendAsync(target, movie.Id, ["a,b"]);
+
+        var problem = await ReadValidationProblemAsync(response);
+        Assert.Contains("tags", problem.Errors.Keys);
+    }
+
+    private Task<HttpResponseMessage> SendAsync(string target, Guid movieId, string[] tags) =>
+        target == "diary"
+            ? Client.PostAsJsonAsync("/api/diary-entries", new { movieId, watchedOn = "2026-10-31", tags }, Ct)
+            : Client.PutAsJsonAsync($"/api/watchlist/{movieId}", new { tags }, Ct);
 }

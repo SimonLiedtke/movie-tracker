@@ -34,6 +34,7 @@ public sealed class DiaryEntryRequest
     public bool Liked { get; init; }
 
     /// <summary>Free tags. Case and surrounding spaces do not matter; the response has them normalized.</summary>
+    [ValidTags]
     public string[]? Tags { get; init; }
 
     // MovieId and WatchedOn are guaranteed by [Required] once model validation has passed.

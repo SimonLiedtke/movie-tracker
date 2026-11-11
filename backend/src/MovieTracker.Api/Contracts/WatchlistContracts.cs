@@ -20,5 +20,6 @@ public sealed class WatchlistItemRequest
     public string? Note { get; init; }
 
     /// <summary>Free tags. Case and surrounding spaces do not matter; the response has them normalized.</summary>
+    [ValidTags]
     public string[]? Tags { get; init; }
 }
