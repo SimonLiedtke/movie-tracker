@@ -1,5 +1,11 @@
 import { Component, effect, inject, input, signal, untracked } from '@angular/core';
-import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  AbstractControl,
+  NonNullableFormBuilder,
+  ReactiveFormsModule,
+  ValidationErrors,
+  Validators,
+} from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { DiaryApi, MoviesApi } from '../../core/api/api';
 import { ApiError, toApiError } from '../../core/api/api-error';
@@ -8,6 +14,13 @@ import { todayIso } from '../../shared/dates';
 import { ErrorNotification } from '../../shared/error-notification';
 import { MoviePicker } from '../../shared/movie-picker';
 import { RATING_OPTIONS } from '../../shared/rating';
+import { MAX_TAGS, MAX_TAG_LENGTH, formatTags, parseTags, tagsError } from '../../shared/tags';
+
+/** The text of the tags field must have valid tags, see tagsError. */
+function tagsValidator(control: AbstractControl<string>): ValidationErrors | null {
+  const error = tagsError(control.value);
+  return error ? { tags: error } : null;
+}
 
 @Component({
   selector: 'app-diary-entry-form',
@@ -26,6 +39,8 @@ export class DiaryEntryForm {
 
   protected readonly today = todayIso();
   protected readonly ratingOptions = RATING_OPTIONS;
+  protected readonly maxTags = MAX_TAGS;
+  protected readonly maxTagLength = MAX_TAG_LENGTH;
   protected readonly movie = signal<MovieRef | null>(null);
   protected readonly movieTouched = signal(false);
   protected readonly loading = signal(false);
@@ -38,6 +53,7 @@ export class DiaryEntryForm {
     review: ['', Validators.maxLength(20000)],
     isRewatch: [false],
     liked: [false],
+    tags: ['', tagsValidator],
   });
 
   constructor() {
@@ -75,6 +91,7 @@ export class DiaryEntryForm {
       review: value.review.trim() || null,
       isRewatch: value.isRewatch,
       liked: value.liked,
+      tags: parseTags(value.tags),
     };
 
     const id = this.id();
@@ -105,6 +122,7 @@ export class DiaryEntryForm {
           review: entry.review ?? '',
           isRewatch: entry.isRewatch,
           liked: entry.liked,
+          tags: formatTags(entry.tags),
         });
         this.loading.set(false);
       },
