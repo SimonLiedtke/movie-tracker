@@ -254,32 +254,40 @@
 
         @if (editing() === item.movie.id) {
           <form
-            class="field has-addons mt-2"
-            (submit)="$event.preventDefault(); saveNote(item, note.value)"
+            class="mt-2"
+            (submit)="$event.preventDefault(); saveDetails(item, note.value, tags.value)"
           >
-            <div class="control is-expanded">
+            <div class="field">
               <input
                 #note
                 class="input is-small"
                 maxlength="500"
+                aria-label="Note"
                 placeholder="Why do you want to watch it?"
                 [value]="item.note ?? ''"
                 (keydown.escape)="editing.set(null)"
               />
             </div>
-            <div class="control">
-              <button
-                type="submit"
-                class="button is-small is-primary"
-                [class.is-loading]="saving()"
-              >
+            <div class="field">
+              <input
+                #tags
+                class="input is-small"
+                aria-label="Tags"
+                autocomplete="off"
+                placeholder="Tags, separated by commas"
+                [class.is-danger]="tagsProblem()"
+                [value]="formatTags(item.tags)"
+                (keydown.escape)="editing.set(null)"
+              />
+              @if (tagsProblem(); as problem) {
+                <p class="help is-danger">{{ problem }}</p>
+              }
+            </div>
+            <div class="buttons are-small">
+              <button type="submit" class="button is-primary" [class.is-loading]="saving()">
                 Save
               </button>
-            </div>
-            <div class="control">
-              <button type="button" class="button is-small" (click)="editing.set(null)">
-                Cancel
-              </button>
+              <button type="button" class="button" (click)="editing.set(null)">Cancel</button>
             </div>
           </form>
         } @else {
@@ -300,8 +308,8 @@
           >
             Log a viewing
           </a>
-          <button class="button" (click)="editing.set(item.movie.id)">
-            {{ item.note ? 'Edit note' : 'Add note' }}
+          <button class="button" (click)="edit(item)">
+            {{ item.note || item.tags.length ? 'Edit note and tags' : 'Add note or tags' }}
           </button>
           <button class="button is-danger is-outlined" (click)="remove(item)">Remove</button>
         </div>

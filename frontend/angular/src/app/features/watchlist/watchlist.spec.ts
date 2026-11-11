@@ -866,6 +866,64 @@ describe('Watchlist genre filter', () => {
       await click(clear, '/watchlist', '', paged([ALIEN, HEAT]));
       expect(input.value).toBe('');
     });
+
+    it('edits the note and the tags together', async () => {
+      await open('/watchlist', '', paged([TAGGED, HEAT]));
+
+      const edit = Array.from(page().querySelectorAll('article:first-of-type button')).find(
+        (b) => b.textContent!.trim() === 'Edit note and tags',
+      ) as HTMLButtonElement;
+      edit.click();
+      await harness.fixture.whenStable();
+      const tags = page().querySelector('input[aria-label=Tags]') as HTMLInputElement;
+      expect(tags.value).toBe('horror, weekend');
+      tags.value = 'weekend, Date Night, ';
+      (page().querySelector('input[aria-label=Note]') as HTMLInputElement).value = 'With Bob';
+      page().querySelector('form')!.dispatchEvent(new Event('submit'));
+
+      const request = http.expectOne('/api/watchlist/m1');
+      expect(request.request.method).toBe('PUT');
+      expect(request.request.body).toEqual({ note: 'With Bob', tags: ['weekend', 'Date Night'] });
+      request.flush({ ...TAGGED, note: 'With Bob', tags: ['date night', 'weekend'] });
+      await harness.fixture.whenStable();
+
+      expect(page().querySelector('form')).toBeNull();
+      expect(text()).toContain('With Bob');
+      expect(text()).toContain('date night');
+    });
+
+    it('keeps the tags when only the note is changed', async () => {
+      await open('/watchlist', '', paged([TAGGED]));
+
+      const edit = Array.from(page().querySelectorAll('button')).find(
+        (b) => b.textContent!.trim() === 'Edit note and tags',
+      ) as HTMLButtonElement;
+      edit.click();
+      await harness.fixture.whenStable();
+      (page().querySelector('input[aria-label=Note]') as HTMLInputElement).value = 'Classic';
+      page().querySelector('form')!.dispatchEvent(new Event('submit'));
+
+      const request = http.expectOne('/api/watchlist/m1');
+      expect(request.request.body).toEqual({ note: 'Classic', tags: ['horror', 'weekend'] });
+      request.flush({ ...TAGGED, note: 'Classic' });
+    });
+
+    it('does not save tags that the server would refuse', async () => {
+      await open('/watchlist', '', paged([HEAT]));
+
+      (
+        Array.from(page().querySelectorAll('button')).find(
+          (b) => b.textContent!.trim() === 'Add note or tags',
+        ) as HTMLButtonElement
+      ).click();
+      await harness.fixture.whenStable();
+      (page().querySelector('input[aria-label=Tags]') as HTMLInputElement).value = 'x'.repeat(51);
+      page().querySelector('form')!.dispatchEvent(new Event('submit'));
+      await harness.fixture.whenStable();
+
+      http.expectNone('/api/watchlist/m2');
+      expect(text()).toContain('A tag can have at most 50 characters.');
+    });
   });
 
   it('still shows the watchlist if the genres cannot be loaded', async () => {

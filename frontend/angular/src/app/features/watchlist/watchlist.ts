@@ -27,7 +27,14 @@ import { ErrorNotification } from '../../shared/error-notification';
 import { MoviePicker } from '../../shared/movie-picker';
 import { Pagination } from '../../shared/pagination';
 import { Poster } from '../../shared/poster';
-import { Tags } from '../../shared/tags';
+import {
+  MAX_TAGS,
+  MAX_TAG_LENGTH,
+  Tags,
+  formatTags,
+  parseTags,
+  tagsError,
+} from '../../shared/tags';
 
 const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -185,9 +192,14 @@ export class Watchlist {
   protected readonly result = signal<WatchlistPage | null>(null);
   protected readonly loading = signal(true);
   protected readonly error = signal<ApiError | null>(null);
-  /** Movie ID of the item whose note is being edited. */
+  /** Movie ID of the item whose note and tags are being edited. */
   protected readonly editing = signal<string | null>(null);
   protected readonly saving = signal(false);
+  /** Why the tags that are being edited are refused; null if they are fine. */
+  protected readonly tagsProblem = signal<string | null>(null);
+  protected readonly formatTags = formatTags;
+  protected readonly maxTags = MAX_TAGS;
+  protected readonly maxTagLength = MAX_TAG_LENGTH;
 
   private readonly reload = new Subject<void>();
   private readonly searchInput = new Subject<string>();
@@ -328,9 +340,20 @@ export class Watchlist {
       });
   }
 
-  protected saveNote(item: WatchlistItem, note: string): void {
+  protected edit(item: WatchlistItem): void {
+    this.tagsProblem.set(null);
+    this.editing.set(item.movie.id);
+  }
+
+  /** Saves the note and the tags: the server replaces both, so the one that is not edited is sent along. */
+  protected saveDetails(item: WatchlistItem, note: string, tagsText: string): void {
+    const problem = tagsError(tagsText);
+    this.tagsProblem.set(problem);
+    if (problem) {
+      return;
+    }
     this.saving.set(true);
-    this.watchlistApi.put(item.movie.id, note.trim() || null, item.tags).subscribe({
+    this.watchlistApi.put(item.movie.id, note.trim() || null, parseTags(tagsText)).subscribe({
       next: (updated) => {
         this.saving.set(false);
         this.editing.set(null);
