@@ -43,6 +43,14 @@ internal sealed class WatchlistRepository(MovieTrackerDbContext db) : IWatchlist
         return new WatchlistPage(views.Select(row => row.ToModel()).ToList(), page, pageSize, totalCount, unfilteredCount);
     }
 
+    public async Task<IReadOnlyList<string>> ListTagsAsync(Guid userId, CancellationToken cancellationToken) =>
+        await OwnItems(userId)
+            .AsNoTracking()
+            .SelectMany(item => item.Tags)
+            .Distinct()
+            .OrderBy(tag => tag)
+            .ToListAsync(cancellationToken);
+
     public async Task<WatchlistItemView?> GetAsync(Guid userId, Guid movieId, CancellationToken cancellationToken) =>
         (await OwnItems(userId)
             .AsNoTracking()

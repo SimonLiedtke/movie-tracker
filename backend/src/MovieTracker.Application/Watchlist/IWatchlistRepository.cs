@@ -9,6 +9,9 @@ public interface IWatchlistRepository
     Task<WatchlistPage> ListAsync(
         Guid userId, WatchlistFilter filter, int page, int pageSize, CancellationToken cancellationToken);
 
+    /// <summary>The different tags of the user's items, alphabetically.</summary>
+    Task<IReadOnlyList<string>> ListTagsAsync(Guid userId, CancellationToken cancellationToken);
+
     Task<WatchlistItemView?> GetAsync(Guid userId, Guid movieId, CancellationToken cancellationToken);
 
     /// <summary>For changing the item: changes are saved with <see cref="IUnitOfWork"/>.</summary>

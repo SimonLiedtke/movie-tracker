@@ -75,6 +75,12 @@ public sealed class WatchlistController(WatchlistService watchlist) : Controller
         return result.ToResponse();
     }
 
+    /// <summary>The different tags on the watchlist, alphabetically: what the tag filter can offer.</summary>
+    [HttpGet("tags", Name = "listWatchlistTags")]
+    [ProducesResponseType<IReadOnlyList<string>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<string>>> ListWatchlistTags(CancellationToken cancellationToken) =>
+        Ok(await watchlist.ListTagsAsync(User.GetUserId(), cancellationToken));
+
     [HttpPut("{movieId:guid}", Name = "putWatchlistItem")]
     [ProducesResponseType<WatchlistItemResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<WatchlistItemResponse>(StatusCodes.Status201Created)]

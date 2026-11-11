@@ -79,6 +79,27 @@ public sealed class WatchlistServiceTests
         Assert.Equal(2, result.UnfilteredCount);
     }
 
+    [Fact]
+    public async Task ListTags_returns_the_different_tags_of_the_users_items_alphabetically()
+    {
+        var alien = AddTmdbMovie(348, "Alien");
+        var heat = AddTmdbMovie(949, "Heat");
+        await _service.PutAsync(Alice, alien.Id, null, ["weekend", "horror"], Ct);
+        await _service.PutAsync(Alice, heat.Id, null, ["Weekend", "crime"], Ct);
+        await _service.PutAsync(Bob, alien.Id, null, ["bobs tag"], Ct);
+
+        Assert.Equal(["crime", "horror", "weekend"], await _service.ListTagsAsync(Alice, Ct));
+    }
+
+    [Fact]
+    public async Task ListTags_is_empty_without_tags()
+    {
+        var movie = AddTmdbMovie();
+        await _service.PutAsync(Alice, movie.Id, null, null, Ct);
+
+        Assert.Empty(await _service.ListTagsAsync(Alice, Ct));
+    }
+
     // --- Putting a movie on the watchlist
 
     [Fact]

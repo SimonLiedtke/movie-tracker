@@ -27,6 +27,10 @@ public sealed class FakeWatchlistRepository(FakeMovieRepository movies) : IWatch
         return Task.FromResult(new WatchlistPage(views, page, pageSize, own.Count, all.Count));
     }
 
+    public Task<IReadOnlyList<string>> ListTagsAsync(Guid userId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<string>>(
+            Items.Where(item => item.UserId == userId).SelectMany(item => item.Tags).Distinct().Order().ToList());
+
     public Task<WatchlistItemView?> GetAsync(Guid userId, Guid movieId, CancellationToken cancellationToken) =>
         Task.FromResult(Own(userId, movieId) is { } item ? ToView(item) : null);
 

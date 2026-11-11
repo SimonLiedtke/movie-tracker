@@ -140,6 +140,32 @@ public sealed class TagsTests(ApiFactory factory) : ApiTestBase(factory)
         Assert.Equal(3, result.UnfilteredCount);
     }
 
+    [Fact]
+    public async Task The_watchlist_lists_its_different_tags_alphabetically()
+    {
+        var alien = await ImportTmdbMovieAsync();
+        var heat = await CreateMovieAsync("Heat");
+        await PutWatchlistAsync(alien.Id, ["weekend", "horror"]);
+        await PutWatchlistAsync(heat.Id, ["Weekend", "crime"]);
+        var logged = await CreateMovieAsync("Aliens");
+        await CreateDiaryEntryAsync(logged.Id, tags: ["not on the watchlist"]);
+
+        var tags = await GetAsync<List<string>>("/api/watchlist/tags");
+
+        Assert.Equal(["crime", "horror", "weekend"], tags);
+    }
+
+    [Fact]
+    public async Task The_tags_of_the_watchlist_are_the_users_own()
+    {
+        var movie = await ImportTmdbMovieAsync();
+        await PutWatchlistAsync(movie.Id, ["alices tag"]);
+
+        var response = await Bob.GetAsync("/api/watchlist/tags", Ct);
+
+        Assert.Empty(await ReadAsync<List<string>>(response, HttpStatusCode.OK));
+    }
+
     // --- From the watchlist to the diary
 
     [Fact]

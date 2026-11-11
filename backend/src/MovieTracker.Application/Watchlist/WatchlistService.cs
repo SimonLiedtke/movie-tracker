@@ -16,6 +16,10 @@ public sealed class WatchlistService(
         Guid userId, WatchlistFilter filter, int page, int pageSize, CancellationToken cancellationToken) =>
         watchlist.ListAsync(userId, filter, page, pageSize, cancellationToken);
 
+    /// <summary>The different tags on the user's watchlist, alphabetically: what the tag filter can offer.</summary>
+    public Task<IReadOnlyList<string>> ListTagsAsync(Guid userId, CancellationToken cancellationToken) =>
+        watchlist.ListTagsAsync(userId, cancellationToken);
+
     /// <summary>Puts the movie on the watchlist, or replaces the note and the tags if it is on it already (idempotent).</summary>
     public async Task<PutWatchlistItemResult> PutAsync(
         Guid userId, Guid movieId, string? note, IReadOnlyList<string>? tags, CancellationToken cancellationToken)
