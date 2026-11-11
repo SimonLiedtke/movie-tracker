@@ -61,6 +61,7 @@ public sealed class FakeDiaryRepository(FakeMovieRepository movies) : IDiaryRepo
             entry.Review,
             entry.IsRewatch,
             entry.Liked,
+            entry.Tags,
             entry.CreatedAt);
     }
 }

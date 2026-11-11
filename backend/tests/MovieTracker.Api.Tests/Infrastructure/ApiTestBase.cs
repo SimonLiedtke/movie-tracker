@@ -74,7 +74,7 @@ public abstract class ApiTestBase(ApiFactory factory) : IAsyncLifetime
     }
 
     protected async Task<DiaryEntryResponse> CreateDiaryEntryAsync(
-        Guid movieId, string watchedOn = "2026-10-31", int? rating = 8, string? review = null)
+        Guid movieId, string watchedOn = "2026-10-31", int? rating = 8, string? review = null, string[]? tags = null)
     {
         var response = await Client.PostAsJsonAsync("/api/diary-entries", new
         {
@@ -82,6 +82,7 @@ public abstract class ApiTestBase(ApiFactory factory) : IAsyncLifetime
             watchedOn,
             rating,
             review,
+            tags,
         }, Ct);
         return await ReadAsync<DiaryEntryResponse>(response, HttpStatusCode.Created);
     }

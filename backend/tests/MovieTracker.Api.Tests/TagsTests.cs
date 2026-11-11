@@ -1,0 +1,47 @@
+using System.Net;
+using System.Net.Http.Json;
+using MovieTracker.Api.Contracts;
+using MovieTracker.Api.Tests.Infrastructure;
+
+namespace MovieTracker.Api.Tests;
+
+public sealed class TagsTests(ApiFactory factory) : ApiTestBase(factory)
+{
+    // --- Diary entries
+
+    [Fact]
+    public async Task A_diary_entry_has_no_tags_by_default()
+    {
+        var movie = await CreateMovieAsync();
+
+        var entry = await CreateDiaryEntryAsync(movie.Id);
+
+        Assert.Empty(entry.Tags);
+    }
+
+    [Fact]
+    public async Task A_diary_entry_keeps_its_tags_normalized()
+    {
+        var movie = await CreateMovieAsync();
+
+        var created = await CreateDiaryEntryAsync(movie.Id, tags: ["Date Night", " horror ", "HORROR", ""]);
+
+        Assert.Equal(["date night", "horror"], created.Tags);
+        var fetched = await GetAsync<DiaryEntryResponse>($"/api/diary-entries/{created.Id}");
+        Assert.Equal(["date night", "horror"], fetched.Tags);
+    }
+
+    [Fact]
+    public async Task Updating_a_diary_entry_replaces_its_tags()
+    {
+        var movie = await CreateMovieAsync();
+        var created = await CreateDiaryEntryAsync(movie.Id, tags: ["a", "b"]);
+
+        var response = await Client.PutAsJsonAsync(
+            $"/api/diary-entries/{created.Id}",
+            new { movieId = movie.Id, watchedOn = "2026-10-31", tags = new[] { "c" } },
+            Ct);
+
+        Assert.Equal(["c"], (await ReadAsync<DiaryEntryResponse>(response, HttpStatusCode.OK)).Tags);
+    }
+}

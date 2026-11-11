@@ -60,6 +60,30 @@ public sealed class DiaryServiceTests
     private static DiaryEntryDetails Details(Movie movie, string watchedOn = "2026-10-31", int? rating = 8, string? review = "Great") =>
         new(movie.Id, DateOnly.Parse(watchedOn), rating is { } halfStars ? new Rating(halfStars) : null, review, IsRewatch: false, Liked: true);
 
+    // --- Tags
+
+    [Fact]
+    public async Task Create_saves_the_tags_normalized()
+    {
+        var movie = AddTmdbMovie();
+
+        var result = await _service.CreateAsync(Alice, Details(movie) with { Tags = [" Date Night", "horror", "HORROR"] }, Ct);
+
+        Assert.Equal(["date night", "horror"], Assert.Single(_diary.Entries).Tags);
+        Assert.Equal(["date night", "horror"], result.Entry!.Tags);
+    }
+
+    [Fact]
+    public async Task Update_replaces_the_tags()
+    {
+        var movie = AddTmdbMovie();
+        var entry = AddEntry(Alice, movie);
+
+        var result = await _service.UpdateAsync(Alice, entry.Id, Details(movie) with { Tags = ["b"] }, Ct);
+
+        Assert.Equal(["b"], result.Entry!.Tags);
+    }
+
     // --- Logging a viewing
 
     [Fact]

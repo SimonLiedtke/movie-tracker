@@ -23,7 +23,7 @@ public sealed class UserIsolationTests(ApiFactory factory) : ApiTestBase(factory
         await ReadProblemAsync(get, HttpStatusCode.NotFound);
         await ReadProblemAsync(put, HttpStatusCode.NotFound);
         await ReadProblemAsync(delete, HttpStatusCode.NotFound);
-        Assert.Equal(entry, await GetAsync<DiaryEntryResponse>(url));
+        Assert.Equivalent(entry, await GetAsync<DiaryEntryResponse>(url));
     }
 
     [Fact]
@@ -42,8 +42,8 @@ public sealed class UserIsolationTests(ApiFactory factory) : ApiTestBase(factory
 
         Assert.Equal(["Alice's review"], alicesDiary.Items.Select(entry => entry.Review));
         Assert.Equal(1, alicesDiary.TotalCount);
-        Assert.Equal([bobsEntry], bobsDiary.Items);
-        Assert.Equal([bobsEntry], bobsMovieEntries);
+        Assert.Equivalent(new[] { bobsEntry }, bobsDiary.Items, strict: true);
+        Assert.Equivalent(new[] { bobsEntry }, bobsMovieEntries, strict: true);
     }
 
     [Fact]

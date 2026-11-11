@@ -11,6 +11,7 @@ public sealed record DiaryEntryView(
     string? Review,
     bool IsRewatch,
     bool Liked,
+    IReadOnlyList<string> Tags,
     DateTimeOffset CreatedAt);
 
 /// <summary>Only entries watched in the range (both ends included) and, if set, of this movie.</summary>

@@ -45,6 +45,7 @@ internal static class Mappings
         entry.Review,
         entry.IsRewatch,
         entry.Liked,
+        entry.Tags,
         entry.CreatedAt);
 
     public static WatchlistItemResponse ToResponse(this WatchlistItemView item) => new(
