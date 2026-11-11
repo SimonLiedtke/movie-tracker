@@ -15,6 +15,10 @@ jobs:
   backend:
     name: Backend (.NET)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # To post the coverage comparison as a comment on pull requests.
+      pull-requests: write
     defaults:
       run:
         working-directory: backend
@@ -48,7 +52,7 @@ jobs:
           dotnet reportgenerator \
             "-reports:coverage/raw/**/*.cobertura.xml" \
             "-targetdir:coverage/report" \
-            "-reporttypes:MarkdownSummaryGithub;HtmlInline_AzurePipelines;Cobertura" \
+            "-reporttypes:MarkdownSummaryGithub;HtmlInline_AzurePipelines;Cobertura;JsonSummary" \
             "-assemblyfilters:+MovieTracker.*;-MovieTracker.*.Tests;-MovieTracker.TestSupport" \
             "-classfilters:-MovieTracker.Infrastructure.Persistence.Migrations.*;-Microsoft.AspNetCore.OpenApi.Generated"
           cat coverage/report/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
@@ -58,6 +62,62 @@ jobs:
         with:
           name: backend-coverage
           path: backend/coverage/report
+
+      # The coverage of main is the baseline for pull requests. It is kept in the Actions cache:
+      # pull requests can read caches that were saved on the default branch.
+      - name: Save coverage baseline
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p coverage/baseline
+          cp coverage/report/Summary.json coverage/baseline/Summary.json
+
+      - name: Cache coverage baseline
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v4
+        with:
+          path: backend/coverage/baseline
+          key: backend-coverage-baseline-${{ github.sha }}
+
+      - name: Restore coverage baseline of main
+        if: github.event_name == 'pull_request'
+        uses: actions/cache/restore@v4
+        with:
+          path: backend/coverage/baseline
+          # No exact match is wanted: take the newest baseline.
+          key: backend-coverage-baseline-none-${{ github.run_id }}
+          restore-keys: backend-coverage-baseline-
+
+      # Informational only: neither this step nor the next one can fail the build,
+      # whatever the coverage is.
+      - name: Compare coverage with main
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        run: |
+          python3 ../.github/scripts/coverage_comment.py \
+            coverage/report/Summary.json coverage/baseline/Summary.json > coverage/comparison.md
+          cat coverage/comparison.md >> "$GITHUB_STEP_SUMMARY"
+
+      # The token of pull requests from forks and from Dependabot is read-only, so they only get the summary above.
+      - name: Comment coverage on the pull request
+        if: >
+          github.event_name == 'pull_request'
+          && github.event.pull_request.head.repo.full_name == github.repository
+          && github.actor != 'dependabot[bot]'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          comments="repos/$GITHUB_REPOSITORY/issues"
+          # Update the comment of an earlier run instead of adding a new one on every push.
+          existing=$(gh api "$comments/$PR_NUMBER/comments" --paginate \
+            --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | contains("<!-- backend-coverage-report -->"))) | .id' \
+            | head -n 1)
+          if [ -n "$existing" ]; then
+            gh api --method PATCH "$comments/comments/$existing" -F body=@coverage/comparison.md
+          else
+            gh api --method POST "$comments/$PR_NUMBER/comments" -F body=@coverage/comparison.md
+          fi
 
       # Room for a later step: compare the generated OpenAPI document
       # (/openapi/v1.json) with api/openapi.yaml.
