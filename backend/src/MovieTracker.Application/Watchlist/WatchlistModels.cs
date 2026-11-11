@@ -3,10 +3,16 @@ using MovieTracker.Domain.Movies;
 
 namespace MovieTracker.Application.Watchlist;
 
+/// <param name="Tags">The item's tags, alphabetically.</param>
 /// <param name="Genres">The movie's genres, alphabetically.</param>
 /// <param name="RuntimeMinutes">The movie's runtime; null if unknown.</param>
 public sealed record WatchlistItemView(
-    MovieRef Movie, DateTimeOffset AddedAt, string? Note, IReadOnlyList<Genre> Genres, int? RuntimeMinutes);
+    MovieRef Movie,
+    DateTimeOffset AddedAt,
+    string? Note,
+    IReadOnlyList<string> Tags,
+    IReadOnlyList<Genre> Genres,
+    int? RuntimeMinutes);
 
 /// <summary>A page of the items matching a <see cref="WatchlistFilter"/>.</summary>
 /// <param name="TotalCount">The number of items matching the filter.</param>
@@ -67,7 +73,7 @@ public enum PutWatchlistItemStatus
     /// <summary>The movie was put on the watchlist now.</summary>
     Added,
 
-    /// <summary>The movie was on the watchlist already; its note was replaced, the date added stays.</summary>
+    /// <summary>The movie was on the watchlist already; its note and tags were replaced, the date added stays.</summary>
     Updated,
 
     /// <summary>The movie does not exist, or belongs to another user.</summary>

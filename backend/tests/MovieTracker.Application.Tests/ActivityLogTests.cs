@@ -80,7 +80,7 @@ public sealed class ActivityLogTests
     public async Task Logging_a_viewing_says_that_the_movie_was_taken_off_the_watchlist()
     {
         var movie = AddTmdbMovie();
-        await _watchlistService.PutAsync(Alice, movie.Id, null, Ct);
+        await _watchlistService.PutAsync(Alice, movie.Id, null, null, Ct);
         _log.Entries.Clear();
 
         await _diaryService.CreateAsync(Alice, Details(movie, rating: null), Ct);
@@ -172,7 +172,7 @@ public sealed class ActivityLogTests
     {
         var movie = AddTmdbMovie();
 
-        await _watchlistService.PutAsync(Alice, movie.Id, "Director's cut", Ct);
+        await _watchlistService.PutAsync(Alice, movie.Id, "Director's cut", null, Ct);
 
         var entry = Single(_log.Entries, ActivityType.WatchlistItemAdded);
         Assert.Equal((Alice, movie.Id, "Alien", "Note: Director's cut"), (entry.UserId, entry.MovieId, entry.MovieTitle, entry.Detail));
@@ -183,7 +183,7 @@ public sealed class ActivityLogTests
     {
         var movie = AddTmdbMovie();
 
-        await _watchlistService.PutAsync(Alice, movie.Id, null, Ct);
+        await _watchlistService.PutAsync(Alice, movie.Id, null, null, Ct);
 
         Assert.Null(Single(_log.Entries, ActivityType.WatchlistItemAdded).Detail);
     }
@@ -192,10 +192,10 @@ public sealed class ActivityLogTests
     public async Task Changing_the_note_is_logged()
     {
         var movie = AddTmdbMovie();
-        await _watchlistService.PutAsync(Alice, movie.Id, "first", Ct);
+        await _watchlistService.PutAsync(Alice, movie.Id, "first", null, Ct);
         _log.Entries.Clear();
 
-        await _watchlistService.PutAsync(Alice, movie.Id, "second", Ct);
+        await _watchlistService.PutAsync(Alice, movie.Id, "second", null, Ct);
 
         Assert.Equal("Note: second", Single(_log.Entries, ActivityType.WatchlistNoteChanged).Detail);
     }
@@ -204,10 +204,10 @@ public sealed class ActivityLogTests
     public async Task Removing_the_note_is_logged()
     {
         var movie = AddTmdbMovie();
-        await _watchlistService.PutAsync(Alice, movie.Id, "first", Ct);
+        await _watchlistService.PutAsync(Alice, movie.Id, "first", null, Ct);
         _log.Entries.Clear();
 
-        await _watchlistService.PutAsync(Alice, movie.Id, null, Ct);
+        await _watchlistService.PutAsync(Alice, movie.Id, null, null, Ct);
 
         Assert.Equal("Note removed", Single(_log.Entries, ActivityType.WatchlistNoteChanged).Detail);
     }
@@ -216,10 +216,10 @@ public sealed class ActivityLogTests
     public async Task Putting_the_same_note_again_is_not_logged()
     {
         var movie = AddTmdbMovie();
-        await _watchlistService.PutAsync(Alice, movie.Id, "same", Ct);
+        await _watchlistService.PutAsync(Alice, movie.Id, "same", null, Ct);
         _log.Entries.Clear();
 
-        await _watchlistService.PutAsync(Alice, movie.Id, "same", Ct);
+        await _watchlistService.PutAsync(Alice, movie.Id, "same", null, Ct);
 
         Assert.Empty(_log.Entries);
     }
@@ -228,7 +228,7 @@ public sealed class ActivityLogTests
     public async Task Removing_a_movie_from_the_watchlist_is_logged()
     {
         var movie = AddTmdbMovie();
-        await _watchlistService.PutAsync(Alice, movie.Id, null, Ct);
+        await _watchlistService.PutAsync(Alice, movie.Id, null, null, Ct);
         _log.Entries.Clear();
 
         Assert.True(await _watchlistService.RemoveAsync(Alice, movie.Id, Ct));
@@ -318,9 +318,9 @@ public sealed class ActivityLogTests
     public async Task List_returns_the_most_recent_actions_of_the_user_first_and_nobody_elses()
     {
         var movie = AddTmdbMovie();
-        await _watchlistService.PutAsync(Alice, movie.Id, null, Ct);
+        await _watchlistService.PutAsync(Alice, movie.Id, null, null, Ct);
         _clock.Advance(TimeSpan.FromMinutes(1));
-        await _watchlistService.PutAsync(Bob, movie.Id, null, Ct);
+        await _watchlistService.PutAsync(Bob, movie.Id, null, null, Ct);
         _clock.Advance(TimeSpan.FromMinutes(1));
         await _diaryService.CreateAsync(Alice, Details(movie), Ct);
 

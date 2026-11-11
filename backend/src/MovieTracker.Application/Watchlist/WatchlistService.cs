@@ -16,9 +16,9 @@ public sealed class WatchlistService(
         Guid userId, WatchlistFilter filter, int page, int pageSize, CancellationToken cancellationToken) =>
         watchlist.ListAsync(userId, filter, page, pageSize, cancellationToken);
 
-    /// <summary>Puts the movie on the watchlist, or replaces the note if it is on it already (idempotent).</summary>
+    /// <summary>Puts the movie on the watchlist, or replaces the note and the tags if it is on it already (idempotent).</summary>
     public async Task<PutWatchlistItemResult> PutAsync(
-        Guid userId, Guid movieId, string? note, CancellationToken cancellationToken)
+        Guid userId, Guid movieId, string? note, IReadOnlyList<string>? tags, CancellationToken cancellationToken)
     {
         var now = timeProvider.GetUtcNow();
         var item = await watchlist.FindAsync(userId, movieId, cancellationToken);
@@ -33,6 +33,7 @@ public sealed class WatchlistService(
             }
 
             item.UpdateNote(note);
+            item.UpdateTags(tags);
             await unitOfWork.SaveChangesAsync(cancellationToken);
             return new PutWatchlistItemResult(
                 PutWatchlistItemStatus.Updated, await watchlist.GetAsync(userId, movieId, cancellationToken));
@@ -43,7 +44,7 @@ public sealed class WatchlistService(
             return new PutWatchlistItemResult(PutWatchlistItemStatus.NotFound);
         }
 
-        watchlist.Add(new WatchlistItem(userId, movieId, note, now));
+        watchlist.Add(new WatchlistItem(userId, movieId, note, now, tags));
         activityLog.Add(ActivityLogEntry.ForMovie(
             userId, ActivityType.WatchlistItemAdded, now, movieId, movieTitle, ActivityDetails.Note(note)));
         await unitOfWork.SaveChangesAsync(cancellationToken);

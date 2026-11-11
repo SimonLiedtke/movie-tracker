@@ -69,6 +69,7 @@ public sealed class FakeWatchlistRepository(FakeMovieRepository movies) : IWatch
             new MovieRef(movie.Id, movie.Title, movie.ReleaseDate, movie.PosterUrl),
             item.AddedAt,
             item.Note,
+            item.Tags,
             movie.Genres.OrderBy(genre => genre.Name).ToList(),
             movie.RuntimeMinutes);
     }

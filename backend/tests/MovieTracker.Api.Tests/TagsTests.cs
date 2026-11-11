@@ -7,6 +7,12 @@ namespace MovieTracker.Api.Tests;
 
 public sealed class TagsTests(ApiFactory factory) : ApiTestBase(factory)
 {
+    private async Task<WatchlistItemResponse> PutWatchlistAsync(Guid movieId, string[]? tags, HttpClient? client = null)
+    {
+        var response = await (client ?? Client).PutAsJsonAsync($"/api/watchlist/{movieId}", new { tags }, Ct);
+        return await ReadAsync<WatchlistItemResponse>(response, HttpStatusCode.Created);
+    }
+
     // --- Diary entries
 
     [Fact]
@@ -43,5 +49,40 @@ public sealed class TagsTests(ApiFactory factory) : ApiTestBase(factory)
             Ct);
 
         Assert.Equal(["c"], (await ReadAsync<DiaryEntryResponse>(response, HttpStatusCode.OK)).Tags);
+    }
+
+    // --- Watchlist
+
+    [Fact]
+    public async Task A_watchlist_item_has_no_tags_by_default()
+    {
+        var movie = await CreateMovieAsync();
+
+        var response = await Client.PutAsync($"/api/watchlist/{movie.Id}", content: null, Ct);
+
+        Assert.Empty((await ReadAsync<WatchlistItemResponse>(response, HttpStatusCode.Created)).Tags);
+    }
+
+    [Fact]
+    public async Task A_watchlist_item_keeps_its_tags_normalized()
+    {
+        var movie = await CreateMovieAsync();
+
+        var item = await PutWatchlistAsync(movie.Id, ["Date Night", "horror", "Horror"]);
+
+        Assert.Equal(["date night", "horror"], item.Tags);
+        var list = await GetAsync<PagedResponse<WatchlistItemResponse>>("/api/watchlist");
+        Assert.Equal(["date night", "horror"], Assert.Single(list.Items).Tags);
+    }
+
+    [Fact]
+    public async Task Putting_a_watchlist_item_again_replaces_its_tags()
+    {
+        var movie = await CreateMovieAsync();
+        await PutWatchlistAsync(movie.Id, ["a", "b"]);
+
+        var response = await Client.PutAsJsonAsync($"/api/watchlist/{movie.Id}", new { tags = new[] { "c" } }, Ct);
+
+        Assert.Equal(["c"], (await ReadAsync<WatchlistItemResponse>(response, HttpStatusCode.OK)).Tags);
     }
 }

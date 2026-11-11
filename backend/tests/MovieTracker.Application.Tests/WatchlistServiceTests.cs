@@ -40,6 +40,31 @@ public sealed class WatchlistServiceTests
         return movie;
     }
 
+    // --- Tags
+
+    [Fact]
+    public async Task Put_saves_the_tags_normalized()
+    {
+        var movie = AddTmdbMovie();
+
+        var result = await _service.PutAsync(Alice, movie.Id, null, [" Date Night", "horror", "HORROR"], Ct);
+
+        Assert.Equal(["date night", "horror"], Assert.Single(_watchlist.Items).Tags);
+        Assert.Equal(["date night", "horror"], result.Item!.Tags);
+    }
+
+    [Fact]
+    public async Task Put_again_replaces_the_tags()
+    {
+        var movie = AddTmdbMovie();
+        await _service.PutAsync(Alice, movie.Id, null, ["a", "b"], Ct);
+
+        var result = await _service.PutAsync(Alice, movie.Id, null, ["c"], Ct);
+
+        Assert.Equal(PutWatchlistItemStatus.Updated, result.Status);
+        Assert.Equal(["c"], result.Item!.Tags);
+    }
+
     // --- Putting a movie on the watchlist
 
     [Fact]
@@ -47,7 +72,7 @@ public sealed class WatchlistServiceTests
     {
         var movie = AddTmdbMovie();
 
-        var result = await _service.PutAsync(Alice, movie.Id, "Director's cut", Ct);
+        var result = await _service.PutAsync(Alice, movie.Id, "Director's cut", null, Ct);
 
         Assert.Equal(PutWatchlistItemStatus.Added, result.Status);
         var item = Assert.Single(_watchlist.Items);
@@ -63,7 +88,7 @@ public sealed class WatchlistServiceTests
     {
         var movie = AddTmdbMovie();
 
-        await _service.PutAsync(Alice, movie.Id, null, Ct);
+        await _service.PutAsync(Alice, movie.Id, null, null, Ct);
 
         Assert.Null(Assert.Single(_watchlist.Items).Note);
     }
@@ -72,10 +97,10 @@ public sealed class WatchlistServiceTests
     public async Task Put_again_replaces_the_note_and_keeps_the_date_added()
     {
         var movie = AddTmdbMovie();
-        await _service.PutAsync(Alice, movie.Id, "first", Ct);
+        await _service.PutAsync(Alice, movie.Id, "first", null, Ct);
         _clock.Advance(TimeSpan.FromDays(1));
 
-        var result = await _service.PutAsync(Alice, movie.Id, "second", Ct);
+        var result = await _service.PutAsync(Alice, movie.Id, "second", null, Ct);
 
         Assert.Equal(PutWatchlistItemStatus.Updated, result.Status);
         var item = Assert.Single(_watchlist.Items);
@@ -88,9 +113,9 @@ public sealed class WatchlistServiceTests
     public async Task Put_again_without_a_note_removes_the_note()
     {
         var movie = AddTmdbMovie();
-        await _service.PutAsync(Alice, movie.Id, "first", Ct);
+        await _service.PutAsync(Alice, movie.Id, "first", null, Ct);
 
-        await _service.PutAsync(Alice, movie.Id, null, Ct);
+        await _service.PutAsync(Alice, movie.Id, null, null, Ct);
 
         Assert.Null(Assert.Single(_watchlist.Items).Note);
     }
@@ -98,7 +123,7 @@ public sealed class WatchlistServiceTests
     [Fact]
     public async Task Put_does_not_find_unknown_movies()
     {
-        var result = await _service.PutAsync(Alice, Guid.NewGuid(), "?", Ct);
+        var result = await _service.PutAsync(Alice, Guid.NewGuid(), "?", null, Ct);
 
         Assert.Equal(PutWatchlistItemStatus.NotFound, result.Status);
         Assert.Empty(_watchlist.Items);
@@ -110,7 +135,7 @@ public sealed class WatchlistServiceTests
     {
         var movie = AddManualMovie(Bob);
 
-        var result = await _service.PutAsync(Alice, movie.Id, null, Ct);
+        var result = await _service.PutAsync(Alice, movie.Id, null, null, Ct);
 
         Assert.Equal(PutWatchlistItemStatus.NotFound, result.Status);
         Assert.Empty(_watchlist.Items);
@@ -120,9 +145,9 @@ public sealed class WatchlistServiceTests
     public async Task Every_user_has_their_own_watchlist()
     {
         var movie = AddTmdbMovie();
-        await _service.PutAsync(Bob, movie.Id, "Bob's note", Ct);
+        await _service.PutAsync(Bob, movie.Id, "Bob's note", null, Ct);
 
-        var result = await _service.PutAsync(Alice, movie.Id, "Alice's note", Ct);
+        var result = await _service.PutAsync(Alice, movie.Id, "Alice's note", null, Ct);
 
         Assert.Equal(PutWatchlistItemStatus.Added, result.Status);
         Assert.Equal(
@@ -136,7 +161,7 @@ public sealed class WatchlistServiceTests
     public async Task Remove_takes_the_movie_off_the_users_watchlist()
     {
         var movie = AddTmdbMovie();
-        await _service.PutAsync(Alice, movie.Id, null, Ct);
+        await _service.PutAsync(Alice, movie.Id, null, null, Ct);
 
         Assert.True(await _service.RemoveAsync(Alice, movie.Id, Ct));
 
@@ -147,7 +172,7 @@ public sealed class WatchlistServiceTests
     public async Task Remove_does_not_touch_other_users_watchlists()
     {
         var movie = AddTmdbMovie();
-        await _service.PutAsync(Bob, movie.Id, null, Ct);
+        await _service.PutAsync(Bob, movie.Id, null, null, Ct);
 
         Assert.False(await _service.RemoveAsync(Alice, movie.Id, Ct));
 
@@ -161,10 +186,10 @@ public sealed class WatchlistServiceTests
     {
         var alien = AddTmdbMovie(348, "Alien");
         var aliens = AddTmdbMovie(679, "Aliens");
-        await _service.PutAsync(Alice, alien.Id, null, Ct);
+        await _service.PutAsync(Alice, alien.Id, null, null, Ct);
         _clock.Advance(TimeSpan.FromMinutes(1));
-        await _service.PutAsync(Alice, aliens.Id, null, Ct);
-        await _service.PutAsync(Bob, alien.Id, null, Ct);
+        await _service.PutAsync(Alice, aliens.Id, null, null, Ct);
+        await _service.PutAsync(Bob, alien.Id, null, null, Ct);
 
         var result = await _service.ListAsync(Alice, WatchlistFilter.None, page: 1, pageSize: 10, Ct);
 

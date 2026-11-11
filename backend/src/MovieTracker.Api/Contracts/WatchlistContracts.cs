@@ -6,6 +6,7 @@ public sealed record WatchlistItemResponse(
     MovieRefResponse Movie,
     DateTimeOffset AddedAt,
     string? Note,
+    IReadOnlyList<string> Tags,
     IReadOnlyList<GenreResponse> Genres,
     int? RuntimeMinutes);
 
@@ -17,4 +18,7 @@ public sealed class WatchlistItemRequest
 {
     [StringLength(500)]
     public string? Note { get; init; }
+
+    /// <summary>Free tags. Case and surrounding spaces do not matter; the response has them normalized.</summary>
+    public string[]? Tags { get; init; }
 }

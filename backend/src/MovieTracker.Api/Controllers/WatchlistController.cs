@@ -81,7 +81,7 @@ public sealed class WatchlistController(WatchlistService watchlist) : Controller
         [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] WatchlistItemRequest? request,
         CancellationToken cancellationToken)
     {
-        var result = await watchlist.PutAsync(User.GetUserId(), movieId, request?.Note, cancellationToken);
+        var result = await watchlist.PutAsync(User.GetUserId(), movieId, request?.Note, request?.Tags, cancellationToken);
 
         return result.Status switch
         {

@@ -16,6 +16,7 @@ internal sealed class WatchlistRepository(MovieTrackerDbContext db) : IWatchlist
             new MovieRef(item.Movie.Id, item.Movie.Title, item.Movie.ReleaseDate, item.Movie.PosterUrl),
             item.AddedAt,
             item.Note,
+            item.Tags,
             item.Movie.Genres
                 .OrderBy(genre => genre.Name)
                 .Select(genre => new GenreRow(genre.Id, genre.Name))
@@ -58,8 +59,8 @@ internal sealed class WatchlistRepository(MovieTrackerDbContext db) : IWatchlist
 }
 
 internal sealed record WatchlistItemRow(
-    MovieRef Movie, DateTimeOffset AddedAt, string? Note, List<GenreRow> Genres, int? RuntimeMinutes)
+    MovieRef Movie, DateTimeOffset AddedAt, string? Note, string[] Tags, List<GenreRow> Genres, int? RuntimeMinutes)
 {
     public WatchlistItemView ToModel() =>
-        new(Movie, AddedAt, Note, Genres.Select(genre => genre.ToModel()).ToList(), RuntimeMinutes);
+        new(Movie, AddedAt, Note, Tags, Genres.Select(genre => genre.ToModel()).ToList(), RuntimeMinutes);
 }
