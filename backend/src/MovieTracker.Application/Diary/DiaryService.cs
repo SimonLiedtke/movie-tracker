@@ -3,6 +3,7 @@ using MovieTracker.Application.Movies;
 using MovieTracker.Application.Watchlist;
 using MovieTracker.Domain.Activity;
 using MovieTracker.Domain.Diary;
+using MovieTracker.Domain.Tags;
 
 namespace MovieTracker.Application.Diary;
 
@@ -36,6 +37,7 @@ public sealed class DiaryService(
     /// <summary>
     /// Logs the viewing. The movie has been watched, so it is taken off the user's watchlist, in the same save: either
     /// the viewing is logged and the movie is off the watchlist, or nothing changes. The activity log says so.
+    /// The tags of the watchlist item move to the entry along with it: the entry gets them in addition to its own tags.
     /// </summary>
     public async Task<SaveDiaryEntryResult> CreateAsync(
         Guid userId, DiaryEntryDetails details, CancellationToken cancellationToken)
@@ -51,13 +53,15 @@ public sealed class DiaryService(
         }
 
         var now = timeProvider.GetUtcNow();
-        var entry = new DiaryEntry(userId, details, now);
-        diary.Add(entry);
         var watchlistItem = await watchlist.FindAsync(userId, details.MovieId, cancellationToken);
         if (watchlistItem is not null)
         {
+            details = details with { Tags = TagList.Merge(details.Tags, watchlistItem.Tags) };
             watchlist.Remove(watchlistItem);
         }
+
+        var entry = new DiaryEntry(userId, details, now);
+        diary.Add(entry);
 
         activityLog.Add(ActivityLogEntry.ForMovie(
             userId,

@@ -74,6 +74,40 @@ public sealed class DiaryServiceTests
     }
 
     [Fact]
+    public async Task Create_keeps_the_tags_of_the_watchlist_item_along_with_the_ones_of_the_entry()
+    {
+        var movie = AddTmdbMovie();
+        _watchlist.Items.Add(new WatchlistItem(Alice, movie.Id, null, Start, ["recommended", "horror"]));
+
+        var result = await _service.CreateAsync(Alice, Details(movie) with { Tags = ["Horror", "cinema"] }, Ct);
+
+        Assert.Equal(["cinema", "horror", "recommended"], result.Entry!.Tags);
+        Assert.Empty(_watchlist.Items);
+    }
+
+    [Fact]
+    public async Task Create_keeps_the_tags_of_the_watchlist_item_if_the_entry_has_none()
+    {
+        var movie = AddTmdbMovie();
+        _watchlist.Items.Add(new WatchlistItem(Alice, movie.Id, null, Start, ["recommended"]));
+
+        var result = await _service.CreateAsync(Alice, Details(movie), Ct);
+
+        Assert.Equal(["recommended"], result.Entry!.Tags);
+    }
+
+    [Fact]
+    public async Task Create_does_not_take_over_the_tags_of_the_watchlist_of_another_user()
+    {
+        var movie = AddTmdbMovie();
+        _watchlist.Items.Add(new WatchlistItem(Bob, movie.Id, null, Start, ["bobs tag"]));
+
+        var result = await _service.CreateAsync(Alice, Details(movie), Ct);
+
+        Assert.Empty(result.Entry!.Tags);
+    }
+
+    [Fact]
     public async Task Update_replaces_the_tags()
     {
         var movie = AddTmdbMovie();

@@ -85,4 +85,41 @@ public sealed class TagsTests(ApiFactory factory) : ApiTestBase(factory)
 
         Assert.Equal(["c"], (await ReadAsync<WatchlistItemResponse>(response, HttpStatusCode.OK)).Tags);
     }
+
+    // --- From the watchlist to the diary
+
+    [Fact]
+    public async Task Logging_a_viewing_keeps_the_tags_of_the_watchlist_item()
+    {
+        var movie = await CreateMovieAsync();
+        await PutWatchlistAsync(movie.Id, ["recommended", "horror"]);
+
+        var entry = await CreateDiaryEntryAsync(movie.Id, tags: ["cinema", "Horror"]);
+
+        Assert.Equal(["cinema", "horror", "recommended"], entry.Tags);
+        var watchlist = await GetAsync<PagedResponse<WatchlistItemResponse>>("/api/watchlist");
+        Assert.Empty(watchlist.Items);
+    }
+
+    [Fact]
+    public async Task Logging_a_viewing_without_tags_keeps_the_tags_of_the_watchlist_item()
+    {
+        var movie = await CreateMovieAsync();
+        await PutWatchlistAsync(movie.Id, ["recommended"]);
+
+        var entry = await CreateDiaryEntryAsync(movie.Id);
+
+        Assert.Equal(["recommended"], entry.Tags);
+    }
+
+    [Fact]
+    public async Task Logging_a_viewing_does_not_take_over_the_tags_of_the_watchlist_of_another_user()
+    {
+        var movie = await ImportTmdbMovieAsync();
+        await PutWatchlistAsync(movie.Id, ["bobs tag"], Bob);
+
+        var entry = await CreateDiaryEntryAsync(movie.Id);
+
+        Assert.Empty(entry.Tags);
+    }
 }
