@@ -122,6 +122,25 @@ jobs:
       # Room for a later step: compare the generated OpenAPI document
       # (/openapi/v1.json) with api/openapi.yaml.
 
+  openapi:
+    name: OpenAPI
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      # Validates api/openapi.yaml against the OpenAPI 3.0 schema and lints it
+      # with the rules in api/redocly.yaml.
+      - name: Lint OpenAPI document
+        run: npx --yes @redocly/cli@2 lint openapi.yaml --config redocly.yaml --format github-actions
+
   frontend:
     name: Frontend (Angular)
     runs-on: ubuntu-latest
