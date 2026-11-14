@@ -8,7 +8,7 @@ import { DiaryEntry, DiaryQuery, PagedResponse } from '../../core/api/models';
 import { formatDate, formatDay, formatMonth, yearOf } from '../../shared/dates';
 import { ErrorNotification } from '../../shared/error-notification';
 import { Pagination } from '../../shared/pagination';
-import { Rating } from '../../shared/rating';
+import { RATING_OPTIONS, Rating } from '../../shared/rating';
 import { Tags } from '../../shared/tags';
 
 const PAGE_SIZE = 25;
@@ -18,6 +18,8 @@ function parseQuery(params: ParamMap): DiaryQuery {
     from: params.get('from') ?? undefined,
     to: params.get('to') ?? undefined,
     tag: params.get('tag')?.trim() || undefined,
+    ratingFrom: Number(params.get('ratingFrom')) || undefined,
+    ratingTo: Number(params.get('ratingTo')) || undefined,
     page: Number(params.get('page')) || 1,
     pageSize: PAGE_SIZE,
   };
@@ -40,6 +42,7 @@ export class DiaryList {
   private readonly router = inject(Router);
   private readonly diaryApi = inject(DiaryApi);
 
+  protected readonly ratingOptions = RATING_OPTIONS;
   protected readonly yearOf = yearOf;
   protected readonly formatDay = formatDay;
   protected readonly query = toSignal(this.route.queryParamMap.pipe(map(parseQuery)), {
@@ -98,12 +101,18 @@ export class DiaryList {
       });
   }
 
-  protected onFilter(key: 'from' | 'to' | 'tag', value: string): void {
+  protected onFilter(key: 'from' | 'to' | 'tag' | 'ratingFrom' | 'ratingTo', value: string): void {
     this.router.navigate([], {
       queryParams: { [key]: value || undefined, page: undefined },
       queryParamsHandling: 'merge',
     });
   }
+
+  /** Whether a filter other than the page is set. */
+  protected readonly hasFilter = computed(() => {
+    const { from, to, tag, ratingFrom, ratingTo } = this.query();
+    return !!(from || to || tag || ratingFrom || ratingTo);
+  });
 
   protected clearFilters(): void {
     this.router.navigate([]);
