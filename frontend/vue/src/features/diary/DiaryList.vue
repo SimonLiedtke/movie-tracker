@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router';
 import { useApi } from '../../core/api/api';
 import { toApiError, type ApiError } from '../../core/api/api-error';
 import type { DiaryEntry, DiaryQuery, PagedResponse } from '../../core/api/models';
-import { formatDate, formatDay, formatMonth, yearOf } from '../../shared/dates';
+import { formatDate, formatDay, formatMonth, monthOf, yearOf } from '../../shared/dates';
 import ErrorNotification from '../../shared/ErrorNotification.vue';
 import Pagination from '../../shared/Pagination.vue';
 import { mergeQuery } from '../../shared/query';
@@ -44,7 +44,7 @@ const result = ref<PagedResponse<DiaryEntry> | null>(null);
 const groups = computed<MonthGroup[]>(() => {
   const groups: MonthGroup[] = [];
   for (const entry of result.value?.items ?? []) {
-    const key = entry.watchedOn.slice(0, 7);
+    const key = monthOf(entry.watchedOn);
     let group = groups.at(-1);
     if (group?.key !== key) {
       group = { key, label: formatMonth(entry.watchedOn), entries: [] };

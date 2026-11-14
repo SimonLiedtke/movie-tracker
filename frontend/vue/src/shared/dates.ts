@@ -11,6 +11,11 @@ export function yearOf(date: string | null | undefined): string {
   return date ? date.slice(0, 4) : '';
 }
 
+/** The "YYYY-MM" month of a "YYYY-MM-DD" date. */
+export function monthOf(date: string): string {
+  return date.slice(0, 7);
+}
+
 /** Parses a "YYYY-MM-DD" date as a local date (avoids the UTC shift of `new Date(iso)`). */
 function parseIso(date: string): Date {
   const [year, month, day] = date.split('-').map(Number);
