@@ -166,6 +166,69 @@ describe('DiaryList', () => {
     });
   });
 
+  describe('rating', () => {
+    it('filters by the rating range in the URL and says so when nothing matches', async () => {
+      const { page } = await openWith(
+        [],
+        '/diary?ratingFrom=4&ratingTo=8',
+        'ratingFrom=4&ratingTo=8&page=1&pageSize=25',
+      );
+
+      expect(page.get<HTMLSelectElement>('#ratingFrom').element.value).toBe('4');
+      expect(page.get<HTMLSelectElement>('#ratingTo').element.value).toBe('8');
+      expect(text(page)).toContain('No diary entries for this filter.');
+      expect(page.findAll('button').map((button) => button.text())).toContain('Clear');
+    });
+
+    it('does not offer a maximum below the minimum, nor a minimum above the maximum', async () => {
+      const { page } = await openWith(
+        ENTRIES,
+        '/diary?ratingFrom=4&ratingTo=8',
+        'ratingFrom=4&ratingTo=8&page=1&pageSize=25',
+      );
+
+      const disabled = (id: string) =>
+        page
+          .findAll(`#${id} option`)
+          .filter((option) => option.attributes('disabled') !== undefined)
+          .map((option) => (option.element as HTMLOptionElement).value);
+      expect(disabled('ratingFrom')).toEqual(['9', '10']);
+      expect(disabled('ratingTo')).toEqual(['1', '2', '3']);
+    });
+
+    it('filters by the rating that is chosen, starting again at the first page', async () => {
+      const { page, router } = await openWith(ENTRIES, '/diary?page=3', 'page=3&pageSize=25');
+
+      await page.get('#ratingFrom').setValue('7');
+      await flushPromises();
+
+      expect(router.currentRoute.value.query).toEqual({ ratingFrom: '7' });
+      diaryRequest('ratingFrom=7&page=1&pageSize=25').flush(paged([ENTRIES[0]]));
+      await flushPromises();
+
+      await page.get('#ratingTo').setValue('9');
+      await flushPromises();
+      expect(router.currentRoute.value.query).toEqual({ ratingFrom: '7', ratingTo: '9' });
+      diaryRequest('ratingFrom=7&ratingTo=9&page=1&pageSize=25').flush(paged([ENTRIES[0]]));
+      await flushPromises();
+    });
+
+    it('removes the rating filter when "Any" is chosen', async () => {
+      const { page, router } = await openWith(
+        ENTRIES,
+        '/diary?ratingFrom=7',
+        'ratingFrom=7&page=1&pageSize=25',
+      );
+
+      await page.get('#ratingFrom').setValue('');
+      await flushPromises();
+
+      expect(router.currentRoute.value.query).toEqual({});
+      diaryRequest('page=1&pageSize=25').flush(paged(ENTRIES));
+      await flushPromises();
+    });
+  });
+
   it('has nothing to clear without a period', async () => {
     const { page } = await openWith(ENTRIES);
 

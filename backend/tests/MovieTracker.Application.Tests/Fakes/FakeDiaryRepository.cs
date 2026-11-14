@@ -22,6 +22,8 @@ public sealed class FakeDiaryRepository(FakeMovieRepository movies) : IDiaryRepo
             .Where(entry => filter.To is null || entry.WatchedOn <= filter.To)
             .Where(entry => filter.MovieId is null || entry.MovieId == filter.MovieId)
             .Where(entry => filter.Tag is null || entry.Tags.Contains(filter.Tag))
+            .Where(entry => filter.RatingFrom is null || entry.Rating?.HalfStars >= filter.RatingFrom.Value.HalfStars)
+            .Where(entry => filter.RatingTo is null || entry.Rating?.HalfStars <= filter.RatingTo.Value.HalfStars)
             .ToList();
         var items = matching.Skip((page - 1) * pageSize).Take(pageSize).Select(ToView).ToList();
         return Task.FromResult(new PagedResult<DiaryEntryView>(items, page, pageSize, matching.Count));

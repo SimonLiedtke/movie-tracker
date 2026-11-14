@@ -109,6 +109,10 @@ export interface DiaryQuery {
   movieId?: string;
   /** Only entries with this tag (case does not matter). */
   tag?: string;
+  /** Only entries rated at least this, in half stars (1-10). Unrated entries do not match. */
+  ratingFrom?: number;
+  /** Only entries rated at most this, in half stars (1-10). Unrated entries do not match. */
+  ratingTo?: number;
   page?: number;
   pageSize?: number;
 }

@@ -262,6 +262,16 @@ paths:
           in: query
           schema: { type: string, format: uuid }
         - $ref: '#/components/parameters/Tag'
+        - name: ratingFrom
+          in: query
+          description: |
+            Only entries rated at least this (half stars, inclusive). Unrated entries are left out when
+            `ratingFrom` or `ratingTo` is set.
+          schema: { type: integer, format: int32, minimum: 1, maximum: 10 }
+        - name: ratingTo
+          in: query
+          description: Only entries rated at most this (half stars, inclusive). Must not be less than `ratingFrom`.
+          schema: { type: integer, format: int32, minimum: 1, maximum: 10 }
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PageSize'
       responses:

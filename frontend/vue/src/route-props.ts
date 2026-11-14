@@ -31,11 +31,13 @@ export const movieFormProps = (route: RouteLocationNormalized) => ({
   next: queryString(route.query['next']),
 });
 
-/** The period and page of the diary. */
+/** The filters (period, tag, rating) and page of the diary. */
 export const diaryListProps = (route: RouteLocationNormalized) => ({
   from: queryString(route.query['from']),
   to: queryString(route.query['to']),
   tag: queryString(route.query['tag']),
+  ratingFrom: queryString(route.query['ratingFrom']),
+  ratingTo: queryString(route.query['ratingTo']),
   page: queryString(route.query['page']),
 });
 

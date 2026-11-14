@@ -177,6 +177,47 @@ public sealed class DiaryEntriesTests(ApiFactory factory) : ApiTestBase(factory)
         Assert.Equal([new DateOnly(2026, 11, 1), new DateOnly(2026, 10, 1)], alienOnly.Items.Select(entry => entry.WatchedOn));
     }
 
+    [Theory]
+    [InlineData("ratingFrom=7", new[] { 10, 7 })]
+    [InlineData("ratingTo=4", new[] { 4, 1 })]
+    [InlineData("ratingFrom=4&ratingTo=7", new[] { 7, 4 })]
+    [InlineData("ratingFrom=7&ratingTo=7", new[] { 7 })]
+    [InlineData("ratingFrom=1&ratingTo=10", new[] { 10, 7, 4, 1 })]
+    public async Task List_filters_by_rating(string query, int[] expected)
+    {
+        var movie = await CreateMovieAsync();
+        await CreateDiaryEntryAsync(movie.Id, watchedOn: "2026-10-01", rating: 1);
+        await CreateDiaryEntryAsync(movie.Id, watchedOn: "2026-10-02", rating: 4);
+        await CreateDiaryEntryAsync(movie.Id, watchedOn: "2026-10-03", rating: 7);
+        await CreateDiaryEntryAsync(movie.Id, watchedOn: "2026-10-04", rating: 10);
+        await CreateDiaryEntryAsync(movie.Id, watchedOn: "2026-10-05", rating: null);
+
+        var result = await GetAsync<PagedResponse<DiaryEntryResponse>>($"/api/diary-entries?{query}");
+
+        Assert.Equal(expected, result.Items.Select(entry => entry.Rating!.Value));
+        Assert.Equal(expected.Length, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task List_rejects_a_rating_range_that_ends_before_it_starts()
+    {
+        var response = await Client.GetAsync("/api/diary-entries?ratingFrom=8&ratingTo=3", Ct);
+
+        var problem = await ReadValidationProblemAsync(response);
+        Assert.Contains("ratingFrom", problem.Errors.Keys);
+    }
+
+    [Theory]
+    [InlineData("ratingFrom=0")]
+    [InlineData("ratingTo=11")]
+    [InlineData("ratingFrom=high")]
+    public async Task List_rejects_an_invalid_rating(string query)
+    {
+        var response = await Client.GetAsync($"/api/diary-entries?{query}", Ct);
+
+        await ReadValidationProblemAsync(response);
+    }
+
     [Fact]
     public async Task List_pages_through_the_entries()
     {

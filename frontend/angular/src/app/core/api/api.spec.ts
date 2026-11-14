@@ -135,6 +135,12 @@ describe('API services', () => {
     http.expectOne('/api/diary-entries?tag=horror').flush({});
   });
 
+  it('filters the diary by rating', () => {
+    TestBed.inject(DiaryApi).list({ ratingFrom: 4, ratingTo: 8 }).subscribe();
+
+    http.expectOne('/api/diary-entries?ratingFrom=4&ratingTo=8').flush({});
+  });
+
   it('uploads a Letterboxd export as a file in a multipart form', () => {
     const file = new File(['zip'], 'export.zip', { type: 'application/zip' });
     TestBed.inject(LetterboxdImportApi).start(file).subscribe();
