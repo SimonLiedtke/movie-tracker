@@ -72,6 +72,13 @@ describe('API clients', () => {
     await Promise.all([watchlist, diary]);
   });
 
+  it('filters the diary by rating', async () => {
+    const result = api().diary.list({ ratingFrom: 4, ratingTo: 8 });
+
+    backend.expectOne('/api/diary-entries?ratingFrom=4&ratingTo=8').flush({});
+    await result;
+  });
+
   it('puts a movie on the watchlist with a note', async () => {
     const result = api().watchlist.put('42', "Director's cut");
 
