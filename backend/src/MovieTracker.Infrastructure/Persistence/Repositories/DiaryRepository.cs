@@ -35,6 +35,17 @@ internal sealed class DiaryRepository(MovieTrackerDbContext db) : IDiaryReposito
             entries = entries.Where(entry => entry.Tags.Contains(tag));
         }
 
+        if (filter.RatingFrom is not null || filter.RatingTo is not null)
+        {
+            // Rating is value-converted, so EF Core can only compare it for equality: list the ratings in the range.
+            var lowest = filter.RatingFrom?.HalfStars ?? Rating.MinHalfStars;
+            var highest = filter.RatingTo?.HalfStars ?? Rating.MaxHalfStars;
+            var ratings = Enumerable.Range(lowest, Math.Max(0, highest - lowest + 1))
+                .Select(halfStars => new Rating(halfStars))
+                .ToArray();
+            entries = entries.Where(entry => ratings.Contains(entry.Rating!.Value));
+        }
+
         var totalCount = await entries.CountAsync(cancellationToken);
         var rows = await entries
             .OrderByNewest()

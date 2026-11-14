@@ -4,6 +4,38 @@ Personal movie tracker (similar to Letterboxd, without the social features).
 API-driven backend in C# with PostgreSQL, multiple frontends (Angular, Vue, React, MAUI).
 There are an Angular and a Vue frontend so far; both do the same.
 
+## Screenshots
+
+A look at the app in action (click an image for the full size).
+
+**Sign in**: Users sign in with their Google account.
+
+[![Sign in](docs/screenshots/sign-in.png)](docs/screenshots/sign-in.png)
+
+**My movies**: Everything you logged, put on your watchlist or added manually, searchable and filterable.
+
+[![My movies](docs/screenshots/my-movies.webp)](docs/screenshots/my-movies.webp)
+
+**Diary**: Your viewings by month, filterable by date and tag.
+
+[![Diary](docs/screenshots/diary.png)](docs/screenshots/diary.png)
+
+**Log a viewing**: With rating, review, tags, rewatch and like.
+
+[![Log a viewing](docs/screenshots/log-a-viewing.png)](docs/screenshots/log-a-viewing.png)
+
+**Watchlist**: Movies to watch later, with filters, notes and tags.
+
+[![Watchlist](docs/screenshots/watchlist.png)](docs/screenshots/watchlist.png)
+
+**Activity log**: Everything you did that changed your data.
+
+[![Activity log](docs/screenshots/activity-log.png)](docs/screenshots/activity-log.png)
+
+**Import from Letterboxd**: Brings your diary and watchlist over from a Letterboxd export.
+
+[![Import from Letterboxd](docs/screenshots/import.png)](docs/screenshots/import.png)
+
 ## Structure
 
 | Folder      | Content                                                  |
@@ -215,6 +247,12 @@ dotnet reportgenerator "-reports:coverage/raw/**/*.cobertura.xml" "-targetdir:co
 
 Open `backend/coverage/report/index.html`. GitHub Actions does the same on every push: the coverage summary is on the
 workflow run's summary page, and the full HTML report is attached to it as the `backend-coverage` artifact.
+
+On pull requests, a comment shows whether the line and branch coverage (in total and per assembly) went up, went down
+or stayed the same compared with the latest run on `main` (kept in the Actions cache). The comment is only
+informational: it never fails the build, however low the coverage is. Pull requests from forks and from Dependabot cannot
+write comments, so they get the comparison on the run's summary page only. The comparison is done by
+`.github/scripts/coverage_comment.py`.
 
 ## Adding a migration
 

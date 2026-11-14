@@ -9,6 +9,7 @@ import ErrorNotification from '../../shared/ErrorNotification.vue';
 import Pagination from '../../shared/Pagination.vue';
 import { mergeQuery } from '../../shared/query';
 import Rating from '../../shared/Rating.vue';
+import { RATING_OPTIONS } from '../../shared/rating-format';
 import TagList from '../../shared/TagList.vue';
 
 const PAGE_SIZE = 25;
@@ -25,6 +26,8 @@ const props = defineProps<{
   from?: string;
   to?: string;
   tag?: string;
+  ratingFrom?: string;
+  ratingTo?: string;
   page?: string;
 }>();
 
@@ -35,6 +38,8 @@ const query = computed<DiaryQuery>(() => ({
   from: props.from,
   to: props.to,
   tag: props.tag?.trim() || undefined,
+  ratingFrom: Number(props.ratingFrom) || undefined,
+  ratingTo: Number(props.ratingTo) || undefined,
   page: Number(props.page) || 1,
   pageSize: PAGE_SIZE,
 }));
@@ -92,10 +97,22 @@ async function load(): Promise<void> {
   loading.value = false;
 }
 
+/** Whether a filter other than the page is set. */
+const hasFilter = computed(
+  () =>
+    !!(
+      query.value.from ||
+      query.value.to ||
+      query.value.tag ||
+      query.value.ratingFrom ||
+      query.value.ratingTo
+    ),
+);
+
 // Every load goes through this watcher, so that a newer one always cancels an older one.
 watch([query, reloads], load, { immediate: true });
 
-function onFilter(key: 'from' | 'to' | 'tag', value: string): void {
+function onFilter(key: 'from' | 'to' | 'tag' | 'ratingFrom' | 'ratingTo', value: string): void {
   router.push({
     query: mergeQuery(router.currentRoute.value.query, {
       [key]: value || undefined,
@@ -142,7 +159,7 @@ async function deleteEntry(entry: DiaryEntry): Promise<void> {
 
   <div class="box">
     <div class="columns is-mobile is-multiline is-align-items-flex-end">
-      <div class="column is-half-mobile is-3-tablet">
+      <div class="column is-half-mobile is-2-tablet">
         <div class="field">
           <label class="label" for="from">From</label>
           <div class="control">
@@ -157,7 +174,7 @@ async function deleteEntry(entry: DiaryEntry): Promise<void> {
           </div>
         </div>
       </div>
-      <div class="column is-half-mobile is-3-tablet">
+      <div class="column is-half-mobile is-2-tablet">
         <div class="field">
           <label class="label" for="to">To</label>
           <div class="control">
@@ -169,6 +186,54 @@ async function deleteEntry(entry: DiaryEntry): Promise<void> {
               :min="query.from ?? ''"
               @change="onFilter('to', ($event.target as HTMLInputElement).value)"
             />
+          </div>
+        </div>
+      </div>
+      <div class="column is-half-mobile is-2-tablet">
+        <div class="field">
+          <label class="label" for="ratingFrom">Min rating</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select
+                id="ratingFrom"
+                :value="query.ratingFrom ?? ''"
+                @change="onFilter('ratingFrom', ($event.target as HTMLSelectElement).value)"
+              >
+                <option value="">Any</option>
+                <option
+                  v-for="option in RATING_OPTIONS"
+                  :key="option.value"
+                  :value="option.value"
+                  :disabled="!!query.ratingTo && option.value > query.ratingTo"
+                >
+                  {{ option.label }}
+                </option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="column is-half-mobile is-2-tablet">
+        <div class="field">
+          <label class="label" for="ratingTo">Max rating</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select
+                id="ratingTo"
+                :value="query.ratingTo ?? ''"
+                @change="onFilter('ratingTo', ($event.target as HTMLSelectElement).value)"
+              >
+                <option value="">Any</option>
+                <option
+                  v-for="option in RATING_OPTIONS"
+                  :key="option.value"
+                  :value="option.value"
+                  :disabled="!!query.ratingFrom && option.value < query.ratingFrom"
+                >
+                  {{ option.label }}
+                </option>
+              </select>
+            </div>
           </div>
         </div>
       </div>
@@ -187,7 +252,7 @@ async function deleteEntry(entry: DiaryEntry): Promise<void> {
           </div>
         </div>
       </div>
-      <div v-if="query.from || query.to || query.tag" class="column is-narrow">
+      <div v-if="hasFilter" class="column is-narrow">
         <button class="button is-light" @click="clearFilters">Clear</button>
       </div>
     </div>
@@ -245,7 +310,7 @@ async function deleteEntry(entry: DiaryEntry): Promise<void> {
     </div>
     <div v-else class="notification">
       No diary entries
-      <template v-if="query.tag">for this filter.</template>
+      <template v-if="query.tag || query.ratingFrom || query.ratingTo">for this filter.</template>
       <template v-else-if="query.from || query.to">in this period.</template>
       <template v-else
         >yet. <RouterLink to="/diary/new">Log your first viewing</RouterLink>.</template

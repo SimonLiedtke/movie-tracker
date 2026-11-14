@@ -9,7 +9,7 @@
 
 <div class="box">
   <div class="columns is-mobile is-multiline is-align-items-flex-end">
-    <div class="column is-half-mobile is-3-tablet">
+    <div class="column is-half-mobile is-2-tablet">
       <div class="field">
         <label class="label" for="from">From</label>
         <div class="control">
@@ -24,7 +24,7 @@
         </div>
       </div>
     </div>
-    <div class="column is-half-mobile is-3-tablet">
+    <div class="column is-half-mobile is-2-tablet">
       <div class="field">
         <label class="label" for="to">To</label>
         <div class="control">
@@ -36,6 +36,56 @@
             [min]="query().from ?? ''"
             (change)="onFilter('to', $any($event.target).value)"
           />
+        </div>
+      </div>
+    </div>
+    <div class="column is-half-mobile is-2-tablet">
+      <div class="field">
+        <label class="label" for="ratingFrom">Min rating</label>
+        <div class="control">
+          <div class="select is-fullwidth">
+            <select
+              id="ratingFrom"
+              [value]="query().ratingFrom ?? ''"
+              (change)="onFilter('ratingFrom', $any($event.target).value)"
+            >
+              <option value="">Any</option>
+              @for (option of ratingOptions; track option.value) {
+                <option
+                  [value]="option.value"
+                  [selected]="option.value === query().ratingFrom"
+                  [disabled]="!!query().ratingTo && option.value > query().ratingTo!"
+                >
+                  {{ option.label }}
+                </option>
+              }
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="column is-half-mobile is-2-tablet">
+      <div class="field">
+        <label class="label" for="ratingTo">Max rating</label>
+        <div class="control">
+          <div class="select is-fullwidth">
+            <select
+              id="ratingTo"
+              [value]="query().ratingTo ?? ''"
+              (change)="onFilter('ratingTo', $any($event.target).value)"
+            >
+              <option value="">Any</option>
+              @for (option of ratingOptions; track option.value) {
+                <option
+                  [value]="option.value"
+                  [selected]="option.value === query().ratingTo"
+                  [disabled]="!!query().ratingFrom && option.value < query().ratingFrom!"
+                >
+                  {{ option.label }}
+                </option>
+              }
+            </select>
+          </div>
         </div>
       </div>
     </div>
@@ -54,7 +104,7 @@
         </div>
       </div>
     </div>
-    @if (query().from || query().to || query().tag) {
+    @if (hasFilter()) {
       <div class="column is-narrow">
         <button class="button is-light" (click)="clearFilters()">Clear</button>
       </div>
@@ -126,7 +176,7 @@
   } @else {
     <div class="notification">
       No diary entries
-      @if (query().tag) {
+      @if (query().tag || query().ratingFrom || query().ratingTo) {
         for this filter.
       } @else if (query().from || query().to) {
         in this period.
