@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onWatcherCleanup, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useApi } from '../../core/api/api';
 import { toApiError, type ApiError } from '../../core/api/api-error';
@@ -65,21 +65,23 @@ const result = ref<PagedResponse<MovieSummary> | null>(null);
 const loading = ref(true);
 const error = ref<ApiError | null>(null);
 
-/** Numbers the requests, so that the answer to an outdated one is ignored. */
-let latestLoad = 0;
-
+/** Runs as the watcher's callback: `onWatcherCleanup` must be called before the first `await`. */
 async function load(movieQuery: MovieQuery): Promise<void> {
-  const thisLoad = ++latestLoad;
+  // Runs when the query changes again (or the component goes away), so the answer to this
+  // request is ignored.
+  let outdated = false;
+  onWatcherCleanup(() => (outdated = true));
+
   loading.value = true;
   try {
     const loaded = await api.movies.list(movieQuery);
-    if (thisLoad !== latestLoad) {
+    if (outdated) {
       return;
     }
     error.value = null;
     result.value = loaded;
   } catch (failure) {
-    if (thisLoad !== latestLoad) {
+    if (outdated) {
       return;
     }
     error.value = toApiError(failure);
