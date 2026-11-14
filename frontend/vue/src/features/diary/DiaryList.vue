@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onWatcherCleanup, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useApi } from '../../core/api/api';
 import { toApiError, type ApiError } from '../../core/api/api-error';
 import type { DiaryEntry, DiaryQuery, PagedResponse } from '../../core/api/models';
-import { formatDate, formatDay, formatMonth, yearOf } from '../../shared/dates';
+import { formatDate, formatDay, formatMonth, monthOf, yearOf } from '../../shared/dates';
 import ErrorNotification from '../../shared/ErrorNotification.vue';
 import Pagination from '../../shared/Pagination.vue';
 import { mergeQuery } from '../../shared/query';
@@ -49,7 +49,7 @@ const result = ref<PagedResponse<DiaryEntry> | null>(null);
 const groups = computed<MonthGroup[]>(() => {
   const groups: MonthGroup[] = [];
   for (const entry of result.value?.items ?? []) {
-    const key = entry.watchedOn.slice(0, 7);
+    const key = monthOf(entry.watchedOn);
     let group = groups.at(-1);
     if (group?.key !== key) {
       group = { key, label: formatMonth(entry.watchedOn), entries: [] };
@@ -62,22 +62,26 @@ const groups = computed<MonthGroup[]>(() => {
 const loading = ref(true);
 const error = ref<ApiError | null>(null);
 
-/** Numbers the requests, so that the answer to an outdated one is ignored. */
-let latestLoad = 0;
+/** Increased to load the current page again without the query having changed. */
+const reloads = ref(0);
 
-/** Loads the current page of the diary. */
+/** Loads the current page of the diary. Runs as the watcher's callback, see below. */
 async function load(): Promise<void> {
-  const thisLoad = ++latestLoad;
+  // Runs when the next load starts (or the component goes away), so the answer to this
+  // request is ignored. Must be called before the first `await`.
+  let outdated = false;
+  onWatcherCleanup(() => (outdated = true));
+
   loading.value = true;
   let loaded: PagedResponse<DiaryEntry> | null;
   try {
     loaded = await api.diary.list(query.value);
-    if (thisLoad !== latestLoad) {
+    if (outdated) {
       return;
     }
     error.value = null;
   } catch (failure) {
-    if (thisLoad !== latestLoad) {
+    if (outdated) {
       return;
     }
     error.value = toApiError(failure);
@@ -105,7 +109,8 @@ const hasFilter = computed(
     ),
 );
 
-watch(query, load, { immediate: true });
+// Every load goes through this watcher, so that a newer one always cancels an older one.
+watch([query, reloads], load, { immediate: true });
 
 function onFilter(key: 'from' | 'to' | 'tag' | 'ratingFrom' | 'ratingTo', value: string): void {
   router.push({
@@ -138,7 +143,7 @@ async function deleteEntry(entry: DiaryEntry): Promise<void> {
     error.value = toApiError(failure);
     return;
   }
-  void load();
+  reloads.value++;
 }
 </script>
 

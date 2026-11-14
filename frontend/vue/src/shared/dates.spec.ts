@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { formatDate, formatDateTime, formatDay, formatMonth, todayIso, yearOf } from './dates';
+import {
+  formatDate,
+  formatDateTime,
+  formatDay,
+  formatMonth,
+  monthOf,
+  todayIso,
+  yearOf,
+} from './dates';
 
 describe('date formatting', () => {
   it('formats the month', () => {
@@ -25,6 +33,10 @@ describe('date formatting', () => {
     expect(yearOf('1979-05-25')).toBe('1979');
     expect(yearOf(null)).toBe('');
     expect(yearOf(undefined)).toBe('');
+  });
+
+  it('takes the month of a date', () => {
+    expect(monthOf('2026-11-07')).toBe('2026-11');
   });
 
   it("knows today's date in the local time zone", () => {
