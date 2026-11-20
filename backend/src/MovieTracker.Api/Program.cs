@@ -57,7 +57,7 @@ app.UseMiddleware<CsrfHeaderMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {
-    // Generated from the code at /openapi/v1.json. Later compared against api/openapi.yaml in CI.
+    // Generated from the code at /openapi/v1.json. Compared against api/openapi.yaml in CI (.github/scripts/openapi_contract.py).
     app.MapOpenApi().AllowAnonymous();
 }
 

@@ -119,9 +119,6 @@ jobs:
             gh api --method POST "$comments/$PR_NUMBER/comments" -F body=@coverage/comparison.md
           fi
 
-      # Room for a later step: compare the generated OpenAPI document
-      # (/openapi/v1.json) with api/openapi.yaml.
-
   openapi:
     name: OpenAPI
     runs-on: ubuntu-latest
@@ -140,6 +137,79 @@ jobs:
       # with the rules in api/redocly.yaml.
       - name: Lint OpenAPI document
         run: npx --yes @redocly/cli@2 lint openapi.yaml --config redocly.yaml --format github-actions
+
+  # The contract (api/openapi.yaml) and the code must not drift apart: the OpenAPI document that the
+  # running API generates (/openapi/v1.json) is compared with it.
+  openapi-contract:
+    name: OpenAPI contract
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: movie_tracker
+          POSTGRES_USER: movie_tracker
+          POSTGRES_PASSWORD: movie_tracker
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U movie_tracker"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # The generated document is only served in the Development environment, which also applies the migrations.
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://127.0.0.1:5080
+      ConnectionStrings__MovieTracker: Host=localhost;Port=5432;Database=movie_tracker;Username=movie_tracker;Password=movie_tracker
+      # Dummy credentials: enough to register the Google handler.
+      Authentication__Google__ClientId: ci-client-id
+      Authentication__Google__ClientSecret: ci-client-secret
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: backend/global.json
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+
+      - name: Install PyYAML
+        run: pip install pyyaml
+
+      - name: Build
+        run: dotnet build backend/src/MovieTracker.Api
+
+      - name: Start the API
+        run: |
+          dotnet run --project backend/src/MovieTracker.Api --no-build --no-launch-profile > api.log 2>&1 &
+
+      # Waits (up to about a minute) until the API is up and has applied the migrations.
+      - name: Fetch the generated OpenAPI document
+        run: >
+          curl --silent --show-error --fail
+          --retry 30 --retry-delay 2 --retry-connrefused
+          --output generated-openapi.json
+          http://127.0.0.1:5080/openapi/v1.json
+
+      - name: Compare with api/openapi.yaml
+        run: python3 .github/scripts/openapi_contract.py api/openapi.yaml generated-openapi.json
+
+      - name: API log
+        if: failure()
+        run: cat api.log
+
+      - name: Upload generated OpenAPI document
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: generated-openapi
+          path: generated-openapi.json
+          if-no-files-found: ignore
 
   frontend:
     name: Frontend (Angular)
