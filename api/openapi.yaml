@@ -941,6 +941,7 @@ components:
           description: How many of the films have been looked up so far.
         result:
           description: Set once the import has completed.
+          type: object
           allOf:
             - $ref: '#/components/schemas/ImportResult'
           nullable: true
