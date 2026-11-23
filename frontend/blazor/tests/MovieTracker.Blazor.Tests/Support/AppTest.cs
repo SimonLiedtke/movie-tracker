@@ -1,3 +1,4 @@
+using Bunit.TestDoubles;
 using Microsoft.AspNetCore.Components;
 using MovieTracker.Blazor.Tests.Support;
 
@@ -18,7 +19,7 @@ public abstract class AppTest : BunitContext
 
     protected FakeBackend Backend { get; } = new();
 
-    protected NavigationManager Navigation => Services.GetRequiredService<NavigationManager>();
+    protected BunitNavigationManager Navigation => (BunitNavigationManager)Services.GetRequiredService<NavigationManager>();
 
     protected AuthService Auth => Services.GetRequiredService<AuthService>();
 
