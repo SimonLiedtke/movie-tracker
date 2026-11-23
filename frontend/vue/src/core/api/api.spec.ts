@@ -39,6 +39,18 @@ describe('API clients', () => {
     await result;
   });
 
+  it('uploads the poster of a movie as multipart form data', async () => {
+    const image = new File(['jpeg'], 'poster.jpg', { type: 'image/jpeg' });
+    const result = api().movies.uploadPoster('m1', image);
+
+    const request = backend.expectOne('/api/movies/m1/poster');
+    expect(request.method).toBe('PUT');
+    expect(request.body).toBeInstanceOf(FormData);
+    expect((request.body as FormData).get('file')).toBe(image);
+    request.flush({ id: 'm1', posterUrl: '/api/movies/m1/poster' });
+    expect((await result).posterUrl).toBe('/api/movies/m1/poster');
+  });
+
   it('lists the activity log page by page', async () => {
     const result = api().activityLog.list({ page: 3, pageSize: 50 });
 

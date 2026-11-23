@@ -1,5 +1,5 @@
 import { flushPromises, type VueWrapper } from '@vue/test-utils';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApi } from '../../core/api/api';
 import { createHttp } from '../../core/api/http';
 import type { Genre, Movie } from '../../core/api/models';
@@ -29,6 +29,9 @@ const HOME_VIDEO: Movie = {
   onWatchlist: false,
   createdAt: '2026-10-01T10:00:00Z',
 };
+
+const POSTER_REJECTED = 'Please choose a JPEG, PNG or WebP image of at most 5 MB.';
+const POSTER_MAX_BYTES = 5 * 1024 * 1024;
 
 describe('MovieForm', () => {
   const backend = useFakeBackend();
@@ -71,6 +74,25 @@ describe('MovieForm', () => {
     await input(page, 'posterUrl').setValue('https://image/home.jpg');
     await page.get('#overview').setValue('Our holidays.');
     await page.findAll('input[type=checkbox]')[1].setValue(true);
+  }
+
+  /** Chooses an image like the user does with the file dialog. */
+  async function choosePoster(page: VueWrapper, file: File) {
+    const field = page.get<HTMLInputElement>('input[type=file]');
+    Object.defineProperty(field.element, 'files', { value: [file], configurable: true });
+    await field.trigger('change');
+  }
+
+  const IMAGE = () => new File(['jpeg'], 'home.jpg', { type: 'image/jpeg' });
+  const UPLOADED: Movie = { ...HOME_VIDEO, posterUrl: '/api/movies/m1/poster' };
+
+  async function openForEditWith(movie: Movie) {
+    const opening = open('/movies/m1/edit');
+    const request = await backend.expectOneEventually('/api/movies/m1');
+    request.flush(movie);
+    const result = await opening;
+    await flushPromises();
+    return result;
   }
 
   const REQUEST = {
@@ -302,5 +324,232 @@ describe('MovieForm', () => {
 
     expect(page.get('[role=alert]').text()).toContain('Not Found');
     expect(page.find('progress').exists()).toBe(false);
+  });
+  describe('poster image', () => {
+    // jsdom's File is not what Node's URL.createObjectURL expects.
+    const revokeObjectURL = vi.fn();
+    beforeEach(() => {
+      vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:preview');
+      vi.spyOn(URL, 'revokeObjectURL').mockImplementation(revokeObjectURL);
+    });
+    afterEach(() => {
+      vi.restoreAllMocks();
+      revokeObjectURL.mockClear();
+    });
+
+    it('offers a file field for JPEG, PNG and WebP images', async () => {
+      const { page } = await open();
+
+      const field = page.get<HTMLInputElement>('input[type=file]');
+      expect(field.attributes('accept')).toBe('image/jpeg,image/png,image/webp');
+      expect(page.text()).toContain('No file chosen');
+      expect(errors(page)).toEqual([]);
+    });
+
+    it('uploads the chosen image after adding the movie, and then shows the movie', async () => {
+      const { page, router } = await open();
+      await input(page, 'title').setValue('Home Video');
+      const image = IMAGE();
+      await choosePoster(page, image);
+      expect(page.text()).toContain('home.jpg');
+
+      await submit(page);
+      const create = backend.expectOne('/api/movies');
+      expect(create.json).toMatchObject({ title: 'Home Video', posterUrl: null });
+      create.flush({ ...HOME_VIDEO, id: 'm9', posterUrl: null }, { status: 201 });
+      await flushPromises();
+      const upload = backend.expectOne('/api/movies/m9/poster');
+      expect(upload.method).toBe('PUT');
+      expect((upload.body as FormData).get('file')).toBe(image);
+      upload.flush({ ...HOME_VIDEO, id: 'm9', posterUrl: '/api/movies/m9/poster' });
+      await flushPromises();
+
+      expect(router.currentRoute.value.fullPath).toBe('/movies/m9');
+    });
+
+    it('uploads the image before going on to log a viewing', async () => {
+      const { page, router } = await open('/movies/new?next=diary');
+      await input(page, 'title').setValue('Home Video');
+      await choosePoster(page, IMAGE());
+
+      await submit(page);
+      backend.expectOne('/api/movies').flush({ ...HOME_VIDEO, id: 'm9' });
+      await flushPromises();
+      expect(router.currentRoute.value.fullPath).toBe('/movies/new?next=diary');
+      backend.expectOne('/api/movies/m9/poster').flush({ ...HOME_VIDEO, id: 'm9' });
+      await flushPromises();
+
+      expect(router.currentRoute.value.fullPath).toBe('/diary/new?movieId=m9');
+    });
+
+    it('does not upload anything without a chosen image', async () => {
+      const { page } = await open();
+      await input(page, 'title').setValue('Home Video');
+
+      await submit(page);
+      backend.expectOne('/api/movies').flush({ ...HOME_VIDEO, id: 'm9' });
+      await flushPromises();
+
+      backend.verify();
+    });
+
+    it('does not save a file that is not an image the server accepts', async () => {
+      const { page } = await open();
+      await input(page, 'title').setValue('Home Video');
+
+      await choosePoster(page, new File(['gif'], 'home.gif', { type: 'image/gif' }));
+      await submit(page);
+      expect(errors(page)).toEqual([POSTER_REJECTED]);
+      backend.verify();
+
+      const tooBig = new File([new Uint8Array(POSTER_MAX_BYTES + 1)], 'big.png', {
+        type: 'image/png',
+      });
+      await choosePoster(page, tooBig);
+      expect(errors(page)).toEqual([POSTER_REJECTED]);
+
+      await choosePoster(page, IMAGE());
+      expect(errors(page)).toEqual([]);
+    });
+
+    it('previews the chosen image, and lets go of the preview when it is not needed', async () => {
+      const { page } = await open();
+      expect(page.find('img').exists()).toBe(false);
+
+      await choosePoster(page, IMAGE());
+      expect(page.get('img').attributes('src')).toBe('blob:preview');
+      expect(revokeObjectURL).not.toHaveBeenCalled();
+
+      await page.get('button.is-light').trigger('click');
+      expect(page.find('img').exists()).toBe(false);
+      expect(revokeObjectURL).toHaveBeenCalledWith('blob:preview');
+    });
+
+    it('forgets the chosen image on request', async () => {
+      const { page } = await open();
+      await input(page, 'title').setValue('Home Video');
+      await choosePoster(page, IMAGE());
+
+      await page.get('button.is-light').trigger('click');
+      expect(page.text()).toContain('No file chosen');
+      await submit(page);
+
+      backend.expectOne('/api/movies').flush({ ...HOME_VIDEO, id: 'm9' });
+      await flushPromises();
+      backend.verify();
+    });
+
+    it('shows a failed upload and saves the movie that was added only once', async () => {
+      const { page, router } = await open();
+      await input(page, 'title').setValue('Home Video');
+      await choosePoster(page, IMAGE());
+
+      await submit(page);
+      backend.expectOne('/api/movies').flush({ ...HOME_VIDEO, id: 'm9' }, { status: 201 });
+      await flushPromises();
+      backend
+        .expectOne('/api/movies/m9/poster')
+        .flush(
+          { title: 'One or more validation errors occurred.', errors: { file: ['Not an image.'] } },
+          { status: 400, statusText: 'Bad Request' },
+        );
+      await flushPromises();
+      expect(page.get('[role=alert]').text()).toContain('Not an image.');
+      expect(router.currentRoute.value.fullPath).toBe('/movies/new');
+
+      // Saving again changes the movie that exists now, instead of adding it a second time.
+      await submit(page);
+      const update = backend.expectOne('/api/movies/m9');
+      expect(update.method).toBe('PUT');
+      update.flush({ ...HOME_VIDEO, id: 'm9' });
+      await flushPromises();
+      backend.expectOne('/api/movies/m9/poster').flush({ ...HOME_VIDEO, id: 'm9' });
+      await flushPromises();
+
+      expect(router.currentRoute.value.fullPath).toBe('/movies/m9');
+    });
+
+    it('replaces the poster of a movie by uploading another image', async () => {
+      const { page, router } = await openForEdit();
+      expect(input(page, 'posterUrl').element.value).toBe('https://image/home.jpg');
+      await choosePoster(page, IMAGE());
+
+      await submit(page);
+      const update = backend.expectOne('/api/movies/m1');
+      expect(update.method).toBe('PUT');
+      update.flush(HOME_VIDEO);
+      await flushPromises();
+      const upload = backend.expectOne('/api/movies/m1/poster');
+      expect(upload.method).toBe('PUT');
+      upload.flush(UPLOADED);
+      await flushPromises();
+
+      expect(router.currentRoute.value.fullPath).toBe('/movies/m1');
+    });
+
+    it('shows that the movie has an uploaded poster, not its path as URL', async () => {
+      const { page } = await openForEditWith(UPLOADED);
+
+      expect(input(page, 'posterUrl').element.value).toBe('');
+      expect(page.text()).toContain('Uploaded image');
+      expect(page.get('img').attributes('src')).toBe('/api/movies/m1/poster');
+    });
+
+    it('keeps the uploaded poster when other things are changed, by sending its URL back', async () => {
+      const { page } = await openForEditWith(UPLOADED);
+      await input(page, 'title').setValue('Home Video 2');
+
+      await submit(page);
+
+      const update = backend.expectOne('/api/movies/m1');
+      expect(update.json).toMatchObject({
+        title: 'Home Video 2',
+        posterUrl: '/api/movies/m1/poster',
+      });
+      update.flush(UPLOADED);
+      await flushPromises();
+      backend.verify();
+    });
+
+    it('removes the uploaded poster on request', async () => {
+      const { page } = await openForEditWith(UPLOADED);
+
+      await page.get('button.is-light').trigger('click');
+      expect(page.text()).toContain('No file chosen');
+      expect(page.find('img').exists()).toBe(false);
+      await submit(page);
+
+      const update = backend.expectOne('/api/movies/m1');
+      expect(update.json).toMatchObject({ posterUrl: null });
+      update.flush({ ...HOME_VIDEO, posterUrl: null });
+      await flushPromises();
+    });
+
+    it('replaces the uploaded poster by a poster URL', async () => {
+      const { page } = await openForEditWith(UPLOADED);
+      await input(page, 'posterUrl').setValue('https://image/other.jpg');
+
+      await submit(page);
+
+      const update = backend.expectOne('/api/movies/m1');
+      expect(update.json).toMatchObject({ posterUrl: 'https://image/other.jpg' });
+      update.flush({ ...HOME_VIDEO, posterUrl: 'https://image/other.jpg' });
+      await flushPromises();
+      backend.verify();
+    });
+
+    it('keeps the uploaded poster and replaces it by the chosen image', async () => {
+      const { page } = await openForEditWith(UPLOADED);
+      await choosePoster(page, IMAGE());
+
+      await submit(page);
+
+      const update = backend.expectOne('/api/movies/m1');
+      expect(update.json).toMatchObject({ posterUrl: '/api/movies/m1/poster' });
+      update.flush(UPLOADED);
+      await flushPromises();
+      backend.expectOne('/api/movies/m1/poster').flush(UPLOADED);
+      await flushPromises();
+    });
   });
 });

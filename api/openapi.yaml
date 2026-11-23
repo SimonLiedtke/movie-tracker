@@ -213,6 +213,56 @@ paths:
             application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
+  /api/movies/{movieId}/poster:
+    parameters:
+      - $ref: '#/components/parameters/MovieId'
+    get:
+      tags: [Movies]
+      operationId: getMoviePoster
+      summary: Get the uploaded poster image of a movie
+      description: |
+        The image behind the `posterUrl` of a manually added movie with an uploaded poster. The image is
+        revalidated with its `ETag` on every request (`Cache-Control: private, no-cache`), because the URL does not
+        change when the poster is replaced. Movies with a poster URL or without poster answer with 404.
+      responses:
+        '200':
+          description: The image
+          content:
+            image/jpeg:
+              schema: { type: string, format: binary }
+            image/png:
+              schema: { type: string, format: binary }
+            image/webp:
+              schema: { type: string, format: binary }
+        '304': { description: The image has not changed since the request's `If-None-Match` ETag. }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Movies]
+      operationId: uploadMoviePoster
+      summary: Upload the poster of a manually added movie
+      description: |
+        Sets the poster from an image file (JPEG, PNG or WebP, at most 5 MB; the format is detected from the
+        file's content, not from its name or declared type). It replaces the previous poster, whether that was an
+        uploaded image or a `posterUrl`. The movie's `posterUrl` is then the URL of the uploaded image.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '200':
+          description: The movie with its new poster
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Movie' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '403': { $ref: '#/components/responses/ReadOnlyMovie' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /api/movies/{movieId}/diary-entries:
     parameters:
       - $ref: '#/components/parameters/MovieId'
@@ -645,7 +695,12 @@ components:
         id: { type: string, format: uuid }
         title: { type: string }
         releaseDate: { type: string, format: date, nullable: true }
-        posterUrl: { type: string, format: uri, nullable: true }
+        posterUrl:
+          type: string
+          nullable: true
+          description: |
+            Where to load the poster from: an external http(s) URL, or for a manually added movie with an
+            uploaded poster the relative URL of that image (`/api/movies/{movieId}/poster`).
 
     MovieSummary:
       type: object
@@ -654,7 +709,12 @@ components:
         id: { type: string, format: uuid }
         title: { type: string }
         releaseDate: { type: string, format: date, nullable: true }
-        posterUrl: { type: string, format: uri, nullable: true }
+        posterUrl:
+          type: string
+          nullable: true
+          description: |
+            Where to load the poster from: an external http(s) URL, or for a manually added movie with an
+            uploaded poster the relative URL of that image (`/api/movies/{movieId}/poster`).
         genres:
           type: array
           items: { $ref: '#/components/schemas/Genre' }
@@ -699,7 +759,14 @@ components:
         releaseDate: { type: string, format: date, nullable: true }
         runtimeMinutes: { type: integer, format: int32, minimum: 1, maximum: 1500, nullable: true }
         overview: { type: string, maxLength: 5000, nullable: true }
-        posterUrl: { type: string, format: uri, maxLength: 2000, nullable: true }
+        posterUrl:
+          type: string
+          maxLength: 2000
+          nullable: true
+          description: |
+            An http(s) URL of the poster, or the movie's own `posterUrl` as returned by the API while it is an
+            uploaded poster, which keeps that poster. Anything else, including no value, removes an uploaded
+            poster. To upload an image, use `PUT /api/movies/{movieId}/poster`.
         genreIds:
           type: array
           uniqueItems: true
@@ -717,7 +784,12 @@ components:
         title: { type: string }
         originalTitle: { type: string, nullable: true }
         releaseDate: { type: string, format: date, nullable: true }
-        posterUrl: { type: string, format: uri, nullable: true }
+        posterUrl:
+          type: string
+          nullable: true
+          description: |
+            Where to load the poster from: an external http(s) URL, or for a manually added movie with an
+            uploaded poster the relative URL of that image (`/api/movies/{movieId}/poster`).
 
     MovieSearchResponse:
       type: object

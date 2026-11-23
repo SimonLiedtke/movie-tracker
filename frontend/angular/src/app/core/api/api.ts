@@ -74,6 +74,16 @@ export class MoviesApi {
     return this.http.delete<void>(`${BASE}/movies/${id}`);
   }
 
+  /**
+   * Sets the poster of a manually added movie from an image file (the formats and the size limit are those of `PUT /api/movies/{movieId}/poster`),
+   * replacing its previous poster. Returns the movie, whose `posterUrl` is then the image's URL.
+   */
+  uploadPoster(id: string, file: File): Observable<Movie> {
+    const body = new FormData();
+    body.append('file', file);
+    return this.http.put<Movie>(`${BASE}/movies/${id}/poster`, body);
+  }
+
   diaryEntries(id: string): Observable<DiaryEntry[]> {
     return this.http.get<DiaryEntry[]>(`${BASE}/movies/${id}/diary-entries`);
   }

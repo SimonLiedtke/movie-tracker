@@ -12,6 +12,9 @@ public sealed class FakeMovieRepository : IMovieRepository
 {
     public List<Movie> Movies { get; } = [];
 
+    /// <summary>The uploaded posters.</summary>
+    public List<MoviePoster> Posters { get; } = [];
+
     /// <summary>The movies that have diary entries.</summary>
     public HashSet<Guid> MoviesInDiary { get; } = [];
 
@@ -53,6 +56,21 @@ public sealed class FakeMovieRepository : IMovieRepository
 
     public Task<MovieDetail?> GetDetailAsync(Guid userId, Guid movieId, CancellationToken cancellationToken) =>
         Task.FromResult(Visible(userId, movieId) is { } movie ? ToDetail(movie) : null);
+
+    public Task<PosterImage?> GetPosterAsync(Guid userId, Guid movieId, CancellationToken cancellationToken)
+    {
+        var poster = Visible(userId, movieId) is { IsManual: true }
+            ? Posters.FirstOrDefault(poster => poster.MovieId == movieId)
+            : null;
+        return Task.FromResult(poster is null ? null : new PosterImage(poster.ContentType, poster.Data, poster.UpdatedAt));
+    }
+
+    public Task<MoviePoster?> FindPosterAsync(Guid movieId, CancellationToken cancellationToken) =>
+        Task.FromResult(Posters.FirstOrDefault(poster => poster.MovieId == movieId));
+
+    public void AddPoster(MoviePoster poster) => Posters.Add(poster);
+
+    public void RemovePoster(MoviePoster poster) => Posters.Remove(poster);
 
     public Task<bool> ExistsAsync(Guid userId, Guid movieId, CancellationToken cancellationToken) =>
         Task.FromResult(Visible(userId, movieId) is not null);

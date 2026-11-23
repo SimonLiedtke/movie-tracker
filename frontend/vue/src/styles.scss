@@ -9,6 +9,11 @@
   font-size: 3rem;
 }
 
+/* The poster preview in the form of a manually added movie. */
+.poster-field {
+  width: 9rem;
+}
+
 .rating-stars {
   color: hsl(var(--bulma-warning-h), var(--bulma-warning-s), 45%);
   letter-spacing: 0.05em;

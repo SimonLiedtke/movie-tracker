@@ -91,6 +91,22 @@ internal sealed class MovieRepository(MovieTrackerDbContext db) : IMovieReposito
         return row?.ToModel();
     }
 
+    public async Task<PosterImage?> GetPosterAsync(Guid userId, Guid movieId, CancellationToken cancellationToken) =>
+        await db.MoviePosters
+            .AsNoTracking()
+            .Where(poster => poster.MovieId == movieId)
+            // Only the movie's owner has a poster to see, so the movie's visibility needs no extra check.
+            .Where(poster => db.Movies.Any(movie => movie.Id == movieId && movie.OwnerId == userId))
+            .Select(poster => new PosterImage(poster.ContentType, poster.Data, poster.UpdatedAt))
+            .SingleOrDefaultAsync(cancellationToken);
+
+    public async Task<MoviePoster?> FindPosterAsync(Guid movieId, CancellationToken cancellationToken) =>
+        await db.MoviePosters.SingleOrDefaultAsync(poster => poster.MovieId == movieId, cancellationToken);
+
+    public void AddPoster(MoviePoster poster) => db.MoviePosters.Add(poster);
+
+    public void RemovePoster(MoviePoster poster) => db.MoviePosters.Remove(poster);
+
     public async Task<bool> ExistsAsync(Guid userId, Guid movieId, CancellationToken cancellationToken) =>
         await db.Movies.VisibleTo(userId).AnyAsync(movie => movie.Id == movieId, cancellationToken);
 

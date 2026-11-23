@@ -196,6 +196,25 @@ Without a token the app still works: the search then only finds your manually ad
 TMDB's [terms](https://www.themoviedb.org/api-terms-of-use) require the attribution shown in the
 footer of the frontend.
 
+## Posters of manual movies
+
+A manually added movie can have a poster from an image file (JPEG, PNG or WebP, at most 5 MB) or from a URL. The
+movie form has a file field next to the URL field; when adding a movie, the image is uploaded right after the movie is
+saved, and when editing one, a new image replaces the old poster. An image that is chosen wins over the URL.
+
+- The image is stored in PostgreSQL (table `movie_posters`), not on disk, so it survives redeploys on hosts without a
+  persistent disk like Render's free plan. It is kept apart from the movie, so listing movies never loads image data,
+  and is deleted with the movie.
+- The format is detected from the file's content, not from its name or the type the browser sends. SVG is refused
+  on purpose: it can contain scripts, and the image is served from the app's own origin.
+- The API serves the image at `GET /api/movies/{movieId}/poster` for its owner only (with an `ETag`, so browsers
+  revalidate it cheaply), and the movie's `posterUrl` is then this path instead of an external URL. Upload with
+  `PUT /api/movies/{movieId}/poster` (`multipart/form-data`, field `file`).
+- Saving a movie with `PUT /api/movies/{movieId}` keeps the uploaded poster only if the request carries the movie's
+  own `posterUrl` back (what the frontends do when the poster is not touched). Any other `posterUrl`, or none, replaces
+  and deletes the image.
+- Movies from TMDB keep their TMDB poster; their posters cannot be changed.
+
 ## Importing from Letterboxd
 
 The **Import** page of the frontend (`/import`) brings the diary and watchlist over from

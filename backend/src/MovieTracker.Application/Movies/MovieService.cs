@@ -115,6 +115,12 @@ public sealed class MovieService(
             return new SaveMovieResult(SaveMovieStatus.UnknownGenres, UnknownGenreIds: movieGenres.UnknownIds);
         }
 
+        // A new movie has no uploaded poster yet, so only an external URL is possible.
+        if (details.PosterUrl is not null && !MoviePosterUrl.IsExternal(details.PosterUrl))
+        {
+            return new SaveMovieResult(SaveMovieStatus.InvalidPosterUrl);
+        }
+
         var now = timeProvider.GetUtcNow();
         var movie = Movie.CreateManual(userId, details, movieGenres.Genres, now);
         movies.Add(movie);
@@ -128,15 +134,10 @@ public sealed class MovieService(
     public async Task<SaveMovieResult> UpdateAsync(
         Guid userId, Guid movieId, MovieDetails details, IReadOnlyList<int> genreIds, CancellationToken cancellationToken)
     {
-        var movie = await movies.FindAsync(userId, movieId, cancellationToken);
+        var (movie, refusal) = await FindManualMovieAsync(userId, movieId, cancellationToken);
         if (movie is null)
         {
-            return new SaveMovieResult(SaveMovieStatus.NotFound);
-        }
-
-        if (!movie.IsManual)
-        {
-            return new SaveMovieResult(SaveMovieStatus.ReadOnly);
+            return refusal!;
         }
 
         var movieGenres = await LoadGenresAsync(genreIds, cancellationToken);
@@ -145,9 +146,64 @@ public sealed class MovieService(
             return new SaveMovieResult(SaveMovieStatus.UnknownGenres, UnknownGenreIds: movieGenres.UnknownIds);
         }
 
+        // The movie's poster is its uploaded image as long as it keeps that image's URL. Any other URL (or none)
+        // replaces the image, which is then deleted.
+        var uploadedPosterUrl = MoviePosterUrl.For(movie.Id);
+        var hasUploadedPoster = movie.PosterUrl == uploadedPosterUrl;
+        var keepsUploadedPoster = hasUploadedPoster && details.PosterUrl == uploadedPosterUrl;
+        if (details.PosterUrl is not null && !keepsUploadedPoster && !MoviePosterUrl.IsExternal(details.PosterUrl))
+        {
+            return new SaveMovieResult(SaveMovieStatus.InvalidPosterUrl);
+        }
+
+        if (hasUploadedPoster && !keepsUploadedPoster)
+        {
+            await RemovePosterImageAsync(movie.Id, cancellationToken);
+        }
+
         movie.Update(details, movieGenres.Genres);
         activityLog.Add(ActivityLogEntry.ForMovie(
             userId, ActivityType.MovieUpdated, timeProvider.GetUtcNow(), movie.Id, movie.Title));
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return new SaveMovieResult(SaveMovieStatus.Saved, await movies.GetDetailAsync(userId, movieId, cancellationToken));
+    }
+
+    /// <summary>The image of a movie's uploaded poster. Null if the movie does not exist, is not visible to the user or has none.</summary>
+    public Task<PosterImage?> GetPosterAsync(Guid userId, Guid movieId, CancellationToken cancellationToken) =>
+        movies.GetPosterAsync(userId, movieId, cancellationToken);
+
+    /// <summary>
+    /// Uploads the poster of a manually added movie, replacing its previous poster (an uploaded image or a URL).
+    /// </summary>
+    public async Task<SaveMovieResult> SetPosterAsync(
+        Guid userId, Guid movieId, byte[] image, CancellationToken cancellationToken)
+    {
+        var (movie, refusal) = await FindManualMovieAsync(userId, movieId, cancellationToken);
+        if (movie is null)
+        {
+            return refusal!;
+        }
+
+        var now = timeProvider.GetUtcNow();
+        var poster = await movies.FindPosterAsync(movie.Id, cancellationToken);
+        if (poster is null)
+        {
+            poster = MoviePoster.TryCreate(movie.Id, image, now);
+            if (poster is null)
+            {
+                return new SaveMovieResult(SaveMovieStatus.InvalidPosterImage);
+            }
+
+            movies.AddPoster(poster);
+        }
+        else if (!poster.TryReplace(image, now))
+        {
+            return new SaveMovieResult(SaveMovieStatus.InvalidPosterImage);
+        }
+
+        movie.SetPosterUrl(MoviePosterUrl.For(movie.Id));
+        activityLog.Add(ActivityLogEntry.ForMovie(userId, ActivityType.MovieUpdated, now, movie.Id, movie.Title));
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new SaveMovieResult(SaveMovieStatus.Saved, await movies.GetDetailAsync(userId, movieId, cancellationToken));
@@ -178,6 +234,31 @@ public sealed class MovieService(
             userId, ActivityType.MovieDeleted, timeProvider.GetUtcNow(), movieId: null, movie.Title));
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return DeleteMovieResult.Deleted;
+    }
+
+    /// <summary>
+    /// The movie to change, or why it cannot be changed: it does not exist or is not visible to the user (NotFound),
+    /// or it comes from TMDB (ReadOnly).
+    /// </summary>
+    private async Task<(Movie? Movie, SaveMovieResult? Refusal)> FindManualMovieAsync(
+        Guid userId, Guid movieId, CancellationToken cancellationToken)
+    {
+        var movie = await movies.FindAsync(userId, movieId, cancellationToken);
+        if (movie is null)
+        {
+            return (null, new SaveMovieResult(SaveMovieStatus.NotFound));
+        }
+
+        return movie.IsManual ? (movie, null) : (null, new SaveMovieResult(SaveMovieStatus.ReadOnly));
+    }
+
+    private async Task RemovePosterImageAsync(Guid movieId, CancellationToken cancellationToken)
+    {
+        var poster = await movies.FindPosterAsync(movieId, cancellationToken);
+        if (poster is not null)
+        {
+            movies.RemovePoster(poster);
+        }
     }
 
     /// <summary>Null if TMDB is not configured or failed; the search then only shows manual movies.</summary>
