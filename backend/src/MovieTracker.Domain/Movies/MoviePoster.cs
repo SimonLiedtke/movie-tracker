@@ -1,3 +1,5 @@
+using System.Collections.Frozen;
+
 namespace MovieTracker.Domain.Movies;
 
 /// <summary>
@@ -31,8 +33,12 @@ public sealed class MoviePoster
 
     public DateTimeOffset UpdatedAt { get; private set; }
 
+    private const string Jpeg = "image/jpeg";
+    private const string Png = "image/png";
+    private const string WebP = "image/webp";
+
     /// <summary>The image formats that are accepted. No SVG: it can contain scripts.</summary>
-    public static IReadOnlyList<string> ContentTypes { get; } = ["image/jpeg", "image/png", "image/webp"];
+    public static IReadOnlySet<string> ContentTypes { get; } = new[] { Jpeg, Png, WebP }.ToFrozenSet();
 
     /// <summary>Null if the data is empty, too big or not a JPEG, PNG or WebP image.</summary>
     public static MoviePoster? TryCreate(Guid movieId, byte[] data, DateTimeOffset now)
@@ -90,18 +96,18 @@ public sealed class MoviePoster
 
         if (data.StartsWith(jpeg))
         {
-            return "image/jpeg";
+            return Jpeg;
         }
 
         if (data.StartsWith(png))
         {
-            return "image/png";
+            return Png;
         }
 
         // WebP is a RIFF container: "RIFF", the size, then "WEBP".
         if (data.Length >= 12 && data[..4].SequenceEqual("RIFF"u8) && data[8..12].SequenceEqual("WEBP"u8))
         {
-            return "image/webp";
+            return WebP;
         }
 
         return null;

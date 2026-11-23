@@ -13,6 +13,12 @@ public sealed class MoviePosterTests
 
     private static byte[] WebP => [.. "RIFF"u8, 0x1A, 0x00, 0x00, 0x00, .. "WEBP"u8, .. "VP8 "u8];
 
+    [Fact]
+    public void Lists_the_accepted_content_types()
+    {
+        Assert.Equal(["image/jpeg", "image/png", "image/webp"], MoviePoster.ContentTypes.Order());
+    }
+
     [Theory]
     [MemberData(nameof(AcceptedImages))]
     public void Accepts_jpeg_png_and_webp_and_knows_the_type_from_the_data(string expectedContentType, byte[] data)
