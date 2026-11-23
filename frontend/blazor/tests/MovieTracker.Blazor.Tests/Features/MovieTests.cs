@@ -261,8 +261,8 @@ public class MoviePickerTests : AppTest
 
         app.FindAll(".dropdown-content button")[0].Click();
 
+        app.WaitForAssertion(() => Assert.True(app.Find("#movie").HasAttribute("readonly")));
         Assert.Equal("My own film", app.Find("#movie").GetAttribute("value"));
-        Assert.True(app.Find("#movie").HasAttribute("readonly"));
         Assert.Empty(Backend.Sent(HttpMethod.Post, $"/api/movies/tmdb/{Tmdb.TmdbId}"));
     }
 
@@ -301,10 +301,11 @@ public class MoviePickerTests : AppTest
         var app = await OpenDiaryFormAsync();
         Search(app, "m");
         app.Find(".dropdown-content button").Click();
+        app.WaitForAssertion(() => Assert.True(app.Find("#movie").HasAttribute("readonly")));
 
         app.Find(".field.has-addons button").Click();
 
-        Assert.False(app.Find("#movie").HasAttribute("readonly"));
+        app.WaitForAssertion(() => Assert.False(app.Find("#movie").HasAttribute("readonly")));
         Assert.Equal("", app.Find("#movie").GetAttribute("value"));
     }
 
