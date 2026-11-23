@@ -30,6 +30,9 @@ const HOME_VIDEO: Movie = {
   createdAt: '2026-10-01T10:00:00Z',
 };
 
+const POSTER_REJECTED = 'Please choose a JPEG, PNG or WebP image of at most 5 MB.';
+const POSTER_MAX_BYTES = 5 * 1024 * 1024;
+
 describe('MovieForm', () => {
   const backend = useFakeBackend();
 
@@ -396,14 +399,14 @@ describe('MovieForm', () => {
 
       await choosePoster(page, new File(['gif'], 'home.gif', { type: 'image/gif' }));
       await submit(page);
-      expect(errors(page)).toEqual(['Please choose a JPEG, PNG or WebP image of at most 5 MB.']);
+      expect(errors(page)).toEqual([POSTER_REJECTED]);
       backend.verify();
 
-      const tooBig = new File([new Uint8Array(5 * 1024 * 1024 + 1)], 'big.png', {
+      const tooBig = new File([new Uint8Array(POSTER_MAX_BYTES + 1)], 'big.png', {
         type: 'image/png',
       });
       await choosePoster(page, tooBig);
-      expect(errors(page)).toEqual(['Please choose a JPEG, PNG or WebP image of at most 5 MB.']);
+      expect(errors(page)).toEqual([POSTER_REJECTED]);
 
       await choosePoster(page, IMAGE());
       expect(errors(page)).toEqual([]);

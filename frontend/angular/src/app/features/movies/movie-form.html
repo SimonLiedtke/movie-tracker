@@ -101,9 +101,11 @@
             </label>
           </div>
           @if (posterFileInvalid()) {
-            <p class="help is-danger">Please choose a JPEG, PNG or WebP image of at most 5 MB.</p>
+            <p class="help is-danger">
+              Please choose a JPEG, PNG or WebP image of at most {{ posterMaxMegabytes }} MB.
+            </p>
           } @else {
-            <p class="help">JPEG, PNG or WebP, at most 5 MB.</p>
+            <p class="help">JPEG, PNG or WebP, at most {{ posterMaxMegabytes }} MB.</p>
           }
           @if (posterFile() || uploadedPosterUrl()) {
             <button type="button" class="button is-small is-light mt-2" (click)="removePoster()">

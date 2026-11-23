@@ -24,6 +24,8 @@ const HOME_VIDEO: Movie = {
 };
 const UPLOADED: Movie = { ...HOME_VIDEO, posterUrl: '/api/movies/m1/poster' };
 
+const POSTER_REJECTED = 'Please choose a JPEG, PNG or WebP image of at most 5 MB.';
+const POSTER_MAX_BYTES = 5 * 1024 * 1024;
 const IMAGE = () => new File(['jpeg'], 'home.jpg', { type: 'image/jpeg' });
 
 describe('MovieForm poster image', () => {
@@ -161,14 +163,14 @@ describe('MovieForm poster image', () => {
 
     await choosePoster(new File(['gif'], 'home.gif', { type: 'image/gif' }));
     await submit();
-    expect(errors()).toEqual(['Please choose a JPEG, PNG or WebP image of at most 5 MB.']);
+    expect(errors()).toEqual([POSTER_REJECTED]);
     http.verify();
 
-    const tooBig = new File([new Uint8Array(5 * 1024 * 1024 + 1)], 'big.png', {
+    const tooBig = new File([new Uint8Array(POSTER_MAX_BYTES + 1)], 'big.png', {
       type: 'image/png',
     });
     await choosePoster(tooBig);
-    expect(errors()).toEqual(['Please choose a JPEG, PNG or WebP image of at most 5 MB.']);
+    expect(errors()).toEqual([POSTER_REJECTED]);
 
     await choosePoster(IMAGE());
     expect(errors()).toEqual([]);

@@ -20,7 +20,8 @@ const POSTER_URL_MAX_LENGTH = 2000;
 
 /** What the server accepts as uploaded poster, see `PUT /api/movies/{movieId}/poster`. */
 const POSTER_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const POSTER_MAX_BYTES = 5 * 1024 * 1024;
+const POSTER_MAX_MEGABYTES = 5;
+const POSTER_MAX_BYTES = POSTER_MAX_MEGABYTES * 1024 * 1024;
 
 /** Empty strings become null, the backend expects absent values as null. */
 const orNull = <T>(value: T | '' | null): T | null => (value === '' ? null : value);
@@ -77,6 +78,7 @@ export class MovieForm {
 
   /** For the file dialog: only offers the images the server accepts. */
   protected readonly posterAccept = POSTER_TYPES.join(',');
+  protected readonly posterMaxMegabytes = POSTER_MAX_MEGABYTES;
 
   /** The image file the user has chosen as poster; it is uploaded when the movie is saved. */
   protected readonly posterFile = signal<File | null>(null);

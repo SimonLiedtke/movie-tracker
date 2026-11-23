@@ -82,7 +82,7 @@ function createMoviesApi(http: Http) {
     },
 
     /**
-     * Sets the poster of a manually added movie from an image file (JPEG, PNG or WebP, at most 5 MB),
+     * Sets the poster of a manually added movie from an image file (the formats and the size limit are those of `PUT /api/movies/{movieId}/poster`),
      * replacing its previous poster. Returns the movie, whose `posterUrl` is then the image's URL.
      */
     uploadPoster(id: string, file: File): Promise<Movie> {

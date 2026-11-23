@@ -14,7 +14,8 @@ const POSTER_URL_PATTERN = /^https?:\/\/\S+$/;
 
 /** What the server accepts as uploaded poster, see `PUT /api/movies/{movieId}/poster`. */
 const POSTER_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const POSTER_MAX_BYTES = 5 * 1024 * 1024;
+const POSTER_MAX_MEGABYTES = 5;
+const POSTER_MAX_BYTES = POSTER_MAX_MEGABYTES * 1024 * 1024;
 
 /**
  * Adds or edits a manually added movie: one that TMDB does not know, or that the user wants to describe
@@ -363,9 +364,9 @@ async function continueAfterAdding(movieId: string): Promise<RouteLocationRaw> {
             </label>
           </div>
           <p v-if="posterFileInvalid" class="help is-danger">
-            Please choose a JPEG, PNG or WebP image of at most 5 MB.
+            Please choose a JPEG, PNG or WebP image of at most {{ POSTER_MAX_MEGABYTES }} MB.
           </p>
-          <p v-else class="help">JPEG, PNG or WebP, at most 5 MB.</p>
+          <p v-else class="help">JPEG, PNG or WebP, at most {{ POSTER_MAX_MEGABYTES }} MB.</p>
           <button
             v-if="posterFile || uploadedPosterUrl"
             type="button"

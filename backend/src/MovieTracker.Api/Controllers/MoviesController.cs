@@ -174,7 +174,7 @@ public sealed class MoviesController(MovieService movies, DiaryService diary) : 
     }
 
     /// <summary>
-    /// Uploads the poster of a manually added movie as image file (JPEG, PNG or WebP, at most 5 MB). It replaces
+    /// Uploads the poster of a manually added movie as image file (see <see cref="MoviePoster"/> for the formats and the size limit). It replaces
     /// the movie's previous poster, whether that was an uploaded image or a URL.
     /// </summary>
     [HttpPut("{movieId:guid}/poster", Name = "uploadMoviePoster")]
