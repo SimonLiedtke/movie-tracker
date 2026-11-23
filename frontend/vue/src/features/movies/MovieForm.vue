@@ -5,11 +5,16 @@ import { useApi } from '../../core/api/api';
 import { toApiError, type ApiError } from '../../core/api/api-error';
 import type { Genre, Movie, MovieRequest } from '../../core/api/models';
 import ErrorNotification from '../../shared/ErrorNotification.vue';
+import Poster from '../../shared/Poster.vue';
 
 /** Empty strings become null, the backend expects absent values as null. */
 const orNull = (value: string): string | null => (value === '' ? null : value);
 
 const POSTER_URL_PATTERN = /^https?:\/\/\S+$/;
+
+/** What the server accepts as uploaded poster, see `PUT /api/movies/{movieId}/poster`. */
+const POSTER_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const POSTER_MAX_BYTES = 5 * 1024 * 1024;
 
 /**
  * Adds or edits a manually added movie: one that TMDB does not know, or that the user wants to describe
@@ -37,6 +42,13 @@ const loading = ref(false);
 const saving = ref(false);
 const error = ref<ApiError | null>(null);
 
+/** The image file the user has chosen as poster; it is uploaded when the movie is saved. */
+const posterFile = ref<File | null>(null);
+/** The uploaded poster the movie already has (editing only), as long as the user does not remove or replace it. */
+const uploadedPosterUrl = ref<string | null>(null);
+/** The movie that was added, if saving failed after that (e.g. the poster upload): saving again changes it. */
+const addedId = ref<string | null>(null);
+
 const form = reactive({
   title: '',
   originalTitle: '',
@@ -60,6 +72,41 @@ const invalid = computed<Record<Field, boolean>>(() => ({
     form.posterUrl.length > 0 &&
     (form.posterUrl.length > 2000 || !POSTER_URL_PATTERN.test(form.posterUrl)),
 }));
+
+/** The chosen file is not an image the server accepts. */
+const posterFileInvalid = computed(
+  () =>
+    posterFile.value !== null &&
+    (!POSTER_TYPES.includes(posterFile.value.type) || posterFile.value.size > POSTER_MAX_BYTES),
+);
+
+/** A preview of the chosen file. The browser holds on to it until it is revoked. */
+const chosenPosterUrl = ref<string | null>(null);
+watch(
+  () => (posterFileInvalid.value ? null : posterFile.value),
+  (file, _previous, onCleanup) => {
+    if (!file) {
+      chosenPosterUrl.value = null;
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    chosenPosterUrl.value = url;
+    onCleanup(() => URL.revokeObjectURL(url));
+  },
+  { immediate: true },
+);
+
+/** The poster the movie will have after saving, as far as the form can tell. */
+const posterPreviewUrl = computed(() => {
+  if (chosenPosterUrl.value) {
+    return chosenPosterUrl.value;
+  }
+  const typed = form.posterUrl.trim();
+  if (typed) {
+    return invalid.value.posterUrl ? null : typed;
+  }
+  return uploadedPosterUrl.value;
+});
 
 /** The fields the user has been in, or has failed to fill in by trying to save. */
 const touched = reactive<Record<Field, boolean>>({
@@ -123,7 +170,10 @@ function fill(movie: Movie): void {
   form.releaseDate = movie.releaseDate ?? '';
   form.runtimeMinutes = movie.runtimeMinutes;
   form.overview = movie.overview ?? '';
-  form.posterUrl = movie.posterUrl ?? '';
+  // An uploaded poster has a path on this server as URL; it is not something to edit in the URL field.
+  const uploaded = movie.posterUrl?.startsWith('/') ?? false;
+  uploadedPosterUrl.value = uploaded ? movie.posterUrl : null;
+  form.posterUrl = uploaded ? '' : (movie.posterUrl ?? '');
   form.genreIds = movie.genres.map((genre) => genre.id);
 }
 
@@ -132,8 +182,21 @@ function onRuntime(value: string): void {
   touched.runtimeMinutes = true;
 }
 
+function onPosterFile(event: Event): void {
+  posterFile.value = (event.target as HTMLInputElement).files?.[0] ?? null;
+}
+
+/** Forgets the chosen file, or: removes the uploaded poster when the movie is saved. */
+function removePoster(): void {
+  if (posterFile.value) {
+    posterFile.value = null;
+  } else {
+    uploadedPosterUrl.value = null;
+  }
+}
+
 async function save(): Promise<void> {
-  if (Object.values(invalid.value).some(Boolean)) {
+  if (Object.values(invalid.value).some(Boolean) || posterFileInvalid.value) {
     for (const field of Object.keys(touched) as Field[]) {
       touched[field] = true;
     }
@@ -146,7 +209,9 @@ async function save(): Promise<void> {
     releaseDate: orNull(form.releaseDate),
     runtimeMinutes: form.runtimeMinutes,
     overview: orNull(form.overview.trim()),
-    posterUrl: orNull(form.posterUrl.trim()),
+    // A typed URL replaces an uploaded poster. Without one, the movie keeps its uploaded poster (by sending
+    // its URL back) unless the user removed it.
+    posterUrl: orNull(form.posterUrl.trim()) ?? uploadedPosterUrl.value,
     genreIds: [...form.genreIds],
   };
 
@@ -154,7 +219,7 @@ async function save(): Promise<void> {
   error.value = null;
   let next: RouteLocationRaw;
   try {
-    next = props.id ? await update(props.id, request) : await addAndContinue(request);
+    next = await saveMovie(request);
   } catch (failure) {
     saving.value = false;
     error.value = toApiError(failure);
@@ -163,22 +228,33 @@ async function save(): Promise<void> {
   void router.push(next);
 }
 
-async function update(id: string, request: MovieRequest): Promise<RouteLocationRaw> {
-  const movie = await api.movies.update(id, request);
-  return `/movies/${movie.id}`;
+/** Saves the movie and its poster (a second request), then returns where to continue. */
+async function saveMovie(request: MovieRequest): Promise<RouteLocationRaw> {
+  const existingId = props.id ?? addedId.value;
+  const movie = existingId
+    ? await api.movies.update(existingId, request)
+    : await api.movies.create(request);
+  if (!existingId) {
+    addedId.value = movie.id;
+  }
+
+  if (posterFile.value) {
+    await api.movies.uploadPoster(movie.id, posterFile.value);
+  }
+
+  return props.id ? `/movies/${movie.id}` : continueAfterAdding(movie.id);
 }
 
-/** Creates the movie, then continues where the user came from. */
-async function addAndContinue(request: MovieRequest): Promise<RouteLocationRaw> {
-  const movie = await api.movies.create(request);
+/** Continues where the user came from. */
+async function continueAfterAdding(movieId: string): Promise<RouteLocationRaw> {
   switch (props.next) {
     case 'diary':
-      return { path: '/diary/new', query: { movieId: movie.id } };
+      return { path: '/diary/new', query: { movieId } };
     case 'watchlist':
-      await api.watchlist.put(movie.id, null);
+      await api.watchlist.put(movieId, null);
       return '/watchlist';
     default:
-      return `/movies/${movie.id}`;
+      return `/movies/${movieId}`;
   }
 }
 </script>
@@ -262,21 +338,64 @@ async function addAndContinue(request: MovieRequest): Promise<RouteLocationRaw> 
       </div>
     </div>
 
-    <div class="field">
-      <label class="label" for="posterUrl">Poster URL</label>
-      <div class="control">
-        <input
-          id="posterUrl"
-          v-model="form.posterUrl"
-          class="input"
-          type="url"
-          placeholder="https://…"
-          :class="{ 'is-danger': isInvalid('posterUrl') }"
-          @input="touched.posterUrl = true"
-          @blur="touched.posterUrl = true"
-        />
+    <div class="columns">
+      <div class="column is-narrow poster-field">
+        <Poster :url="posterPreviewUrl" :title="form.title" />
       </div>
-      <p v-if="isInvalid('posterUrl')" class="help is-danger">Please enter a valid http(s) URL.</p>
+      <div class="column">
+        <div class="field">
+          <label class="label" for="posterFile">Poster image</label>
+          <div class="file has-name">
+            <label class="file-label">
+              <input
+                id="posterFile"
+                class="file-input"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                @change="onPosterFile"
+              />
+              <span class="file-cta">
+                <span class="file-label">Choose an image…</span>
+              </span>
+              <span class="file-name">{{
+                posterFile?.name ?? (uploadedPosterUrl ? 'Uploaded image' : 'No file chosen')
+              }}</span>
+            </label>
+          </div>
+          <p v-if="posterFileInvalid" class="help is-danger">
+            Please choose a JPEG, PNG or WebP image of at most 5 MB.
+          </p>
+          <p v-else class="help">JPEG, PNG or WebP, at most 5 MB.</p>
+          <button
+            v-if="posterFile || uploadedPosterUrl"
+            type="button"
+            class="button is-small is-light mt-2"
+            @click="removePoster"
+          >
+            {{ posterFile ? 'Clear the chosen image' : 'Remove the uploaded image' }}
+          </button>
+        </div>
+
+        <div class="field">
+          <label class="label" for="posterUrl">or a poster URL</label>
+          <div class="control">
+            <input
+              id="posterUrl"
+              v-model="form.posterUrl"
+              class="input"
+              type="url"
+              placeholder="https://…"
+              :class="{ 'is-danger': isInvalid('posterUrl') }"
+              @input="touched.posterUrl = true"
+              @blur="touched.posterUrl = true"
+            />
+          </div>
+          <p v-if="isInvalid('posterUrl')" class="help is-danger">
+            Please enter a valid http(s) URL.
+          </p>
+          <p v-else class="help">An image you choose is used instead of the URL.</p>
+        </div>
+      </div>
     </div>
 
     <div class="field">
