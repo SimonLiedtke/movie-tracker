@@ -89,7 +89,7 @@
                 id="posterFile"
                 class="file-input"
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
+                [accept]="posterAccept"
                 (change)="onPosterFile($event)"
               />
               <span class="file-cta">

@@ -351,7 +351,7 @@ async function continueAfterAdding(movieId: string): Promise<RouteLocationRaw> {
                 id="posterFile"
                 class="file-input"
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
+                :accept="POSTER_TYPES.join(',')"
                 @change="onPosterFile"
               />
               <span class="file-cta">

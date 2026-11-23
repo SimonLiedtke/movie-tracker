@@ -75,6 +75,9 @@ export class MovieForm {
     initialValue: this.form.getRawValue(),
   });
 
+  /** For the file dialog: only offers the images the server accepts. */
+  protected readonly posterAccept = POSTER_TYPES.join(',');
+
   /** The image file the user has chosen as poster; it is uploaded when the movie is saved. */
   protected readonly posterFile = signal<File | null>(null);
   /** The uploaded poster the movie already has (editing only), as long as the user does not remove or replace it. */
