@@ -26,11 +26,7 @@ public static class NavigationExtensions
     public static void NavigateWith(this NavigationManager navigation, params (string Key, object? Value)[] changes) =>
         navigation.NavigateTo(navigation.UrlWith(changes));
 
-    /// <summary>Like <see cref="NavigateWith"/>, but replaces the current history entry (for what is typed in a field).</summary>
-    public static void ReplaceWith(this NavigationManager navigation, params (string Key, object? Value)[] changes) =>
-        navigation.NavigateTo(navigation.UrlWith(changes), replace: true);
-
-    /// <summary>The page, from page 1 up: goes to the same page without any query parameters.</summary>
+    /// <summary>Goes to the same page without any query parameters (clears the filters).</summary>
     public static void ClearQuery(this NavigationManager navigation) =>
         navigation.NavigateTo(new Uri(navigation.Uri).AbsolutePath);
 }
