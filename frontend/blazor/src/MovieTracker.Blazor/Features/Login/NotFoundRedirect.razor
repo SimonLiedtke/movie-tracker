@@ -1,0 +1,8 @@
+@page "/not-found"
+@attribute [PublicPage]
+@inject NavigationManager Navigation
+
+@code {
+    // Unknown URLs lead to the start page: the sign-in page, or the movies for someone who is signed in.
+    protected override void OnInitialized() => Navigation.NavigateTo("/", replace: true);
+}

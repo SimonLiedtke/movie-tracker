@@ -1,0 +1,24 @@
+@inject NavigationManager Navigation
+
+@if (Tags.Count > 0)
+{
+    <div class="tags mb-0">
+        @foreach (var tag in Tags)
+        {
+            @* Each tag leads to the list filtered by it, from page 1. *@
+            <a class="tag @(tag == Active ? "is-info" : "is-light")"
+               href="@Navigation.LinkTo(Route, ("tag", tag), ("page", null))"
+               title="Show everything tagged @tag">@tag</a>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public IReadOnlyList<string> Tags { get; set; } = [];
+
+    /// <summary>The route of the list that the tags filter, e.g. "/diary".</summary>
+    [Parameter, EditorRequired] public string Route { get; set; } = "";
+
+    /// <summary>The tag the list is filtered by now, if any.</summary>
+    [Parameter] public string? Active { get; set; }
+}

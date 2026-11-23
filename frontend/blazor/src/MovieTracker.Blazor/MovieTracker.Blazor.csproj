@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <RootNamespace>MovieTracker.Blazor</RootNamespace>
+    <!-- The app formats dates itself, in English (see Core/Dates.cs). Without ICU data, the download is much smaller
+         and the backend (which serves the published files) does not need to know the .dat file type. -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- DateTime.Now and TimeZoneInfo.Local follow the browser's time zone. -->
+    <BlazorEnableTimeZoneSupport>true</BlazorEnableTimeZoneSupport>
+    <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="System.Net.Http.Json" />
+    <Using Include="MovieTracker.Blazor.Core" />
+    <Using Include="MovieTracker.Blazor.Core.Api" />
+    <Using Include="MovieTracker.Blazor.Core.Auth" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.10" />
+  </ItemGroup>
+
+</Project>

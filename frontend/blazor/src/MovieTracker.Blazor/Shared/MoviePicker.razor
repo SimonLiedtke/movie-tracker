@@ -1,0 +1,248 @@
+@implements IDisposable
+@inject Api Api
+@inject NavigationManager Navigation
+
+@*
+    Search field to pick a movie: the user's manually added movies and TMDB's results.
+    Picking a TMDB movie imports it first, so the result is always a movie with an ID.
+
+    - @bind-Selected: shows the picked movie instead of the search field (for forms).
+    - OnPicked with KeepSelection="false": emits and clears the field (for "add" actions).
+*@
+
+@if (KeepSelection && Selected is not null)
+{
+    <div class="field has-addons">
+        <div class="control is-expanded">
+            <input class="input is-static" readonly value="@Label(Selected.Title, Selected.ReleaseDate)" id="@InputId" />
+        </div>
+        <div class="control">
+            <button type="button" class="button" @onclick="ClearAsync">Change</button>
+        </div>
+    </div>
+}
+else
+{
+    <div class="dropdown is-block @(open ? "is-active" : null)">
+        <div class="dropdown-trigger">
+            <div class="control @(searching || importing ? "is-loading" : null)">
+                <input class="input @(Invalid ? "is-danger" : null)" type="search" autocomplete="off"
+                       placeholder="@Placeholder" id="@InputId" value="@term" disabled="@importing"
+                       @oninput="OnInput" @onfocus="OnFocus" @onkeydown="OnKeyDown" />
+            </div>
+        </div>
+        <div class="dropdown-menu" role="menu" style="width: 100%">
+            <div class="dropdown-content" style="max-height: 24rem; overflow-y: auto">
+                @if (response is not null)
+                {
+                    @if (!response.TmdbAvailable)
+                    {
+                        <div class="dropdown-item has-text-grey is-size-7">
+                            TMDB search is not available right now, only your own movies are shown.
+                        </div>
+                    }
+                    @if (response.Items.Count > 0)
+                    {
+                        @foreach (var result in response.Items)
+                        {
+                            <button type="button" class="dropdown-item is-flex is-align-items-center"
+                                    @key="(result.MovieId, result.TmdbId)" @onclick="() => PickAsync(result)">
+                                <span class="is-flex-grow-1">@Label(result.Title, result.ReleaseDate)</span>
+                                @if (result.TmdbId is null)
+                                {
+                                    <span class="tag is-warning is-light ml-2" title="Added manually by you">Yours</span>
+                                }
+                            </button>
+                        }
+                    }
+                    else
+                    {
+                        <div class="dropdown-item has-text-grey">No matching movies.</div>
+                    }
+                    <hr class="dropdown-divider" />
+                    <a class="dropdown-item" href="@ManualAddLink()">
+                        Can't find it? <strong>Add it manually</strong>
+                    </a>
+                }
+            </div>
+        </div>
+    </div>
+    @if (importError is not null)
+    {
+        <p class="help is-danger">@importError</p>
+    }
+}
+
+@code {
+    private const int SearchDebounceMs = 250;
+
+    [Parameter] public bool KeepSelection { get; set; } = true;
+
+    [Parameter] public string? AfterManualAdd { get; set; }
+
+    [Parameter] public string? InputId { get; set; }
+
+    [Parameter] public bool Invalid { get; set; }
+
+    [Parameter] public string Placeholder { get; set; } = "Search a movie by title";
+
+    [Parameter] public MovieRef? Selected { get; set; }
+
+    [Parameter] public EventCallback<MovieRef?> SelectedChanged { get; set; }
+
+    [Parameter] public EventCallback<MovieRef> OnPicked { get; set; }
+
+    private string term = "";
+    private MovieSearchResponse? response;
+    private bool searching;
+    private bool importing;
+    private string? importError;
+    private bool open;
+
+    private CancellationTokenSource? debounce;
+    private string lastSearched = "";
+
+    /// <summary>Numbers the searches, so that the answer to an outdated one is ignored.</summary>
+    private int latestSearch;
+
+    public void Dispose()
+    {
+        debounce?.Cancel();
+        debounce?.Dispose();
+        latestSearch++;
+    }
+
+    private void OnInput(ChangeEventArgs args)
+    {
+        term = args.Value?.ToString() ?? "";
+        importError = null;
+        debounce?.Cancel();
+        debounce?.Dispose();
+        debounce = new CancellationTokenSource();
+        _ = SearchAfterPauseAsync(term.Trim(), debounce.Token);
+    }
+
+    private async Task SearchAfterPauseAsync(string searchTerm, CancellationToken cancellation)
+    {
+        try
+        {
+            await Task.Delay(SearchDebounceMs, cancellation);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        await RunSearchAsync(searchTerm);
+    }
+
+    private async Task RunSearchAsync(string searchTerm)
+    {
+        if (searchTerm == lastSearched)
+        {
+            return;
+        }
+
+        lastSearched = searchTerm;
+        var thisSearch = ++latestSearch;
+
+        if (searchTerm == "")
+        {
+            searching = false;
+            response = null;
+            open = false;
+            StateHasChanged();
+            return;
+        }
+
+        searching = true;
+        StateHasChanged();
+        MovieSearchResponse result;
+        try
+        {
+            result = await Api.Movies.SearchAsync(searchTerm);
+        }
+        catch
+        {
+            result = new MovieSearchResponse([], false);
+        }
+
+        if (thisSearch != latestSearch)
+        {
+            return;
+        }
+
+        searching = false;
+        response = result;
+        open = true;
+        StateHasChanged();
+    }
+
+    private void OnFocus() => open = response is not null;
+
+    private void OnKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape")
+        {
+            open = false;
+        }
+    }
+
+    private async Task PickAsync(MovieSearchResult result)
+    {
+        open = false;
+        if (result.MovieId is { } movieId)
+        {
+            await DoneAsync(new MovieRef(movieId, result.Title, result.ReleaseDate, result.PosterUrl));
+            return;
+        }
+
+        importing = true;
+        importError = null;
+        try
+        {
+            var movie = await Api.Movies.ImportFromTmdbAsync(result.TmdbId!.Value);
+            importing = false;
+            await DoneAsync(movie.ToRef());
+        }
+        catch (Exception exception) when (exception is ApiException or HttpRequestException)
+        {
+            importing = false;
+            importError = ApiError.From(exception).Message;
+        }
+    }
+
+    private async Task ClearAsync()
+    {
+        Selected = null;
+        await SelectedChanged.InvokeAsync(null);
+        Reset();
+    }
+
+    private static string Label(string title, DateOnly? releaseDate) =>
+        Dates.YearOf(releaseDate) is { Length: > 0 } year ? $"{title} ({year})" : title;
+
+    private string ManualAddLink() => "/movies/new" + QueryString.Build(("title", term.Trim()), ("next", AfterManualAdd));
+
+    private async Task DoneAsync(MovieRef movie)
+    {
+        await OnPicked.InvokeAsync(movie);
+        if (KeepSelection)
+        {
+            Selected = movie;
+            await SelectedChanged.InvokeAsync(movie);
+        }
+
+        Reset();
+    }
+
+    private void Reset()
+    {
+        debounce?.Cancel();
+        latestSearch++;
+        lastSearched = "";
+        term = "";
+        response = null;
+        searching = false;
+    }
+}
