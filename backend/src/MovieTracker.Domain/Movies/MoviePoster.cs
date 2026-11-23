@@ -9,7 +9,15 @@ namespace MovieTracker.Domain.Movies;
 public sealed class MoviePoster
 {
     /// <summary>A poster is shown at a few hundred pixels width, so this leaves room for even a large scan.</summary>
-    public const int MaxBytes = 5 * 1024 * 1024;
+    public const int MaxMegabytes = 5;
+
+    public const int MaxBytes = MaxMegabytes * 1024 * 1024;
+
+    /// <summary>The longest content type the database column holds; the accepted ones are far shorter.</summary>
+    public const int MaxContentTypeLength = 50;
+
+    /// <summary>A WebP file is a RIFF container: "RIFF", the size of the rest (4 bytes), then "WEBP".</summary>
+    private const int WebPTagOffset = 8;
 
     private MoviePoster()
     {
@@ -33,12 +41,12 @@ public sealed class MoviePoster
 
     public DateTimeOffset UpdatedAt { get; private set; }
 
-    private const string Jpeg = "image/jpeg";
-    private const string Png = "image/png";
-    private const string WebP = "image/webp";
+    public const string JpegContentType = "image/jpeg";
+    public const string PngContentType = "image/png";
+    public const string WebPContentType = "image/webp";
 
     /// <summary>The image formats that are accepted. No SVG: it can contain scripts.</summary>
-    public static IReadOnlySet<string> ContentTypes { get; } = new[] { Jpeg, Png, WebP }.ToFrozenSet();
+    public static IReadOnlySet<string> ContentTypes { get; } = new[] { JpegContentType, PngContentType, WebPContentType }.ToFrozenSet();
 
     /// <summary>Null if the data is empty, too big or not a JPEG, PNG or WebP image.</summary>
     public static MoviePoster? TryCreate(Guid movieId, byte[] data, DateTimeOffset now)
@@ -91,25 +99,31 @@ public sealed class MoviePoster
     /// </summary>
     private static string? DetectContentType(ReadOnlySpan<byte> data)
     {
-        ReadOnlySpan<byte> jpeg = [0xFF, 0xD8, 0xFF];
-        ReadOnlySpan<byte> png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
-
-        if (data.StartsWith(jpeg))
+        if (data.StartsWith(JpegSignature))
         {
-            return Jpeg;
+            return JpegContentType;
         }
 
-        if (data.StartsWith(png))
+        if (data.StartsWith(PngSignature))
         {
-            return Png;
+            return PngContentType;
         }
 
-        // WebP is a RIFF container: "RIFF", the size, then "WEBP".
-        if (data.Length >= 12 && data[..4].SequenceEqual("RIFF"u8) && data[8..12].SequenceEqual("WEBP"u8))
+        if (data.StartsWith(RiffTag)
+            && data.Length >= WebPTagOffset + WebPTag.Length
+            && data.Slice(WebPTagOffset, WebPTag.Length).SequenceEqual(WebPTag))
         {
-            return WebP;
+            return WebPContentType;
         }
 
         return null;
     }
+
+    private static ReadOnlySpan<byte> JpegSignature => [0xFF, 0xD8, 0xFF];
+
+    private static ReadOnlySpan<byte> PngSignature => [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]; // "\x89PNG\r\n\x1a\n"
+
+    private static ReadOnlySpan<byte> RiffTag => "RIFF"u8;
+
+    private static ReadOnlySpan<byte> WebPTag => "WEBP"u8;
 }

@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using MovieTracker.Application.Movies;
 
 namespace MovieTracker.Api.Contracts;
 
@@ -12,5 +13,5 @@ internal sealed class PosterUrlAttribute() : ValidationAttribute("The {0} field 
     public override bool IsValid(object? value) =>
         value is not string text
         || (Uri.TryCreate(text, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https")
-        || (text.StartsWith("/api/movies/", StringComparison.Ordinal) && text.AsSpan().IndexOfAny(" \t\r\n") < 0);
+        || (text.StartsWith(MoviePosterUrl.PathPrefix, StringComparison.Ordinal) && text.AsSpan().IndexOfAny(" \t\r\n") < 0);
 }

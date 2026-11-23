@@ -19,8 +19,11 @@ namespace MovieTracker.Api.Controllers;
 [Tags("Movies")]
 public sealed class MoviesController(MovieService movies, DiaryService diary) : ControllerBase
 {
-    /// <summary>The poster image plus a little for the rest of the multipart form. Bigger requests are rejected with 400.</summary>
-    private const int MaxPosterRequestBytes = MoviePoster.MaxBytes + 64 * 1024;
+    /// <summary>What the multipart form needs besides the image: boundaries and part headers.</summary>
+    private const int MultipartOverheadBytes = 64 * 1024;
+
+    /// <summary>The poster image plus the form's overhead. Bigger requests are rejected with 400.</summary>
+    private const int MaxPosterRequestBytes = MoviePoster.MaxBytes + MultipartOverheadBytes;
 
     /// <summary>The user's movies: added manually, logged in the diary or on the watchlist.</summary>
     [HttpGet(Name = "listMovies")]
@@ -157,7 +160,11 @@ public sealed class MoviesController(MovieService movies, DiaryService diary) : 
 
     /// <summary>The image of the movie's uploaded poster, for showing it. 404 for movies with an external poster.</summary>
     [HttpGet("{movieId:guid}/poster", Name = "getMoviePoster")]
-    [ProducesResponseType<FileContentResult>(StatusCodes.Status200OK, "image/jpeg", "image/png", "image/webp")]
+    [ProducesResponseType<FileContentResult>(
+        StatusCodes.Status200OK,
+        MoviePoster.JpegContentType,
+        MoviePoster.PngContentType,
+        MoviePoster.WebPContentType)]
     [ProducesResponseType(StatusCodes.Status304NotModified)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, MediaTypeNames.Application.ProblemJson)]
     public async Task<IActionResult> GetMoviePoster(Guid movieId, CancellationToken cancellationToken)
@@ -268,7 +275,8 @@ public sealed class MoviesController(MovieService movies, DiaryService diary) : 
 
     private ActionResult InvalidPosterImage()
     {
-        ModelState.AddModelError("file", "The poster must be a JPEG, PNG or WebP image of at most 5 MB.");
+        ModelState.AddModelError(
+            "file", $"The poster must be a JPEG, PNG or WebP image of at most {MoviePoster.MaxMegabytes} MB.");
         return ValidationProblem(ModelState);
     }
 

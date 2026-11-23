@@ -4,6 +4,7 @@ using MovieTracker.Application.Tests.Fakes;
 using MovieTracker.Application.Tmdb;
 using MovieTracker.Domain.Activity;
 using MovieTracker.Domain.Movies;
+using MovieTracker.TestSupport;
 
 namespace MovieTracker.Application.Tests;
 
@@ -353,16 +354,12 @@ public sealed class MovieServiceTests
 
     // --- Posters
 
-    private static byte[] Jpeg => [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46];
-
-    private static byte[] Png => [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00];
-
     [Fact]
     public async Task SetPoster_saves_the_image_and_points_the_movie_at_it()
     {
         var movie = AddManualMovie(Alice);
 
-        var result = await _service.SetPosterAsync(Alice, movie.Id, Jpeg, Ct);
+        var result = await _service.SetPosterAsync(Alice, movie.Id, TestImages.Jpeg(), Ct);
 
         Assert.Equal(SaveMovieStatus.Saved, result.Status);
         var poster = Assert.Single(_movies.Posters);
@@ -377,10 +374,10 @@ public sealed class MovieServiceTests
     public async Task SetPoster_replaces_the_previous_image()
     {
         var movie = AddManualMovie(Alice);
-        await _service.SetPosterAsync(Alice, movie.Id, Jpeg, Ct);
+        await _service.SetPosterAsync(Alice, movie.Id, TestImages.Jpeg(), Ct);
         _clock.Advance(TimeSpan.FromMinutes(5));
 
-        var result = await _service.SetPosterAsync(Alice, movie.Id, Png, Ct);
+        var result = await _service.SetPosterAsync(Alice, movie.Id, TestImages.Png(), Ct);
 
         Assert.Equal(SaveMovieStatus.Saved, result.Status);
         var poster = Assert.Single(_movies.Posters);
@@ -392,7 +389,7 @@ public sealed class MovieServiceTests
     {
         var movie = AddManualMovie(Alice); // has the poster URL https://image.example/alien.jpg
 
-        await _service.SetPosterAsync(Alice, movie.Id, Jpeg, Ct);
+        await _service.SetPosterAsync(Alice, movie.Id, TestImages.Jpeg(), Ct);
 
         Assert.Equal($"/api/movies/{movie.Id}/poster", movie.PosterUrl);
     }
@@ -414,12 +411,12 @@ public sealed class MovieServiceTests
     public async Task SetPoster_keeps_the_previous_image_if_the_new_one_is_rejected()
     {
         var movie = AddManualMovie(Alice);
-        await _service.SetPosterAsync(Alice, movie.Id, Jpeg, Ct);
+        await _service.SetPosterAsync(Alice, movie.Id, TestImages.Jpeg(), Ct);
 
         var result = await _service.SetPosterAsync(Alice, movie.Id, [], Ct);
 
         Assert.Equal(SaveMovieStatus.InvalidPosterImage, result.Status);
-        Assert.Equal(Jpeg, Assert.Single(_movies.Posters).Data);
+        Assert.Equal(TestImages.Jpeg(), Assert.Single(_movies.Posters).Data);
     }
 
     [Fact]
@@ -427,7 +424,7 @@ public sealed class MovieServiceTests
     {
         var movie = AddManualMovie(Bob);
 
-        var result = await _service.SetPosterAsync(Alice, movie.Id, Jpeg, Ct);
+        var result = await _service.SetPosterAsync(Alice, movie.Id, TestImages.Jpeg(), Ct);
 
         Assert.Equal(SaveMovieStatus.NotFound, result.Status);
         Assert.Empty(_movies.Posters);
@@ -438,7 +435,7 @@ public sealed class MovieServiceTests
     {
         var movie = AddTmdbMovie(348);
 
-        var result = await _service.SetPosterAsync(Alice, movie.Id, Jpeg, Ct);
+        var result = await _service.SetPosterAsync(Alice, movie.Id, TestImages.Jpeg(), Ct);
 
         Assert.Equal(SaveMovieStatus.ReadOnly, result.Status);
         Assert.Empty(_movies.Posters);
@@ -449,13 +446,13 @@ public sealed class MovieServiceTests
     public async Task GetPoster_returns_the_image_to_the_owner_only()
     {
         var movie = AddManualMovie(Alice);
-        await _service.SetPosterAsync(Alice, movie.Id, Jpeg, Ct);
+        await _service.SetPosterAsync(Alice, movie.Id, TestImages.Jpeg(), Ct);
 
         var own = await _service.GetPosterAsync(Alice, movie.Id, Ct);
         var others = await _service.GetPosterAsync(Bob, movie.Id, Ct);
 
         Assert.Equal("image/jpeg", own!.ContentType);
-        Assert.Equal(Jpeg, own.Data);
+        Assert.Equal(TestImages.Jpeg(), own.Data);
         Assert.Null(others);
     }
 
@@ -463,7 +460,7 @@ public sealed class MovieServiceTests
     public async Task Update_keeps_the_uploaded_poster_if_the_movie_keeps_its_url()
     {
         var movie = AddManualMovie(Alice);
-        await _service.SetPosterAsync(Alice, movie.Id, Jpeg, Ct);
+        await _service.SetPosterAsync(Alice, movie.Id, TestImages.Jpeg(), Ct);
         var url = $"/api/movies/{movie.Id}/poster";
 
         var result = await _service.UpdateAsync(Alice, movie.Id, AlienDetails with { Title = "Aliens", PosterUrl = url }, [Horror], Ct);
@@ -477,7 +474,7 @@ public sealed class MovieServiceTests
     public async Task Update_with_another_poster_url_deletes_the_uploaded_poster()
     {
         var movie = AddManualMovie(Alice);
-        await _service.SetPosterAsync(Alice, movie.Id, Jpeg, Ct);
+        await _service.SetPosterAsync(Alice, movie.Id, TestImages.Jpeg(), Ct);
 
         var result = await _service.UpdateAsync(
             Alice, movie.Id, AlienDetails with { PosterUrl = "https://image.example/other.jpg" }, [Horror], Ct);
@@ -491,7 +488,7 @@ public sealed class MovieServiceTests
     public async Task Update_without_a_poster_url_deletes_the_uploaded_poster()
     {
         var movie = AddManualMovie(Alice);
-        await _service.SetPosterAsync(Alice, movie.Id, Jpeg, Ct);
+        await _service.SetPosterAsync(Alice, movie.Id, TestImages.Jpeg(), Ct);
 
         await _service.UpdateAsync(Alice, movie.Id, AlienDetails with { PosterUrl = null }, [Horror], Ct);
 
@@ -516,7 +513,7 @@ public sealed class MovieServiceTests
     public async Task Update_rejects_the_poster_url_of_another_movies_upload()
     {
         var other = AddManualMovie(Alice, "Other");
-        await _service.SetPosterAsync(Alice, other.Id, Jpeg, Ct);
+        await _service.SetPosterAsync(Alice, other.Id, TestImages.Jpeg(), Ct);
         var movie = AddManualMovie(Alice);
 
         var result = await _service.UpdateAsync(

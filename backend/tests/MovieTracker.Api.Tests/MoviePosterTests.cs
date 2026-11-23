@@ -5,14 +5,16 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MovieTracker.Api.Contracts;
 using MovieTracker.Api.Tests.Infrastructure;
+using MovieTracker.Domain.Movies;
 using MovieTracker.Infrastructure.Persistence;
+using MovieTracker.TestSupport;
 
 namespace MovieTracker.Api.Tests;
 
 public sealed class MoviePosterTests(ApiFactory factory) : ApiTestBase(factory)
 {
-    private static readonly byte[] Jpeg = [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46];
-    private static readonly byte[] Png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00];
+    private static readonly byte[] Jpeg = TestImages.Jpeg();
+    private static readonly byte[] Png = TestImages.Png();
 
     private static MultipartFormDataContent Upload(byte[] data, string fileName = "poster.jpg", string contentType = "image/jpeg")
     {
@@ -127,7 +129,7 @@ public sealed class MoviePosterTests(ApiFactory factory) : ApiTestBase(factory)
     public async Task Upload_rejects_a_file_that_is_too_big()
     {
         var movie = await CreateMovieAsync();
-        var data = new byte[(5 * 1024 * 1024) + 1];
+        var data = new byte[MoviePoster.MaxBytes + 1];
         Jpeg.CopyTo(data, 0);
         using var content = Upload(data);
 

@@ -15,7 +15,7 @@ internal sealed class MoviePosterConfiguration : IEntityTypeConfiguration<MovieP
         builder.HasKey(poster => poster.MovieId);
         builder.Property(poster => poster.MovieId).ValueGeneratedNever();
 
-        builder.Property(poster => poster.ContentType).HasMaxLength(50);
+        builder.Property(poster => poster.ContentType).HasMaxLength(MoviePoster.MaxContentTypeLength);
         builder.Property(poster => poster.Data);
 
         // Cascade: deleting a movie deletes its poster.
