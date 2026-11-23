@@ -134,15 +134,10 @@ public sealed class MovieService(
     public async Task<SaveMovieResult> UpdateAsync(
         Guid userId, Guid movieId, MovieDetails details, IReadOnlyList<int> genreIds, CancellationToken cancellationToken)
     {
-        var movie = await movies.FindAsync(userId, movieId, cancellationToken);
+        var (movie, refusal) = await FindManualMovieAsync(userId, movieId, cancellationToken);
         if (movie is null)
         {
-            return new SaveMovieResult(SaveMovieStatus.NotFound);
-        }
-
-        if (!movie.IsManual)
-        {
-            return new SaveMovieResult(SaveMovieStatus.ReadOnly);
+            return refusal!;
         }
 
         var movieGenres = await LoadGenresAsync(genreIds, cancellationToken);
@@ -184,15 +179,10 @@ public sealed class MovieService(
     public async Task<SaveMovieResult> SetPosterAsync(
         Guid userId, Guid movieId, byte[] image, CancellationToken cancellationToken)
     {
-        var movie = await movies.FindAsync(userId, movieId, cancellationToken);
+        var (movie, refusal) = await FindManualMovieAsync(userId, movieId, cancellationToken);
         if (movie is null)
         {
-            return new SaveMovieResult(SaveMovieStatus.NotFound);
-        }
-
-        if (!movie.IsManual)
-        {
-            return new SaveMovieResult(SaveMovieStatus.ReadOnly);
+            return refusal!;
         }
 
         var now = timeProvider.GetUtcNow();
@@ -244,6 +234,22 @@ public sealed class MovieService(
             userId, ActivityType.MovieDeleted, timeProvider.GetUtcNow(), movieId: null, movie.Title));
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return DeleteMovieResult.Deleted;
+    }
+
+    /// <summary>
+    /// The movie to change, or why it cannot be changed: it does not exist or is not visible to the user (NotFound),
+    /// or it comes from TMDB (ReadOnly).
+    /// </summary>
+    private async Task<(Movie? Movie, SaveMovieResult? Refusal)> FindManualMovieAsync(
+        Guid userId, Guid movieId, CancellationToken cancellationToken)
+    {
+        var movie = await movies.FindAsync(userId, movieId, cancellationToken);
+        if (movie is null)
+        {
+            return (null, new SaveMovieResult(SaveMovieStatus.NotFound));
+        }
+
+        return movie.IsManual ? (movie, null) : (null, new SaveMovieResult(SaveMovieStatus.ReadOnly));
     }
 
     private async Task RemovePosterImageAsync(Guid movieId, CancellationToken cancellationToken)

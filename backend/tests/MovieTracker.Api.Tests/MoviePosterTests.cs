@@ -30,6 +30,13 @@ public sealed class MoviePosterTests(ApiFactory factory) : ApiTestBase(factory)
         return await ReadAsync<MovieResponse>(response, HttpStatusCode.OK);
     }
 
+    private async Task<byte[]> DownloadPosterAsync(Guid movieId)
+    {
+        var response = await Client.GetAsync($"/api/movies/{movieId}/poster", Ct);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return await response.Content.ReadAsByteArrayAsync(Ct);
+    }
+
     [Fact]
     public async Task Upload_sets_the_poster_of_the_movie_everywhere_it_is_shown()
     {
@@ -184,7 +191,7 @@ public sealed class MoviePosterTests(ApiFactory factory) : ApiTestBase(factory)
 
         await ReadProblemAsync(get, HttpStatusCode.NotFound);
         await ReadProblemAsync(put, HttpStatusCode.NotFound);
-        Assert.Equal(Jpeg, await (await Client.GetAsync($"/api/movies/{movie.Id}/poster", Ct)).Content.ReadAsByteArrayAsync(Ct));
+        Assert.Equal(Jpeg, await DownloadPosterAsync(movie.Id));
     }
 
     [Fact]
@@ -223,7 +230,7 @@ public sealed class MoviePosterTests(ApiFactory factory) : ApiTestBase(factory)
 
         var updated = await ReadAsync<MovieResponse>(response, HttpStatusCode.OK);
         Assert.Equal(uploaded.PosterUrl, updated.PosterUrl);
-        Assert.Equal(Jpeg, await (await Client.GetAsync($"/api/movies/{movie.Id}/poster", Ct)).Content.ReadAsByteArrayAsync(Ct));
+        Assert.Equal(Jpeg, await DownloadPosterAsync(movie.Id));
     }
 
     [Theory]

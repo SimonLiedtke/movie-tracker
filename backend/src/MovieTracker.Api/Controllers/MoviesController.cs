@@ -122,14 +122,9 @@ public sealed class MoviesController(MovieService movies, DiaryService diary) : 
         MovieRequest request, CancellationToken cancellationToken)
     {
         var result = await movies.CreateAsync(User.GetUserId(), request.ToDetails(), request.GenreIds!, cancellationToken);
-        if (result.Status == SaveMovieStatus.UnknownGenres)
+        if (result.Status != SaveMovieStatus.Saved)
         {
-            return UnknownGenres(result);
-        }
-
-        if (result.Status == SaveMovieStatus.InvalidPosterUrl)
-        {
-            return InvalidPosterUrl();
+            return ToActionResult(result);
         }
 
         var response = result.Movie!.ToResponse();
@@ -148,14 +143,7 @@ public sealed class MoviesController(MovieService movies, DiaryService diary) : 
         var result = await movies.UpdateAsync(
             User.GetUserId(), movieId, request.ToDetails(), request.GenreIds!, cancellationToken);
 
-        return result.Status switch
-        {
-            SaveMovieStatus.NotFound => NotFound(),
-            SaveMovieStatus.ReadOnly => TmdbMovieIsReadOnly(),
-            SaveMovieStatus.UnknownGenres => UnknownGenres(result),
-            SaveMovieStatus.InvalidPosterUrl => InvalidPosterUrl(),
-            _ => result.Movie!.ToResponse(),
-        };
+        return ToActionResult(result);
     }
 
     /// <summary>The image of the movie's uploaded poster, for showing it. 404 for movies with an external poster.</summary>
@@ -213,13 +201,7 @@ public sealed class MoviesController(MovieService movies, DiaryService diary) : 
 
         var result = await movies.SetPosterAsync(User.GetUserId(), movieId, image, cancellationToken);
 
-        return result.Status switch
-        {
-            SaveMovieStatus.NotFound => NotFound(),
-            SaveMovieStatus.ReadOnly => TmdbMovieIsReadOnly(),
-            SaveMovieStatus.InvalidPosterImage => InvalidPosterImage(),
-            _ => result.Movie!.ToResponse(),
-        };
+        return ToActionResult(result);
     }
 
     /// <summary>Only manually added movies can be deleted, and only while they are not in the diary.</summary>
@@ -259,6 +241,17 @@ public sealed class MoviesController(MovieService movies, DiaryService diary) : 
 
         return entries.Select(entry => entry.ToResponse()).ToList();
     }
+
+    /// <summary>The saved movie, or the problem that kept it from being saved.</summary>
+    private ActionResult<MovieResponse> ToActionResult(SaveMovieResult result) => result.Status switch
+    {
+        SaveMovieStatus.NotFound => NotFound(),
+        SaveMovieStatus.ReadOnly => TmdbMovieIsReadOnly(),
+        SaveMovieStatus.UnknownGenres => UnknownGenres(result),
+        SaveMovieStatus.InvalidPosterUrl => InvalidPosterUrl(),
+        SaveMovieStatus.InvalidPosterImage => InvalidPosterImage(),
+        _ => result.Movie!.ToResponse(),
+    };
 
     private ActionResult UnknownGenres(SaveMovieResult result)
     {
