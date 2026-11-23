@@ -76,21 +76,61 @@
       </div>
     </div>
 
-    <div class="field">
-      <label class="label" for="posterUrl">Poster URL</label>
-      <div class="control">
-        <input
-          id="posterUrl"
-          class="input"
-          type="url"
-          placeholder="https://…"
-          formControlName="posterUrl"
-          [class.is-danger]="isInvalid('posterUrl')"
-        />
+    <div class="columns">
+      <div class="column is-narrow poster-field">
+        <app-poster [url]="posterPreviewUrl()" [title]="formValue().title ?? ''" />
       </div>
-      @if (isInvalid('posterUrl')) {
-        <p class="help is-danger">Please enter a valid http(s) URL.</p>
-      }
+      <div class="column">
+        <div class="field">
+          <label class="label" for="posterFile">Poster image</label>
+          <div class="file has-name">
+            <label class="file-label">
+              <input
+                id="posterFile"
+                class="file-input"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                (change)="onPosterFile($event)"
+              />
+              <span class="file-cta">
+                <span class="file-label">Choose an image…</span>
+              </span>
+              <span class="file-name">{{
+                posterFile()?.name ?? (uploadedPosterUrl() ? 'Uploaded image' : 'No file chosen')
+              }}</span>
+            </label>
+          </div>
+          @if (posterFileInvalid()) {
+            <p class="help is-danger">Please choose a JPEG, PNG or WebP image of at most 5 MB.</p>
+          } @else {
+            <p class="help">JPEG, PNG or WebP, at most 5 MB.</p>
+          }
+          @if (posterFile() || uploadedPosterUrl()) {
+            <button type="button" class="button is-small is-light mt-2" (click)="removePoster()">
+              {{ posterFile() ? 'Clear the chosen image' : 'Remove the uploaded image' }}
+            </button>
+          }
+        </div>
+
+        <div class="field">
+          <label class="label" for="posterUrl">or a poster URL</label>
+          <div class="control">
+            <input
+              id="posterUrl"
+              class="input"
+              type="url"
+              placeholder="https://…"
+              formControlName="posterUrl"
+              [class.is-danger]="isInvalid('posterUrl')"
+            />
+          </div>
+          @if (isInvalid('posterUrl')) {
+            <p class="help is-danger">Please enter a valid http(s) URL.</p>
+          } @else {
+            <p class="help">An image you choose is used instead of the URL.</p>
+          }
+        </div>
+      </div>
     </div>
 
     <div class="field">
