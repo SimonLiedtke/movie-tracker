@@ -33,6 +33,21 @@ describe('API services', () => {
     request.flush({ items: [], tmdbAvailable: true });
   });
 
+  it('uploads the poster of a movie as multipart form data', () => {
+    const image = new File(['jpeg'], 'poster.jpg', { type: 'image/jpeg' });
+    let posterUrl: string | null | undefined;
+    TestBed.inject(MoviesApi)
+      .uploadPoster('m1', image)
+      .subscribe((movie) => (posterUrl = movie.posterUrl));
+
+    const request = http.expectOne('/api/movies/m1/poster');
+    expect(request.request.method).toBe('PUT');
+    expect(request.request.body).toBeInstanceOf(FormData);
+    expect((request.request.body as FormData).get('file')).toBe(image);
+    request.flush({ id: 'm1', posterUrl: '/api/movies/m1/poster' });
+    expect(posterUrl).toBe('/api/movies/m1/poster');
+  });
+
   it('imports a movie from TMDB', () => {
     TestBed.inject(MoviesApi).importFromTmdb(348).subscribe();
 
