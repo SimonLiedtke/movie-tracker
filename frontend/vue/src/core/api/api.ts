@@ -81,6 +81,16 @@ function createMoviesApi(http: Http) {
       return body(http.delete<void>(`${BASE}/movies/${id}`));
     },
 
+    /**
+     * Sets the poster of a manually added movie from an image file (JPEG, PNG or WebP, at most 5 MB),
+     * replacing its previous poster. Returns the movie, whose `posterUrl` is then the image's URL.
+     */
+    uploadPoster(id: string, file: File): Promise<Movie> {
+      const form = new FormData();
+      form.append('file', file);
+      return body(http.put<Movie>(`${BASE}/movies/${id}/poster`, form));
+    },
+
     diaryEntries(id: string): Promise<DiaryEntry[]> {
       return body(http.get<DiaryEntry[]>(`${BASE}/movies/${id}/diary-entries`));
     },
