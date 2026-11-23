@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using MovieTracker.Application.Movies;
 using MovieTracker.Application.Tests.Fakes;
 using MovieTracker.Application.Tmdb;
+using MovieTracker.Domain.Activity;
 using MovieTracker.Domain.Movies;
 
 namespace MovieTracker.Application.Tests;
@@ -347,6 +348,195 @@ public sealed class MovieServiceTests
         Assert.Equal([111], result.UnknownGenreIds);
         Assert.Equal("Alien", movie.Title);
         Assert.Equal([Horror], movie.Genres.Select(genre => genre.Id));
+        Assert.Equal(0, _unitOfWork.SaveCount);
+    }
+
+    // --- Posters
+
+    private static byte[] Jpeg => [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46];
+
+    private static byte[] Png => [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00];
+
+    [Fact]
+    public async Task SetPoster_saves_the_image_and_points_the_movie_at_it()
+    {
+        var movie = AddManualMovie(Alice);
+
+        var result = await _service.SetPosterAsync(Alice, movie.Id, Jpeg, Ct);
+
+        Assert.Equal(SaveMovieStatus.Saved, result.Status);
+        var poster = Assert.Single(_movies.Posters);
+        Assert.Equal((movie.Id, "image/jpeg", Start), (poster.MovieId, poster.ContentType, poster.UpdatedAt));
+        Assert.Equal($"/api/movies/{movie.Id}/poster", movie.PosterUrl);
+        Assert.Equal($"/api/movies/{movie.Id}/poster", result.Movie!.PosterUrl);
+        Assert.Equal(1, _unitOfWork.SaveCount);
+        Assert.Equal(ActivityType.MovieUpdated, Assert.Single(_log.Entries).Type);
+    }
+
+    [Fact]
+    public async Task SetPoster_replaces_the_previous_image()
+    {
+        var movie = AddManualMovie(Alice);
+        await _service.SetPosterAsync(Alice, movie.Id, Jpeg, Ct);
+        _clock.Advance(TimeSpan.FromMinutes(5));
+
+        var result = await _service.SetPosterAsync(Alice, movie.Id, Png, Ct);
+
+        Assert.Equal(SaveMovieStatus.Saved, result.Status);
+        var poster = Assert.Single(_movies.Posters);
+        Assert.Equal(("image/png", Start.AddMinutes(5)), (poster.ContentType, poster.UpdatedAt));
+    }
+
+    [Fact]
+    public async Task SetPoster_replaces_a_poster_url()
+    {
+        var movie = AddManualMovie(Alice); // has the poster URL https://image.example/alien.jpg
+
+        await _service.SetPosterAsync(Alice, movie.Id, Jpeg, Ct);
+
+        Assert.Equal($"/api/movies/{movie.Id}/poster", movie.PosterUrl);
+    }
+
+    [Fact]
+    public async Task SetPoster_rejects_data_that_is_not_an_image_and_changes_nothing()
+    {
+        var movie = AddManualMovie(Alice);
+
+        var result = await _service.SetPosterAsync(Alice, movie.Id, "<svg/>"u8.ToArray(), Ct);
+
+        Assert.Equal(SaveMovieStatus.InvalidPosterImage, result.Status);
+        Assert.Empty(_movies.Posters);
+        Assert.Equal("https://image.example/alien.jpg", movie.PosterUrl);
+        Assert.Equal(0, _unitOfWork.SaveCount);
+    }
+
+    [Fact]
+    public async Task SetPoster_keeps_the_previous_image_if_the_new_one_is_rejected()
+    {
+        var movie = AddManualMovie(Alice);
+        await _service.SetPosterAsync(Alice, movie.Id, Jpeg, Ct);
+
+        var result = await _service.SetPosterAsync(Alice, movie.Id, [], Ct);
+
+        Assert.Equal(SaveMovieStatus.InvalidPosterImage, result.Status);
+        Assert.Equal(Jpeg, Assert.Single(_movies.Posters).Data);
+    }
+
+    [Fact]
+    public async Task SetPoster_does_not_find_other_users_manual_movies()
+    {
+        var movie = AddManualMovie(Bob);
+
+        var result = await _service.SetPosterAsync(Alice, movie.Id, Jpeg, Ct);
+
+        Assert.Equal(SaveMovieStatus.NotFound, result.Status);
+        Assert.Empty(_movies.Posters);
+    }
+
+    [Fact]
+    public async Task SetPoster_refuses_movies_from_TMDB()
+    {
+        var movie = AddTmdbMovie(348);
+
+        var result = await _service.SetPosterAsync(Alice, movie.Id, Jpeg, Ct);
+
+        Assert.Equal(SaveMovieStatus.ReadOnly, result.Status);
+        Assert.Empty(_movies.Posters);
+        Assert.Equal(0, _unitOfWork.SaveCount);
+    }
+
+    [Fact]
+    public async Task GetPoster_returns_the_image_to_the_owner_only()
+    {
+        var movie = AddManualMovie(Alice);
+        await _service.SetPosterAsync(Alice, movie.Id, Jpeg, Ct);
+
+        var own = await _service.GetPosterAsync(Alice, movie.Id, Ct);
+        var others = await _service.GetPosterAsync(Bob, movie.Id, Ct);
+
+        Assert.Equal("image/jpeg", own!.ContentType);
+        Assert.Equal(Jpeg, own.Data);
+        Assert.Null(others);
+    }
+
+    [Fact]
+    public async Task Update_keeps_the_uploaded_poster_if_the_movie_keeps_its_url()
+    {
+        var movie = AddManualMovie(Alice);
+        await _service.SetPosterAsync(Alice, movie.Id, Jpeg, Ct);
+        var url = $"/api/movies/{movie.Id}/poster";
+
+        var result = await _service.UpdateAsync(Alice, movie.Id, AlienDetails with { Title = "Aliens", PosterUrl = url }, [Horror], Ct);
+
+        Assert.Equal(SaveMovieStatus.Saved, result.Status);
+        Assert.Equal(url, movie.PosterUrl);
+        Assert.Single(_movies.Posters);
+    }
+
+    [Fact]
+    public async Task Update_with_another_poster_url_deletes_the_uploaded_poster()
+    {
+        var movie = AddManualMovie(Alice);
+        await _service.SetPosterAsync(Alice, movie.Id, Jpeg, Ct);
+
+        var result = await _service.UpdateAsync(
+            Alice, movie.Id, AlienDetails with { PosterUrl = "https://image.example/other.jpg" }, [Horror], Ct);
+
+        Assert.Equal(SaveMovieStatus.Saved, result.Status);
+        Assert.Equal("https://image.example/other.jpg", movie.PosterUrl);
+        Assert.Empty(_movies.Posters);
+    }
+
+    [Fact]
+    public async Task Update_without_a_poster_url_deletes_the_uploaded_poster()
+    {
+        var movie = AddManualMovie(Alice);
+        await _service.SetPosterAsync(Alice, movie.Id, Jpeg, Ct);
+
+        await _service.UpdateAsync(Alice, movie.Id, AlienDetails with { PosterUrl = null }, [Horror], Ct);
+
+        Assert.Null(movie.PosterUrl);
+        Assert.Empty(_movies.Posters);
+    }
+
+    [Fact]
+    public async Task Update_rejects_the_poster_url_of_an_upload_that_does_not_exist()
+    {
+        var movie = AddManualMovie(Alice);
+
+        var result = await _service.UpdateAsync(
+            Alice, movie.Id, AlienDetails with { Title = "Changed", PosterUrl = $"/api/movies/{movie.Id}/poster" }, [Horror], Ct);
+
+        Assert.Equal(SaveMovieStatus.InvalidPosterUrl, result.Status);
+        Assert.Equal("Alien", movie.Title);
+        Assert.Equal(0, _unitOfWork.SaveCount);
+    }
+
+    [Fact]
+    public async Task Update_rejects_the_poster_url_of_another_movies_upload()
+    {
+        var other = AddManualMovie(Alice, "Other");
+        await _service.SetPosterAsync(Alice, other.Id, Jpeg, Ct);
+        var movie = AddManualMovie(Alice);
+
+        var result = await _service.UpdateAsync(
+            Alice, movie.Id, AlienDetails with { PosterUrl = $"/api/movies/{other.Id}/poster" }, [Horror], Ct);
+
+        Assert.Equal(SaveMovieStatus.InvalidPosterUrl, result.Status);
+        Assert.Equal("https://image.example/alien.jpg", movie.PosterUrl);
+        Assert.Single(_movies.Posters);
+    }
+
+    [Theory]
+    [InlineData("ftp://example.com/alien.jpg")]
+    [InlineData("/api/movies/1/poster")]
+    [InlineData("alien.jpg")]
+    public async Task Create_rejects_a_poster_url_that_is_not_http_or_https(string posterUrl)
+    {
+        var result = await _service.CreateAsync(Alice, AlienDetails with { PosterUrl = posterUrl }, [Horror], Ct);
+
+        Assert.Equal(SaveMovieStatus.InvalidPosterUrl, result.Status);
+        Assert.Empty(_movies.Movies);
         Assert.Equal(0, _unitOfWork.SaveCount);
     }
 
