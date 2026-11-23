@@ -19,12 +19,16 @@ public sealed class ApiHandler(Func<AuthService> auth) : DelegatingHandler
         var response = await base.SendAsync(request, cancellationToken);
 
         // The auth endpoints answer 401 for "not signed in": that is for the auth service to handle.
+        // Several requests can fail at once; only the first one ends the session (and remembers the page).
         if (isApi
             && response.StatusCode == System.Net.HttpStatusCode.Unauthorized
             && !request.RequestUri!.AbsolutePath.StartsWith("/api/auth/", StringComparison.Ordinal))
         {
             var service = auth();
-            service.SessionEnded(service.CurrentUrl());
+            if (service.SignedIn)
+            {
+                service.SessionEnded(service.CurrentUrl());
+            }
         }
 
         return response;
