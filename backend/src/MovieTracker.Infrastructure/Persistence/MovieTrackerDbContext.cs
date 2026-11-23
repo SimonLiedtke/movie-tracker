@@ -12,6 +12,8 @@ public sealed class MovieTrackerDbContext(DbContextOptions<MovieTrackerDbContext
 {
     public DbSet<Movie> Movies => Set<Movie>();
 
+    public DbSet<MoviePoster> MoviePosters => Set<MoviePoster>();
+
     public DbSet<Genre> Genres => Set<Genre>();
 
     public DbSet<DiaryEntry> DiaryEntries => Set<DiaryEntry>();

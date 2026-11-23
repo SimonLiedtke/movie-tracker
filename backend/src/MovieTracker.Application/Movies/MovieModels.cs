@@ -33,6 +33,9 @@ public sealed record MovieDetail(
     DateOnly? LastWatchedOn,
     DateTimeOffset CreatedAt);
 
+/// <summary>The uploaded poster of a manually added movie.</summary>
+public sealed record PosterImage(string ContentType, byte[] Data, DateTimeOffset UpdatedAt);
+
 public enum MovieSort
 {
     Title,
@@ -88,6 +91,15 @@ public enum SaveMovieStatus
     ReadOnly,
 
     UnknownGenres,
+
+    /// <summary>
+    /// The poster URL is neither an http(s) URL nor the URL of the movie's own uploaded poster (the one thing that is
+    /// kept as it is when a movie is saved).
+    /// </summary>
+    InvalidPosterUrl,
+
+    /// <summary>The uploaded poster is empty, too big or not a JPEG, PNG or WebP image.</summary>
+    InvalidPosterImage,
 }
 
 /// <param name="UnknownGenreIds">Set if <see cref="Status"/> is <see cref="SaveMovieStatus.UnknownGenres"/>.</param>

@@ -24,6 +24,21 @@ public interface IMovieRepository
     /// <summary>Null if the movie does not exist or is not visible to the user.</summary>
     Task<MovieDetail?> GetDetailAsync(Guid userId, Guid movieId, CancellationToken cancellationToken);
 
+    /// <summary>Null if the movie does not exist, is not visible to the user or has no uploaded poster.</summary>
+    Task<PosterImage?> GetPosterAsync(Guid userId, Guid movieId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// For replacing or removing the movie's uploaded poster: changes are saved with <see cref="IUnitOfWork"/>.
+    /// Null if the movie has none. The caller has checked that the movie is visible to the user.
+    /// </summary>
+    Task<MoviePoster?> FindPosterAsync(Guid movieId, CancellationToken cancellationToken);
+
+    /// <summary>Saved with <see cref="IUnitOfWork"/>.</summary>
+    void AddPoster(MoviePoster poster);
+
+    /// <summary>Saved with <see cref="IUnitOfWork"/>.</summary>
+    void RemovePoster(MoviePoster poster);
+
     Task<bool> ExistsAsync(Guid userId, Guid movieId, CancellationToken cancellationToken);
 
     /// <summary>The movie's title, for naming it in the activity log. Null if the movie does not exist or is not visible to the user.</summary>

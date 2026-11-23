@@ -338,6 +338,36 @@ namespace MovieTracker.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("MovieTracker.Domain.Movies.MoviePoster", b =>
+                {
+                    b.Property<Guid>("MovieId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("movie_id");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("content_type");
+
+                    b.Property<byte[]>("Data")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("data");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("MovieId")
+                        .HasName("pk_movie_posters");
+
+                    b.ToTable("movie_posters", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_movie_posters_data_size", "octet_length(data) BETWEEN 1 AND 5242880");
+                        });
+                });
+
             modelBuilder.Entity("MovieTracker.Domain.Users.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -480,6 +510,16 @@ namespace MovieTracker.Infrastructure.Persistence.Migrations
                         .HasForeignKey("OwnerId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .HasConstraintName("fk_movies_users_owner_id");
+                });
+
+            modelBuilder.Entity("MovieTracker.Domain.Movies.MoviePoster", b =>
+                {
+                    b.HasOne("MovieTracker.Domain.Movies.Movie", null)
+                        .WithOne()
+                        .HasForeignKey("MovieTracker.Domain.Movies.MoviePoster", "MovieId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_movie_posters_movies_movie_id");
                 });
 
             modelBuilder.Entity("MovieTracker.Domain.Watchlist.WatchlistItem", b =>
