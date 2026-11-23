@@ -1,7 +1,7 @@
 # Movie Tracker
 
 Personal movie tracker (similar to Letterboxd, without the social features).
-API-driven backend in C# with PostgreSQL, multiple frontends (Angular, Vue, Blazor, React, MAUI).
+API-driven backend in C# with PostgreSQL, multiple frontends (Angular, Vue, Blazor, React).
 There are an Angular, a Vue and a Blazor frontend so far; all of them do the same.
 
 ## Screenshots
