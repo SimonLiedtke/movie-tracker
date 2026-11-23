@@ -64,7 +64,11 @@ public sealed class MovieRequest
     [StringLength(5000)]
     public string? Overview { get; init; }
 
-    [Url]
+    /// <summary>
+    /// An http(s) URL, or the movie's own uploaded poster URL (as returned by the API) to keep that poster.
+    /// Without a value, the movie has no poster; an uploaded poster is removed.
+    /// </summary>
+    [PosterUrl]
     [StringLength(2000)]
     public string? PosterUrl { get; init; }
 

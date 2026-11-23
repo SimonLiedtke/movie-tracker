@@ -1,10 +1,12 @@
 using System.ComponentModel.DataAnnotations;
 using System.Net.Mime;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Net.Http.Headers;
 using MovieTracker.Api.Auth;
 using MovieTracker.Api.Contracts;
 using MovieTracker.Application.Diary;
 using MovieTracker.Application.Movies;
+using MovieTracker.Domain.Movies;
 
 namespace MovieTracker.Api.Controllers;
 
@@ -17,6 +19,9 @@ namespace MovieTracker.Api.Controllers;
 [Tags("Movies")]
 public sealed class MoviesController(MovieService movies, DiaryService diary) : ControllerBase
 {
+    /// <summary>The poster image plus a little for the rest of the multipart form. Bigger requests are rejected with 400.</summary>
+    private const int MaxPosterRequestBytes = MoviePoster.MaxBytes + 64 * 1024;
+
     /// <summary>The user's movies: added manually, logged in the diary or on the watchlist.</summary>
     [HttpGet(Name = "listMovies")]
     [ProducesResponseType<PagedResponse<MovieSummaryResponse>>(StatusCodes.Status200OK)]
@@ -119,6 +124,11 @@ public sealed class MoviesController(MovieService movies, DiaryService diary) : 
             return UnknownGenres(result);
         }
 
+        if (result.Status == SaveMovieStatus.InvalidPosterUrl)
+        {
+            return InvalidPosterUrl();
+        }
+
         var response = result.Movie!.ToResponse();
         return CreatedAtRoute("getMovie", new { movieId = response.Id }, response);
     }
@@ -140,6 +150,67 @@ public sealed class MoviesController(MovieService movies, DiaryService diary) : 
             SaveMovieStatus.NotFound => NotFound(),
             SaveMovieStatus.ReadOnly => TmdbMovieIsReadOnly(),
             SaveMovieStatus.UnknownGenres => UnknownGenres(result),
+            SaveMovieStatus.InvalidPosterUrl => InvalidPosterUrl(),
+            _ => result.Movie!.ToResponse(),
+        };
+    }
+
+    /// <summary>The image of the movie's uploaded poster, for showing it. 404 for movies with an external poster.</summary>
+    [HttpGet("{movieId:guid}/poster", Name = "getMoviePoster")]
+    [ProducesResponseType<FileContentResult>(StatusCodes.Status200OK, "image/jpeg", "image/png", "image/webp")]
+    [ProducesResponseType(StatusCodes.Status304NotModified)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, MediaTypeNames.Application.ProblemJson)]
+    public async Task<IActionResult> GetMoviePoster(Guid movieId, CancellationToken cancellationToken)
+    {
+        var poster = await movies.GetPosterAsync(User.GetUserId(), movieId, cancellationToken);
+        if (poster is null)
+        {
+            return NotFound();
+        }
+
+        // The URL stays the same when the poster is replaced, so browsers must ask again (cheap: 304 with the ETag).
+        Response.Headers.CacheControl = "private, no-cache";
+        Response.Headers.XContentTypeOptions = "nosniff";
+        return File(
+            poster.Data,
+            poster.ContentType,
+            poster.UpdatedAt,
+            new EntityTagHeaderValue($"\"{poster.UpdatedAt.UtcTicks}\""));
+    }
+
+    /// <summary>
+    /// Uploads the poster of a manually added movie as image file (JPEG, PNG or WebP, at most 5 MB). It replaces
+    /// the movie's previous poster, whether that was an uploaded image or a URL.
+    /// </summary>
+    [HttpPut("{movieId:guid}/poster", Name = "uploadMoviePoster")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(MaxPosterRequestBytes)]
+    [ProducesResponseType<MovieResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, MediaTypeNames.Application.ProblemJson)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, MediaTypeNames.Application.ProblemJson)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, MediaTypeNames.Application.ProblemJson)]
+    public async Task<ActionResult<MovieResponse>> UploadMoviePoster(
+        Guid movieId, IFormFile file, CancellationToken cancellationToken)
+    {
+        if (file.Length is 0 or > MoviePoster.MaxBytes)
+        {
+            return InvalidPosterImage();
+        }
+
+        byte[] image;
+        await using (var stream = file.OpenReadStream())
+        {
+            image = new byte[file.Length];
+            await stream.ReadExactlyAsync(image, cancellationToken);
+        }
+
+        var result = await movies.SetPosterAsync(User.GetUserId(), movieId, image, cancellationToken);
+
+        return result.Status switch
+        {
+            SaveMovieStatus.NotFound => NotFound(),
+            SaveMovieStatus.ReadOnly => TmdbMovieIsReadOnly(),
+            SaveMovieStatus.InvalidPosterImage => InvalidPosterImage(),
             _ => result.Movie!.ToResponse(),
         };
     }
@@ -185,6 +256,19 @@ public sealed class MoviesController(MovieService movies, DiaryService diary) : 
     private ActionResult UnknownGenres(SaveMovieResult result)
     {
         ModelState.AddModelError("genreIds", $"Unknown genre IDs: {string.Join(", ", result.UnknownGenreIds!)}.");
+        return ValidationProblem(ModelState);
+    }
+
+    private ActionResult InvalidPosterUrl()
+    {
+        ModelState.AddModelError(
+            "posterUrl", "The poster URL must be an http(s) URL, or the movie's own uploaded poster URL.");
+        return ValidationProblem(ModelState);
+    }
+
+    private ActionResult InvalidPosterImage()
+    {
+        ModelState.AddModelError("file", "The poster must be a JPEG, PNG or WebP image of at most 5 MB.");
         return ValidationProblem(ModelState);
     }
 
