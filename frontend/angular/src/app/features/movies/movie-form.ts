@@ -16,6 +16,7 @@ interface Navigation {
 }
 
 const POSTER_URL_PATTERN = /^https?:\/\/\S+$/;
+const POSTER_URL_MAX_LENGTH = 2000;
 
 /** What the server accepts as uploaded poster, see `PUT /api/movies/{movieId}/poster`. */
 const POSTER_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -63,7 +64,10 @@ export class MovieForm {
     releaseDate: [''],
     runtimeMinutes: [null as number | null, [Validators.min(1), Validators.max(1500)]],
     overview: ['', Validators.maxLength(5000)],
-    posterUrl: ['', [Validators.maxLength(2000), Validators.pattern(POSTER_URL_PATTERN)]],
+    posterUrl: [
+      '',
+      [Validators.maxLength(POSTER_URL_MAX_LENGTH), Validators.pattern(POSTER_URL_PATTERN)],
+    ],
     genreIds: [[] as number[]],
   });
 
@@ -95,7 +99,7 @@ export class MovieForm {
     }
     const typed = this.formValue().posterUrl?.trim();
     if (typed) {
-      return POSTER_URL_PATTERN.test(typed) && typed.length <= 2000 ? typed : null;
+      return POSTER_URL_PATTERN.test(typed) && typed.length <= POSTER_URL_MAX_LENGTH ? typed : null;
     }
     return this.uploadedPosterUrl();
   });
