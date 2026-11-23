@@ -1,0 +1,25 @@
+@using System.Reflection
+
+@* Every page requires a session, except the sign-in page: without one, go to the sign-in page and come back afterwards. *@
+@inject AuthService Auth
+@inject NavigationManager Navigation
+
+@if (Allowed)
+{
+    <RouteView RouteData="RouteData" DefaultLayout="typeof(MainLayout)" />
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public RouteData RouteData { get; set; } = default!;
+
+    private bool Allowed => Auth.SignedIn || RouteData.PageType.GetCustomAttribute<PublicPageAttribute>() is not null;
+
+    protected override void OnParametersSet()
+    {
+        if (!Allowed)
+        {
+            Navigation.NavigateTo(AuthService.SignInPath(Auth.CurrentUrl()), replace: true);
+        }
+    }
+}

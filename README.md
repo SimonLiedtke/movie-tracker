@@ -1,8 +1,8 @@
 # Movie Tracker
 
 Personal movie tracker (similar to Letterboxd, without the social features).
-API-driven backend in C# with PostgreSQL, multiple frontends (Angular, Vue, React, MAUI).
-There are an Angular and a Vue frontend so far; both do the same.
+API-driven backend in C# with PostgreSQL, multiple frontends (Angular, Vue, Blazor, React).
+There are an Angular, a Vue and a Blazor frontend so far; all of them do the same.
 
 ## Screenshots
 
@@ -42,7 +42,7 @@ A look at the app in action (click an image for the full size).
 |-------------|----------------------------------------------------------|
 | `api/`      | OpenAPI specification -- the contract for all components |
 | `backend/`  | ASP.NET Core API, use cases, domain model, EF Core persistence |
-| `frontend/` | Frontends: `frontend/angular/` (Angular + Bulma), `frontend/vue/` (Vue + Bulma) |
+| `frontend/` | Frontends: `frontend/angular/` (Angular + Bulma), `frontend/vue/` (Vue + Bulma), `frontend/blazor/` (Blazor WebAssembly + Bulma) |
 
 ## Backend layers
 
@@ -161,7 +161,7 @@ One-time setup for local development:
 1. In the [Google Cloud console](https://console.cloud.google.com/apis/credentials), configure the
    OAuth consent screen (while it is in "Testing" mode, add your Google account as a test user).
 2. Create an OAuth client ID of type **Web application** with the authorized redirect URI
-   `http://localhost:4200/api/auth/callback/google` (the Angular and the Vue dev server both use port 4200
+   `http://localhost:4200/api/auth/callback/google` (the Angular, the Vue and the Blazor dev server all use port 4200
    and forward `/api` to the backend).
 3. Store the credentials as user secrets (they stay out of the repository):
 
@@ -301,8 +301,20 @@ npm test
 ```
 
 It has the same features and pages as the Angular frontend; see [frontend/vue/README.md](frontend/vue/README.md).
-Run only one of the two dev servers at a time: both use port 4200, which the Google OAuth client allows.
+Run only one of the dev servers at a time: they all use port 4200, which the Google OAuth client allows.
 
 The Docker image (see `Dockerfile`) still serves the Angular app. To serve the Vue app instead, build
 `frontend/vue` in the Dockerfile's `frontend` stage (`npm ci && npm run build`) and copy its `dist` folder
 to `wwwroot`.
+
+## Blazor frontend
+
+```bash
+cd frontend/blazor
+dotnet run --project src/MovieTracker.Blazor.DevServer   # http://localhost:4200, proxies /api to the backend
+dotnet test
+```
+
+It has the same features and pages as the Angular and the Vue frontend; see [frontend/blazor/README.md](frontend/blazor/README.md),
+which also says how to serve it from the Docker image instead of the Angular app.
+Run only one of the three dev servers at a time: all use port 4200, which the Google OAuth client allows.

@@ -1,0 +1,73 @@
+/* Bulma (bulma.min.css) does the styling; these are the few additions the app needs. */
+
+.poster-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bulma-background);
+  color: var(--bulma-text-weak);
+  font-size: 3rem;
+}
+
+/* The poster preview in the form of a manually added movie. */
+.poster-field {
+  width: 9rem;
+}
+
+.rating-stars {
+  color: hsl(var(--bulma-warning-h), var(--bulma-warning-s), 45%);
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.pre-wrap {
+  white-space: pre-wrap;
+}
+
+.is-nowrap {
+  white-space: nowrap;
+}
+
+/*
+ * A list item with the poster on the left and the actions on the right. Bulma's .media-right
+ * never shrinks, so on a narrow screen the actions take (almost) the whole width and leave
+ * nothing for .media-content, which is then clipped (overflow-x: auto on mobile). Below the
+ * tablet breakpoint (769px), the actions go under the content instead.
+ */
+@media screen and (max-width: 768px) {
+  .media-wrap {
+    flex-wrap: wrap;
+  }
+
+  .media-wrap > .media-content {
+    flex-basis: 0;
+    min-width: 0;
+  }
+
+  .media-wrap > .media-right {
+    flex-basis: 100%;
+    margin-inline-start: 0;
+    margin-top: 0.75rem;
+  }
+}
+
+/* Blazor shows this when the app crashes. */
+#blazor-error-ui {
+  background: var(--bulma-danger-light, #feecf0);
+  color: var(--bulma-danger-dark, #cc0f35);
+  bottom: 0;
+  box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+  display: none;
+  left: 0;
+  padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+  position: fixed;
+  width: 100%;
+  z-index: 1000;
+}
+
+#blazor-error-ui .dismiss {
+  cursor: pointer;
+  position: absolute;
+  right: 0.75rem;
+  top: 0.5rem;
+}

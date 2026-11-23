@@ -1,0 +1,526 @@
+@page "/movies/new"
+@page "/movies/{Id}/edit"
+@inject Api Api
+@inject NavigationManager Navigation
+
+@*
+    Adds or edits a manually added movie: one that TMDB does not know, or that the user wants to describe
+    themselves. Only its owner sees it. Movies from TMDB cannot be edited.
+*@
+
+<PageTitle>@(Id is null ? "Add a movie manually" : "Edit movie") · Movie Tracker</PageTitle>
+
+<h1 class="title">@(Id is null ? "Add a movie manually" : "Edit movie")</h1>
+@if (Id is null)
+{
+    <p class="subtitle is-6 has-text-grey">
+        For movies that TMDB does not know. Only you can see the movies you add here.
+    </p>
+}
+
+<ErrorNotification Error="error" OnDismiss="() => error = null" />
+
+@if (loading)
+{
+    <progress class="progress is-small is-primary" max="100"></progress>
+}
+else
+{
+    <form class="box" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <div class="columns">
+            <div class="column">
+                <div class="field">
+                    <label class="label" for="title">Title *</label>
+                    <div class="control">
+                        <input id="title" class="input @Danger(Field.Title)" @bind="form.Title" @bind:event="oninput"
+                               @bind:after="() => Touch(Field.Title)" @onblur="() => Touch(Field.Title)" />
+                    </div>
+                    @if (IsInvalid(Field.Title))
+                    {
+                        <p class="help is-danger">Please enter a title (at most @MaxTitleLength characters).</p>
+                    }
+                </div>
+            </div>
+            <div class="column">
+                <div class="field">
+                    <label class="label" for="originalTitle">Original title</label>
+                    <div class="control">
+                        <input id="originalTitle" class="input @Danger(Field.OriginalTitle)" @bind="form.OriginalTitle"
+                               @bind:event="oninput" @bind:after="() => Touch(Field.OriginalTitle)"
+                               @onblur="() => Touch(Field.OriginalTitle)" />
+                    </div>
+                    @if (IsInvalid(Field.OriginalTitle))
+                    {
+                        <p class="help is-danger">At most @MaxTitleLength characters.</p>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="columns">
+            <div class="column">
+                <div class="field">
+                    <label class="label" for="releaseDate">Release date</label>
+                    <div class="control">
+                        <input id="releaseDate" class="input" type="date" @bind="form.ReleaseDate" />
+                    </div>
+                </div>
+            </div>
+            <div class="column">
+                <div class="field">
+                    <label class="label" for="runtimeMinutes">Runtime (minutes)</label>
+                    <div class="control">
+                        <input id="runtimeMinutes" class="input @Danger(Field.RuntimeMinutes)" type="number" min="1"
+                               max="1500" value="@form.RuntimeMinutes" @oninput="OnRuntime"
+                               @onblur="() => Touch(Field.RuntimeMinutes)" />
+                    </div>
+                    @if (IsInvalid(Field.RuntimeMinutes))
+                    {
+                        <p class="help is-danger">Between 1 and 1500 minutes.</p>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="columns">
+            <div class="column is-narrow poster-field">
+                <Poster Url="@PosterPreviewUrl" Title="@form.Title" />
+            </div>
+            <div class="column">
+                <div class="field">
+                    <label class="label" for="posterFile">Poster image</label>
+                    <div class="file has-name">
+                        <label class="file-label">
+                            <InputFile id="posterFile" class="file-input" accept="@PosterAccept" OnChange="OnPosterFile"
+                                       @key="fileInputKey" />
+                            <span class="file-cta">
+                                <span class="file-label">Choose an image…</span>
+                            </span>
+                            <span class="file-name">@(posterFile?.Name ?? (uploadedPosterUrl is not null ? "Uploaded image" : "No file chosen"))</span>
+                        </label>
+                    </div>
+                    @if (PosterFileInvalid)
+                    {
+                        <p class="help is-danger">Please choose a JPEG, PNG or WebP image of at most @PosterMaxMegabytes MB.</p>
+                    }
+                    else
+                    {
+                        <p class="help">JPEG, PNG or WebP, at most @PosterMaxMegabytes MB.</p>
+                    }
+                    @if (posterFile is not null || uploadedPosterUrl is not null)
+                    {
+                        <button type="button" class="button is-small is-light mt-2" @onclick="RemovePoster">
+                            @(posterFile is not null ? "Clear the chosen image" : "Remove the uploaded image")
+                        </button>
+                    }
+                </div>
+
+                <div class="field">
+                    <label class="label" for="posterUrl">or a poster URL</label>
+                    <div class="control">
+                        <input id="posterUrl" class="input @Danger(Field.PosterUrl)" type="url" placeholder="https://…"
+                               @bind="form.PosterUrl" @bind:event="oninput" @bind:after="() => Touch(Field.PosterUrl)"
+                               @onblur="() => Touch(Field.PosterUrl)" />
+                    </div>
+                    @if (IsInvalid(Field.PosterUrl))
+                    {
+                        <p class="help is-danger">Please enter a valid http(s) URL.</p>
+                    }
+                    else
+                    {
+                        <p class="help">An image you choose is used instead of the URL.</p>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="field">
+            <label class="label" for="overview">Overview</label>
+            <div class="control">
+                <textarea id="overview" class="textarea @Danger(Field.Overview)" rows="4" @bind="form.Overview"
+                          @bind:event="oninput" @bind:after="() => Touch(Field.Overview)"
+                          @onblur="() => Touch(Field.Overview)"></textarea>
+            </div>
+            @if (IsInvalid(Field.Overview))
+            {
+                <p class="help is-danger">At most @MaxOverviewLength characters.</p>
+            }
+        </div>
+
+        <fieldset class="field">
+            <legend class="label">Genres</legend>
+            <div class="columns is-multiline is-mobile is-gapless">
+                @foreach (var genre in genres)
+                {
+                    <div class="column is-half-mobile is-one-quarter-tablet is-2-desktop" @key="genre.Id">
+                        <label class="checkbox">
+                            <input type="checkbox" checked="@form.GenreIds.Contains(genre.Id)"
+                                   @onchange="e => ToggleGenre(genre.Id, e.Value is true)" />
+                            @genre.Name
+                        </label>
+                    </div>
+                }
+            </div>
+        </fieldset>
+
+        <div class="field is-grouped mt-5">
+            <div class="control">
+                <button type="submit" class="button is-primary @(saving ? "is-loading" : null)">Save</button>
+            </div>
+            <div class="control">
+                <a class="button is-light" href="@CancelLink">Cancel</a>
+            </div>
+        </div>
+    </form>
+}
+
+@code {
+    private const int MaxTitleLength = 300;
+    private const int MaxOverviewLength = 5000;
+    private const int MaxPosterUrlLength = 2000;
+    private const int MinRuntime = 1;
+    private const int MaxRuntime = 1500;
+
+    /// <summary>What the server accepts as uploaded poster, see <c>PUT /api/movies/{movieId}/poster</c>.</summary>
+    private static readonly string[] PosterTypes = ["image/jpeg", "image/png", "image/webp"];
+
+    private const int PosterMaxMegabytes = 5;
+    private const long PosterMaxBytes = PosterMaxMegabytes * 1024 * 1024;
+
+    private static readonly string PosterAccept = string.Join(',', PosterTypes);
+
+    private enum Field
+    {
+        Title,
+        OriginalTitle,
+        RuntimeMinutes,
+        Overview,
+        PosterUrl,
+    }
+
+    private sealed class FormModel
+    {
+        public string Title { get; set; } = "";
+        public string OriginalTitle { get; set; } = "";
+        public DateOnly? ReleaseDate { get; set; }
+        public string RuntimeMinutes { get; set; } = "";
+        public string Overview { get; set; } = "";
+        public string PosterUrl { get; set; } = "";
+        public List<int> GenreIds { get; } = [];
+    }
+
+    /// <summary>Route parameter; not set when adding a movie.</summary>
+    [Parameter] public string? Id { get; set; }
+
+    /// <summary>Query parameter: title to start with, e.g. what the user searched for.</summary>
+    [SupplyParameterFromQuery(Name = "title")] public string? InitialTitle { get; set; }
+
+    /// <summary>Query parameter: where to continue after adding, e.g. back to logging a viewing ("diary" or "watchlist").</summary>
+    [SupplyParameterFromQuery(Name = "next")] public string? Next { get; set; }
+
+    private readonly FormModel form = new();
+    private readonly HashSet<Field> touched = [];
+    private IReadOnlyList<Genre> genres = [];
+    private bool loading;
+    private bool saving;
+    private ApiError? error;
+
+    /// <summary>The image file the user has chosen as poster; it is uploaded when the movie is saved.</summary>
+    private IBrowserFile? posterFile;
+
+    /// <summary>A preview of the chosen file, as a data URL.</summary>
+    private string? chosenPosterUrl;
+
+    /// <summary>The uploaded poster the movie already has (editing only), as long as the user does not remove or replace it.</summary>
+    private string? uploadedPosterUrl;
+
+    /// <summary>The movie that was added, if saving failed after that (e.g. the poster upload): saving again changes it.</summary>
+    private Guid? addedId;
+
+    /// <summary>A new file field forgets the chosen file, so the same file can be chosen again.</summary>
+    private int fileInputKey;
+
+    private string? lastId;
+    private string? lastTitle;
+    private bool parametersSeen;
+
+    /// <summary>Numbers the loads, so that the answer to an outdated one is ignored.</summary>
+    private int latestLoad;
+
+    private int latestPreview;
+
+    protected override void OnInitialized() => _ = LoadGenresAsync();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (parametersSeen && Id == lastId && InitialTitle == lastTitle)
+        {
+            return;
+        }
+
+        parametersSeen = true;
+        lastId = Id;
+        lastTitle = InitialTitle;
+        if (Id is not null)
+        {
+            await LoadAsync(Id);
+        }
+        else if (!string.IsNullOrEmpty(InitialTitle))
+        {
+            form.Title = InitialTitle;
+        }
+    }
+
+    private async Task LoadGenresAsync()
+    {
+        try
+        {
+            genres = await Api.Genres.ListAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+        catch
+        {
+            // Without genres, the form just has no choices.
+        }
+    }
+
+    private async Task LoadAsync(string id)
+    {
+        var thisLoad = ++latestLoad;
+        loading = true;
+        try
+        {
+            var movie = Guid.TryParse(id, out var movieId)
+                ? await Api.Movies.GetAsync(movieId)
+                : throw new ApiException(new ApiError(404, "Not found.", []));
+            if (thisLoad == latestLoad)
+            {
+                Fill(movie);
+            }
+        }
+        catch (Exception failure)
+        {
+            if (thisLoad == latestLoad)
+            {
+                error = ApiError.From(failure);
+            }
+        }
+
+        if (thisLoad == latestLoad)
+        {
+            loading = false;
+        }
+    }
+
+    private void Fill(Movie movie)
+    {
+        form.Title = movie.Title;
+        form.OriginalTitle = movie.OriginalTitle ?? "";
+        form.ReleaseDate = movie.ReleaseDate;
+        form.RuntimeMinutes = movie.RuntimeMinutes?.ToString() ?? "";
+        form.Overview = movie.Overview ?? "";
+        // An uploaded poster has a path on this server as URL; it is not something to edit in the URL field.
+        var uploaded = movie.PosterUrl?.StartsWith('/') ?? false;
+        uploadedPosterUrl = uploaded ? movie.PosterUrl : null;
+        form.PosterUrl = uploaded ? "" : movie.PosterUrl ?? "";
+        form.GenreIds.Clear();
+        form.GenreIds.AddRange(movie.Genres.Select(genre => genre.Id));
+    }
+
+    /// <summary>The runtime as a number, if the field has one that is a whole number of minutes.</summary>
+    private int? RuntimeValue => int.TryParse(form.RuntimeMinutes, out var minutes) ? minutes : null;
+
+    /// <summary>What is wrong with the field.</summary>
+    private bool Invalid(Field field) => field switch
+    {
+        Field.Title => form.Title.Length == 0 || form.Title.Length > MaxTitleLength,
+        Field.OriginalTitle => form.OriginalTitle.Length > MaxTitleLength,
+        Field.RuntimeMinutes => form.RuntimeMinutes != ""
+            && (RuntimeValue is not { } minutes || minutes < MinRuntime || minutes > MaxRuntime),
+        Field.Overview => form.Overview.Length > MaxOverviewLength,
+        Field.PosterUrl => form.PosterUrl.Length > 0
+            && (form.PosterUrl.Length > MaxPosterUrlLength || !IsHttpUrl(form.PosterUrl)),
+        _ => false,
+    };
+
+    private static bool IsHttpUrl(string text) =>
+        (text.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || text.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        && !text.Any(char.IsWhiteSpace)
+        && text.Length > text.IndexOf("//", StringComparison.Ordinal) + 2;
+
+    /// <summary>Problems are only shown for fields the user has touched, not on a fresh form.</summary>
+    private bool IsInvalid(Field field) => touched.Contains(field) && Invalid(field);
+
+    private string? Danger(Field field) => IsInvalid(field) ? "is-danger" : null;
+
+    private void Touch(Field field) => touched.Add(field);
+
+    /// <summary>The chosen file is not an image the server accepts.</summary>
+    private bool PosterFileInvalid =>
+        posterFile is not null && (!PosterTypes.Contains(posterFile.ContentType) || posterFile.Size > PosterMaxBytes);
+
+    /// <summary>The poster the movie will have after saving, as far as the form can tell.</summary>
+    private string? PosterPreviewUrl
+    {
+        get
+        {
+            if (chosenPosterUrl is not null)
+            {
+                return chosenPosterUrl;
+            }
+
+            var typed = form.PosterUrl.Trim();
+            return typed != "" ? (Invalid(Field.PosterUrl) ? null : typed) : uploadedPosterUrl;
+        }
+    }
+
+    private string CancelLink => Id is not null
+        ? $"/movies/{Id}"
+        : Next switch
+        {
+            AfterManualAdd.Diary => "/diary/new",
+            AfterManualAdd.Watchlist => "/watchlist",
+            _ => "/movies",
+        };
+
+    private void OnRuntime(ChangeEventArgs args)
+    {
+        form.RuntimeMinutes = args.Value?.ToString() ?? "";
+        Touch(Field.RuntimeMinutes);
+    }
+
+    private void ToggleGenre(int genreId, bool selected)
+    {
+        if (selected && !form.GenreIds.Contains(genreId))
+        {
+            form.GenreIds.Add(genreId);
+        }
+        else if (!selected)
+        {
+            form.GenreIds.Remove(genreId);
+        }
+    }
+
+    private async Task OnPosterFile(InputFileChangeEventArgs args)
+    {
+        posterFile = args.FileCount > 0 ? args.File : null;
+        await ShowPreviewAsync();
+    }
+
+    /// <summary>Forgets the chosen file, or: removes the uploaded poster when the movie is saved.</summary>
+    private async Task RemovePoster()
+    {
+        if (posterFile is not null)
+        {
+            posterFile = null;
+            fileInputKey++;
+            await ShowPreviewAsync();
+        }
+        else
+        {
+            uploadedPosterUrl = null;
+        }
+    }
+
+    private async Task ShowPreviewAsync()
+    {
+        var thisPreview = ++latestPreview;
+        var file = posterFile;
+        string? url = null;
+        if (file is not null && !PosterFileInvalid)
+        {
+            try
+            {
+                await using var stream = file.OpenReadStream(PosterMaxBytes);
+                using var buffer = new MemoryStream();
+                await stream.CopyToAsync(buffer);
+                url = $"data:{file.ContentType};base64,{Convert.ToBase64String(buffer.GetBuffer(), 0, (int)buffer.Length)}";
+            }
+            catch (IOException)
+            {
+                // The file cannot be read (any more): no preview.
+            }
+        }
+
+        if (thisPreview == latestPreview)
+        {
+            chosenPosterUrl = url;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (Enum.GetValues<Field>().Any(Invalid) || PosterFileInvalid)
+        {
+            foreach (var field in Enum.GetValues<Field>())
+            {
+                touched.Add(field);
+            }
+
+            return;
+        }
+
+        var request = new MovieRequest(
+            form.Title.Trim(),
+            Parse.NullIfEmpty(form.OriginalTitle.Trim()),
+            form.ReleaseDate,
+            form.RuntimeMinutes == "" ? null : RuntimeValue,
+            Parse.NullIfEmpty(form.Overview.Trim()),
+            // A typed URL replaces an uploaded poster. Without one, the movie keeps its uploaded poster (by sending
+            // its URL back) unless the user removed it.
+            Parse.NullIfEmpty(form.PosterUrl.Trim()) ?? uploadedPosterUrl,
+            [.. form.GenreIds]);
+
+        saving = true;
+        error = null;
+        string next;
+        try
+        {
+            next = await SaveMovieAsync(request);
+        }
+        catch (Exception failure)
+        {
+            saving = false;
+            error = ApiError.From(failure);
+            return;
+        }
+
+        Navigation.NavigateTo(next);
+    }
+
+    /// <summary>Saves the movie and its poster (a second request), then returns where to continue.</summary>
+    private async Task<string> SaveMovieAsync(MovieRequest request)
+    {
+        var existingId = Id is not null ? Guid.Parse(Id) : addedId;
+        var movie = existingId is { } id
+            ? await Api.Movies.UpdateAsync(id, request)
+            : await Api.Movies.CreateAsync(request);
+        if (existingId is null)
+        {
+            addedId = movie.Id;
+        }
+
+        if (posterFile is { } file)
+        {
+            await using var stream = file.OpenReadStream(PosterMaxBytes);
+            await Api.Movies.UploadPosterAsync(movie.Id, file.Name, file.ContentType, stream);
+        }
+
+        return Id is not null ? $"/movies/{movie.Id}" : await ContinueAfterAddingAsync(movie.Id);
+    }
+
+    /// <summary>Continues where the user came from.</summary>
+    private async Task<string> ContinueAfterAddingAsync(Guid movieId)
+    {
+        switch (Next)
+        {
+            case AfterManualAdd.Diary:
+                return $"/diary/new?movieId={movieId}";
+            case AfterManualAdd.Watchlist:
+                await Api.Watchlist.PutAsync(movieId, null);
+                return "/watchlist";
+            default:
+                return $"/movies/{movieId}";
+        }
+    }
+}

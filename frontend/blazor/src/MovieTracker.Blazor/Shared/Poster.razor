@@ -1,0 +1,31 @@
+<figure class="image is-2by3">
+    @if (!string.IsNullOrEmpty(Url) && !failed)
+    {
+        <img src="@Url" alt="Poster of @Title" loading="lazy" @onerror="OnError" />
+    }
+    else
+    {
+        <div class="has-ratio poster-placeholder" aria-hidden="true">🎬</div>
+    }
+</figure>
+
+@code {
+    [Parameter] public string? Url { get; set; }
+
+    [Parameter] public string Title { get; set; } = "";
+
+    private bool failed;
+    private string? shownUrl;
+
+    protected override void OnParametersSet()
+    {
+        // A different image gets its chance.
+        if (Url != shownUrl)
+        {
+            shownUrl = Url;
+            failed = false;
+        }
+    }
+
+    private void OnError() => failed = true;
+}

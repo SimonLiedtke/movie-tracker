@@ -62,3 +62,6 @@ NOTES.md
 
 # Test coverage output (dotnet test --coverage, ReportGenerator)
 backend/coverage/
+
+# Output of dotnet publish for the Blazor frontend (see frontend/blazor/README.md)
+frontend/blazor/publish/

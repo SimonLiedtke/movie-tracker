@@ -1,0 +1,92 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject AuthService Auth
+
+@if (Auth.User is { } user)
+{
+    <nav class="navbar is-dark" aria-label="main navigation">
+        <div class="container">
+            <div class="navbar-brand">
+                <NavLink class="navbar-item has-text-weight-bold" href="/movies" @onclick="CloseMenu">
+                    🎬&nbsp;Movie Tracker
+                </NavLink>
+                <a role="button" class="navbar-burger @(menuOpen ? "is-active" : null)" aria-label="menu"
+                   aria-expanded="@(menuOpen ? "true" : "false")" @onclick="ToggleMenu">
+                    <span aria-hidden="true"></span>
+                    <span aria-hidden="true"></span>
+                    <span aria-hidden="true"></span>
+                    <span aria-hidden="true"></span>
+                </a>
+            </div>
+
+            <div class="navbar-menu @(menuOpen ? "is-active" : null)">
+                <div class="navbar-start" @onclick="CloseMenu">
+                    @* A section of the app is current on its own page and on all pages below it (/diary/new is in /diary). *@
+                    <NavLink class="navbar-item" ActiveClass="is-selected" href="/movies">My movies</NavLink>
+                    <NavLink class="navbar-item" ActiveClass="is-selected" href="/diary">Diary</NavLink>
+                    <NavLink class="navbar-item" ActiveClass="is-selected" href="/watchlist">Watchlist</NavLink>
+                    <NavLink class="navbar-item" ActiveClass="is-selected" href="/activity">Activity</NavLink>
+                    <NavLink class="navbar-item" ActiveClass="is-selected" href="/import">Import</NavLink>
+                </div>
+                <div class="navbar-end">
+                    <div class="navbar-item">
+                        <a class="button is-primary" href="/diary/new" @onclick="CloseMenu">Log a viewing</a>
+                    </div>
+                    <div class="navbar-item">
+                        @if (!string.IsNullOrEmpty(user.PictureUrl))
+                        {
+                            <img class="mr-2" style="border-radius: 50%; max-height: 2rem" src="@user.PictureUrl" alt=""
+                                 referrerpolicy="no-referrer" />
+                        }
+                        <span class="mr-3" title="@user.Email">@user.Name</span>
+                        <button class="button is-small is-light is-outlined" @onclick="LogoutAsync">Sign out</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+}
+
+<main class="section">
+    <div class="container">
+        @Body
+    </div>
+</main>
+
+<footer class="footer py-5">
+    <div class="content has-text-centered is-size-7 has-text-grey">
+        @* Required by TMDB's terms of use: https://www.themoviedb.org/api-terms-of-use *@
+        <p>
+            Movie data and posters from
+            <a href="https://www.themoviedb.org/" target="_blank" rel="noopener">TMDB</a>. This product
+            uses the TMDB API but is not endorsed or certified by TMDB.
+        </p>
+    </div>
+</footer>
+
+@code {
+    private bool menuOpen;
+
+    protected override void OnInitialized() => Auth.Changed += OnAuthChanged;
+
+    public void Dispose() => Auth.Changed -= OnAuthChanged;
+
+    private void OnAuthChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private void ToggleMenu() => menuOpen = !menuOpen;
+
+    private void CloseMenu() => menuOpen = false;
+
+    private async Task LogoutAsync()
+    {
+        menuOpen = false;
+        try
+        {
+            await Auth.LogoutAsync();
+        }
+        catch (Exception exception)
+        {
+            Console.Error.WriteLine($"Could not sign out: {exception}");
+        }
+    }
+}

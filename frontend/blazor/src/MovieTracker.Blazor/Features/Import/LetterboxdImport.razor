@@ -1,0 +1,338 @@
+@page "/import"
+@implements IDisposable
+@inject Api Api
+@inject NavigationManager Navigation
+
+@*
+    Uploads a Letterboxd export. The server imports it in the background, which takes a while for a big
+    diary (every film is looked up on TMDB), so this page shows the progress. The import's ID is in the URL
+    (?job=...): reloading the page, or coming back later, shows the progress or result again.
+*@
+
+<PageTitle>Import from Letterboxd · Movie Tracker</PageTitle>
+
+<h1 class="title">Import from Letterboxd</h1>
+
+<ErrorNotification Error="error" OnDismiss="() => error = null" />
+
+@if (job is not null)
+{
+    @if (job.Status == ImportStatus.Running)
+    {
+        <div class="box">
+            @if (job.FilmsTotal > 0)
+            {
+                <p class="mb-3">Looking up your films on TMDB: @job.FilmsProcessed of @job.FilmsTotal</p>
+            }
+            else
+            {
+                <p class="mb-3">Starting the import…</p>
+            }
+            <progress class="progress is-primary" value="@(job.FilmsTotal > 0 ? job.FilmsProcessed : null)"
+                      max="@(job.FilmsTotal > 0 ? job.FilmsTotal : null)"></progress>
+            <p class="help">A big diary takes a minute or two. You can leave this page and come back to it later.</p>
+        </div>
+    }
+    else if (job.Status == ImportStatus.Completed)
+    {
+        @if (job.Result is { } outcome)
+        {
+            <div class="notification is-success is-light">
+                <p class="has-text-weight-semibold mb-2">The import is finished.</p>
+                <ul>
+                    <li>
+                        Diary entries imported: @outcome.DiaryEntriesImported@(" ")
+                        @if (outcome.DiaryEntriesSkipped > 0)
+                        {
+                            <span class="has-text-grey">
+                                (@outcome.DiaryEntriesSkipped skipped, they were in your diary already)
+                            </span>
+                        }
+                    </li>
+                    <li>
+                        Watchlist items imported: @outcome.WatchlistItemsImported@(" ")
+                        @if (outcome.WatchlistItemsSkipped > 0)
+                        {
+                            <span class="has-text-grey">
+                                (@outcome.WatchlistItemsSkipped skipped, they were on your watchlist already)
+                            </span>
+                        }
+                    </li>
+                </ul>
+                <div class="buttons mt-3">
+                    <a class="button is-small" href="/diary">Go to the diary</a>
+                    <a class="button is-small" href="/watchlist">Go to the watchlist</a>
+                </div>
+            </div>
+
+            @if (outcome.FailedFilms.Count > 0)
+            {
+                <div class="notification is-danger is-light">
+                    <p class="mb-2">
+                        TMDB did not answer for @outcome.FailedFilms.Count films, so they were not
+                        imported. Upload the same file again later to add them; everything else is skipped then.
+                    </p>
+                    <ul>
+                        @foreach (var film in outcome.FailedFilms)
+                        {
+                            <li>@FilmLabel(film)</li>
+                        }
+                    </ul>
+                </div>
+            }
+
+            @if (outcome.ManualMovies.Count > 0)
+            {
+                <div class="notification is-warning is-light">
+                    <details>
+                        <summary>
+                            @outcome.ManualMovies.Count films could not be found on TMDB and were added as manual movies
+                        </summary>
+                        <p class="my-2">
+                            Manual movies are private to you and have no poster or genres. Find them under
+                            <a href="/movies">My movies</a> to complete them.
+                        </p>
+                        <ul>
+                            @foreach (var film in outcome.ManualMovies)
+                            {
+                                <li>@FilmLabel(film)</li>
+                            }
+                        </ul>
+                    </details>
+                </div>
+            }
+
+            @if (outcome.Warnings.Count > 0)
+            {
+                <div class="notification is-light">
+                    <details>
+                        <summary>Some rows of the export were skipped</summary>
+                        <ul class="mt-2">
+                            @foreach (var warning in outcome.Warnings)
+                            {
+                                <li>@warning</li>
+                            }
+                        </ul>
+                    </details>
+                </div>
+            }
+        }
+        <button class="button" @onclick="Reset">Import another file</button>
+    }
+    else if (job.Status == ImportStatus.Failed)
+    {
+        <div class="notification is-danger is-light" role="alert">@job.Error</div>
+        <button class="button" @onclick="Reset">Try again</button>
+    }
+}
+else
+{
+    @if (lost)
+    {
+        <div class="notification is-warning is-light" role="alert">
+            This import is not available any more, for example because the server was restarted. Upload
+            the file again: what was imported already is skipped.
+        </div>
+    }
+
+    <div class="content">
+        <p>
+            Brings your diary and watchlist over from
+            <a href="https://letterboxd.com/" target="_blank" rel="noopener">Letterboxd</a>.
+        </p>
+        <ol>
+            <li>
+                On letterboxd.com, open <strong>Settings</strong>, then <strong>Data</strong>, and choose
+                <strong>Export your data</strong>.
+            </li>
+            <li>Upload the ZIP archive you get, without unpacking it.</li>
+        </ol>
+        <p class="is-size-7 has-text-grey">
+            Imported are the diary (dates, ratings, rewatches, reviews, likes) and the watchlist. The
+            export has no TMDB IDs, so every film is looked up on TMDB by title and year; films that
+            TMDB does not know become manual movies. The other files of the archive, such as your
+            profile, are neither read nor stored. Importing the same export again is safe: what exists
+            already is skipped.
+        </p>
+    </div>
+
+    <form class="box" @onsubmit="StartAsync" @onsubmit:preventDefault>
+        <div class="field">
+            <div class="file has-name is-fullwidth">
+                <label class="file-label">
+                    <InputFile class="file-input" name="export" accept=".zip,application/zip" OnChange="ChooseFile"
+                               @key="fileInputKey" />
+                    <span class="file-cta">
+                        <span class="file-label">Choose the ZIP archive…</span>
+                    </span>
+                    <span class="file-name">@(file?.Name ?? "No file chosen")</span>
+                </label>
+            </div>
+        </div>
+        <button type="submit" class="button is-primary @(uploading ? "is-loading" : null)"
+                disabled="@(file is null || uploading)">
+            Start the import
+        </button>
+    </form>
+}
+
+@code {
+    private const int PollIntervalMs = 1000;
+
+    /// <summary>The server decides what is too big (it answers 413); this only keeps the browser from running out of memory.</summary>
+    private const long MaxFileBytes = 100 * 1024 * 1024;
+
+    /// <summary>The ID of the import in the URL.</summary>
+    [SupplyParameterFromQuery(Name = "job")] public string? JobId { get; set; }
+
+    private IBrowserFile? file;
+    private bool uploading;
+    private ImportJob? job;
+    private ApiError? error;
+
+    /// <summary>The server does not know the import in the URL (any more), e.g. because it was restarted.</summary>
+    private bool lost;
+
+    private CancellationTokenSource? polling;
+    private string? lastJobId;
+    private bool parametersSeen;
+    private int fileInputKey;
+
+    public void Dispose()
+    {
+        polling?.Cancel();
+        polling?.Dispose();
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (parametersSeen && JobId == lastJobId)
+        {
+            return;
+        }
+
+        parametersSeen = true;
+        lastJobId = JobId;
+        StopPolling();
+        lost = false;
+        if (string.IsNullOrEmpty(JobId))
+        {
+            job = null;
+            return;
+        }
+
+        if (!Guid.TryParse(JobId, out var id))
+        {
+            lost = true;
+            job = null;
+            return;
+        }
+
+        polling = new CancellationTokenSource();
+        _ = PollAsync(id, polling.Token);
+    }
+
+    private void StopPolling()
+    {
+        polling?.Cancel();
+        polling?.Dispose();
+        polling = null;
+    }
+
+    /// <summary>Asks for the job until it has finished, one request at a time.</summary>
+    private async Task PollAsync(Guid id, CancellationToken cancellation)
+    {
+        while (!cancellation.IsCancellationRequested)
+        {
+            ImportJob current;
+            try
+            {
+                current = await Api.LetterboxdImport.GetAsync(id);
+            }
+            catch (Exception failure)
+            {
+                if (cancellation.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                if (failure is ApiException { Error.IsNotFound: true })
+                {
+                    lost = true;
+                }
+                else
+                {
+                    error = ApiError.From(failure);
+                }
+
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
+
+            if (cancellation.IsCancellationRequested)
+            {
+                return;
+            }
+
+            job = current;
+            await InvokeAsync(StateHasChanged);
+            if (current.Status != ImportStatus.Running)
+            {
+                return;
+            }
+
+            try
+            {
+                await Task.Delay(PollIntervalMs, cancellation);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+        }
+    }
+
+    private void ChooseFile(InputFileChangeEventArgs args)
+    {
+        file = args.FileCount > 0 ? args.File : null;
+        error = null;
+    }
+
+    private async Task StartAsync()
+    {
+        var chosen = file;
+        if (chosen is null || uploading)
+        {
+            return;
+        }
+
+        uploading = true;
+        error = null;
+        try
+        {
+            await using var stream = chosen.OpenReadStream(MaxFileBytes);
+            var started = await Api.LetterboxdImport.StartAsync(chosen.Name, chosen.ContentType, stream);
+            uploading = false;
+            job = started;
+            Navigation.NavigateTo($"/import?job={started.Id}");
+        }
+        catch (Exception failure)
+        {
+            uploading = false;
+            error = failure is IOException
+                ? new ApiError(0, "The file is too big.", [])
+                : ApiError.From(failure);
+        }
+    }
+
+    /// <summary>Back to the upload form.</summary>
+    private void Reset()
+    {
+        file = null;
+        fileInputKey++;
+        error = null;
+        Navigation.NavigateTo("/import");
+    }
+
+    private static string FilmLabel(ImportFilm film) => film.Year is { } year ? $"{film.Name} ({year})" : film.Name;
+}

@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MovieTracker.Blazor/MovieTracker.Blazor.csproj" />
+    <Project Path="src/MovieTracker.Blazor.DevServer/MovieTracker.Blazor.DevServer.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MovieTracker.Blazor.Tests/MovieTracker.Blazor.Tests.csproj" />
+  </Folder>
+</Solution>

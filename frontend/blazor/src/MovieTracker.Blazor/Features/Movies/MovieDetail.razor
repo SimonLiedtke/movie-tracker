@@ -1,0 +1,288 @@
+@page "/movies/{Id}"
+@inject Api Api
+@inject NavigationManager Navigation
+@inject IJSRuntime Js
+
+<PageTitle>Movie · Movie Tracker</PageTitle>
+
+<ErrorNotification Error="error" OnDismiss="() => error = null" />
+
+@if (movie is not null)
+{
+    <div class="columns">
+        <div class="column is-one-quarter-tablet is-one-fifth-desktop">
+            <Poster Url="@movie.PosterUrl" Title="@movie.Title" />
+        </div>
+
+        <div class="column">
+            <h1 class="title">
+                @movie.Title
+                @if (movie.ReleaseDate is not null)
+                {
+                    <span class="has-text-grey has-text-weight-normal"> (@Dates.YearOf(movie.ReleaseDate))</span>
+                }
+            </h1>
+            @if (movie.OriginalTitle is { Length: > 0 } && movie.OriginalTitle != movie.Title)
+            {
+                <p class="subtitle is-6 has-text-grey">Original title: @movie.OriginalTitle</p>
+            }
+
+            <div class="tags">
+                @foreach (var genre in movie.Genres)
+                {
+                    <a class="tag is-link is-light" href="/movies?genreId=@genre.Id">@genre.Name</a>
+                }
+            </div>
+
+            @if (!string.IsNullOrEmpty(movie.Overview))
+            {
+                <p class="block pre-wrap">@movie.Overview</p>
+            }
+
+            <div class="field is-grouped is-grouped-multiline block">
+                @if (movie.ReleaseDate is not null)
+                {
+                    <div class="control">
+                        <div class="tags has-addons">
+                            <span class="tag is-dark">Released</span><span class="tag">@Dates.Iso(movie.ReleaseDate)</span>
+                        </div>
+                    </div>
+                }
+                @if (movie.RuntimeMinutes is > 0)
+                {
+                    <div class="control">
+                        <div class="tags has-addons">
+                            <span class="tag is-dark">Runtime</span><span class="tag">@movie.RuntimeMinutes min</span>
+                        </div>
+                    </div>
+                }
+                <div class="control">
+                    <div class="tags has-addons">
+                        <span class="tag is-dark">Watched</span><span class="tag">@movie.WatchCount×</span>
+                    </div>
+                </div>
+                @if (movie.LastWatchedOn is not null)
+                {
+                    <div class="control">
+                        <div class="tags has-addons">
+                            <span class="tag is-dark">Last watched</span><span class="tag">@Dates.Iso(movie.LastWatchedOn)</span>
+                        </div>
+                    </div>
+                }
+                @if (movie.TmdbId is { } tmdbId)
+                {
+                    <div class="control">
+                        <a class="tags has-addons" href="https://www.themoviedb.org/movie/@tmdbId" target="_blank"
+                           rel="noopener" title="Details from TMDB">
+                            <span class="tag is-dark">TMDB</span><span class="tag">@tmdbId</span>
+                        </a>
+                    </div>
+                }
+                else
+                {
+                    <div class="control">
+                        <span class="tag is-warning is-light" title="Only you can see this movie">Added manually</span>
+                    </div>
+                }
+            </div>
+
+            @if (movie.LatestRating is > 0)
+            {
+                <p class="block is-size-4"><Rating HalfStars="movie.LatestRating" /></p>
+            }
+
+            <div class="buttons">
+                <a class="button is-primary" href="/diary/new?movieId=@movie.Id">Log a viewing</a>
+                <button class="button @(movie.OnWatchlist ? "is-light" : "is-info")" disabled="@busy"
+                        @onclick="() => ToggleWatchlistAsync(movie)">
+                    @(movie.OnWatchlist ? "Remove from watchlist" : "Add to watchlist")
+                </button>
+                @if (movie.TmdbId is null)
+                {
+                    <a class="button" href="/movies/@movie.Id/edit">Edit</a>
+                    <button class="button is-danger is-outlined" disabled="@busy" @onclick="() => DeleteMovieAsync(movie)">
+                        Delete
+                    </button>
+                }
+            </div>
+        </div>
+    </div>
+
+    <h2 class="title is-4 mt-5">Viewings</h2>
+    @if (entries.Count > 0)
+    {
+        <div class="table-container">
+            <table class="table is-fullwidth is-hoverable">
+                <thead>
+                    <tr>
+                        <th>Watched on</th>
+                        <th>Rating</th>
+                        <th>Review</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var entry in entries)
+                    {
+                        <tr @key="entry.Id">
+                            <td class="is-nowrap">
+                                @Dates.Iso(entry.WatchedOn)
+                                @if (entry.IsRewatch)
+                                {
+                                    <span class="tag is-light ml-1" title="Rewatch">↻</span>
+                                }
+                                @if (entry.Liked)
+                                {
+                                    <span class="has-text-danger ml-1" title="Liked">♥</span>
+                                }
+                            </td>
+                            <td><Rating HalfStars="entry.Rating" /></td>
+                            <td class="pre-wrap">@entry.Review<TagList Tags="entry.Tags" Route="/diary" /></td>
+                            <td class="has-text-right">
+                                <div class="buttons is-right are-small">
+                                    <a class="button" href="/diary/@entry.Id/edit">Edit</a>
+                                    <button class="button is-danger is-outlined" disabled="@busy"
+                                            @onclick="() => DeleteEntryAsync(entry)">
+                                        Delete
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <p class="has-text-grey">Not watched yet.</p>
+    }
+}
+else if (notFound)
+{
+    <div class="notification is-warning is-light">
+        This movie does not exist (anymore). <a href="/movies">Back to your movies</a>
+    </div>
+}
+else if (loading)
+{
+    <progress class="progress is-small is-primary" max="100"></progress>
+}
+
+@code {
+    /// <summary>Route parameter.</summary>
+    [Parameter] public string Id { get; set; } = "";
+
+    private Movie? movie;
+    private IReadOnlyList<DiaryEntry> entries = [];
+    private bool loading = true;
+    private bool notFound;
+    private bool busy;
+    private ApiError? error;
+    private string? loadedId;
+
+    /// <summary>Numbers the requests, so that the answer to an outdated one is ignored.</summary>
+    private int latestLoad;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Id == loadedId)
+        {
+            return;
+        }
+
+        loadedId = Id;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var thisLoad = ++latestLoad;
+        loading = true;
+        try
+        {
+            if (!Guid.TryParse(Id, out var movieId))
+            {
+                throw new ApiException(new ApiError(404, "Not found.", []));
+            }
+
+            var loadedMovie = Api.Movies.GetAsync(movieId);
+            var loadedEntries = Api.Movies.DiaryEntriesAsync(movieId);
+            await Task.WhenAll(loadedMovie, loadedEntries);
+            if (thisLoad != latestLoad)
+            {
+                return;
+            }
+
+            movie = loadedMovie.Result;
+            entries = loadedEntries.Result;
+            notFound = false;
+        }
+        catch (Exception failure)
+        {
+            if (thisLoad != latestLoad)
+            {
+                return;
+            }
+
+            var apiError = ApiError.From(failure);
+            movie = null;
+            notFound = apiError.IsNotFound;
+            error = apiError.IsNotFound ? null : apiError;
+        }
+
+        loading = false;
+    }
+
+    private Task ToggleWatchlistAsync(Movie current) => RunAsync(
+        () => current.OnWatchlist ? Api.Watchlist.RemoveAsync(current.Id) : Api.Watchlist.PutAsync(current.Id, null),
+        () =>
+        {
+            movie = current with { OnWatchlist = !current.OnWatchlist };
+            return Task.CompletedTask;
+        });
+
+    private async Task DeleteMovieAsync(Movie current)
+    {
+        if (!await Js.InvokeAsync<bool>("confirm", $"Delete \"{current.Title}\"? This cannot be undone."))
+        {
+            return;
+        }
+
+        await RunAsync(() => Api.Movies.DeleteAsync(current.Id), () =>
+        {
+            Navigation.NavigateTo("/movies");
+            return Task.CompletedTask;
+        });
+    }
+
+    private async Task DeleteEntryAsync(DiaryEntry entry)
+    {
+        if (!await Js.InvokeAsync<bool>("confirm", $"Delete the diary entry from {Dates.Iso(entry.WatchedOn)}?"))
+        {
+            return;
+        }
+
+        // Reload so that the movie's watch count and latest rating are up to date.
+        await RunAsync(() => Api.Diary.DeleteAsync(entry.Id), LoadAsync);
+    }
+
+    private async Task RunAsync(Func<Task> request, Func<Task> onSuccess)
+    {
+        busy = true;
+        error = null;
+        try
+        {
+            await request();
+        }
+        catch (Exception failure)
+        {
+            busy = false;
+            error = ApiError.From(failure);
+            return;
+        }
+
+        busy = false;
+        await onSuccess();
+    }
+}

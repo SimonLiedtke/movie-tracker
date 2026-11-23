@@ -1,0 +1,10 @@
+@if (HalfStars is > 0)
+{
+    var title = RatingFormat.Describe(HalfStars);
+    <span class="rating-stars" title="@title" aria-label="@title">@RatingFormat.Format(HalfStars)</span>
+}
+
+@code {
+    /// <summary>Half stars: 1 = 0.5 stars, 10 = 5 stars.</summary>
+    [Parameter] public int? HalfStars { get; set; }
+}

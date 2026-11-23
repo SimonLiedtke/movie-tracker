@@ -1,0 +1,281 @@
+@page "/diary/new"
+@page "/diary/{Id}/edit"
+@inject Api Api
+@inject NavigationManager Navigation
+
+<PageTitle>@(Id is null ? "Log a viewing" : "Edit diary entry") · Movie Tracker</PageTitle>
+
+<h1 class="title">@(Id is null ? "Log a viewing" : "Edit diary entry")</h1>
+
+<ErrorNotification Error="error" OnDismiss="() => error = null" />
+
+@if (loading)
+{
+    <progress class="progress is-small is-primary" max="100"></progress>
+}
+else
+{
+    <form class="box" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <div class="field">
+            <label class="label" for="movie">Movie *</label>
+            <MoviePicker @bind-Selected="movie" InputId="movie" AfterManualAdd="@AfterManualAdd.Diary"
+                         Invalid="@(movieTouched && movie is null)" />
+            @if (movieTouched && movie is null)
+            {
+                <p class="help is-danger">Please pick a movie.</p>
+            }
+        </div>
+
+        <div class="columns">
+            <div class="column">
+                <div class="field">
+                    <label class="label" for="watchedOn">Watched on *</label>
+                    <div class="control">
+                        <input id="watchedOn" class="input @Danger(Field.WatchedOn)" type="date" max="@Dates.Iso(today)"
+                               @bind="form.WatchedOn" @bind:after="() => Touch(Field.WatchedOn)"
+                               @onblur="() => Touch(Field.WatchedOn)" />
+                    </div>
+                    @if (IsInvalid(Field.WatchedOn))
+                    {
+                        <p class="help is-danger">Please enter the date you watched the movie.</p>
+                    }
+                </div>
+            </div>
+            <div class="column">
+                <div class="field">
+                    <label class="label" for="rating">Rating</label>
+                    <div class="control">
+                        <div class="select is-fullwidth">
+                            <select id="rating" value="@(form.Rating?.ToString() ?? "")" @onchange="OnRating">
+                                <option value="">No rating</option>
+                                @foreach (var option in RatingFormat.Options)
+                                {
+                                    <option value="@option.Value">@option.Label</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="field">
+            <label class="label" for="review">Review</label>
+            <div class="control">
+                <textarea id="review" class="textarea @Danger(Field.Review)" rows="5" @bind="form.Review"
+                          @bind:event="oninput" @bind:after="() => Touch(Field.Review)"
+                          @onblur="() => Touch(Field.Review)"></textarea>
+            </div>
+            @if (IsInvalid(Field.Review))
+            {
+                <p class="help is-danger">At most 20,000 characters.</p>
+            }
+        </div>
+
+        <div class="field">
+            <label class="label" for="tags">Tags</label>
+            <div class="control">
+                <input id="tags" class="input @Danger(Field.Tags)" type="text" autocomplete="off"
+                       placeholder="e.g. cinema, date night" @bind="form.Tags" @bind:event="oninput"
+                       @bind:after="() => Touch(Field.Tags)" @onblur="() => Touch(Field.Tags)" />
+            </div>
+            @if (IsInvalid(Field.Tags))
+            {
+                <p class="help is-danger">@Tags.Error(form.Tags)</p>
+            }
+            else
+            {
+                <p class="help">
+                    Separated by commas.
+                    @if (Id is null)
+                    {
+                        <text> Tags the movie has on your watchlist are added automatically.</text>
+                    }
+                </p>
+            }
+        </div>
+
+        <div class="field is-grouped is-grouped-multiline">
+            <div class="control">
+                <label class="checkbox"><input type="checkbox" @bind="form.IsRewatch" /> Rewatch</label>
+            </div>
+            <div class="control">
+                <label class="checkbox"><input type="checkbox" @bind="form.Liked" /> Liked ♥</label>
+            </div>
+        </div>
+
+        <div class="field is-grouped mt-5">
+            <div class="control">
+                <button type="submit" class="button is-primary @(saving ? "is-loading" : null)">Save</button>
+            </div>
+            <div class="control">
+                <a class="button is-light" href="@CancelLink">Cancel</a>
+            </div>
+        </div>
+    </form>
+}
+
+@code {
+    private const int MaxReviewLength = 20000;
+
+    private enum Field
+    {
+        WatchedOn,
+        Review,
+        Tags,
+    }
+
+    private sealed class FormModel
+    {
+        public DateOnly? WatchedOn { get; set; }
+        public int? Rating { get; set; }
+        public string Review { get; set; } = "";
+        public bool IsRewatch { get; set; }
+        public bool Liked { get; set; }
+        public string Tags { get; set; } = "";
+    }
+
+    /// <summary>Route parameter; not set when logging a new viewing.</summary>
+    [Parameter] public string? Id { get; set; }
+
+    /// <summary>Query parameter to preselect the movie, e.g. when coming from a movie page.</summary>
+    [SupplyParameterFromQuery(Name = "movieId")] public string? MovieId { get; set; }
+
+    private readonly DateOnly today = Dates.Today();
+    private readonly FormModel form = new();
+    private readonly HashSet<Field> touched = [];
+    private MovieRef? movie;
+    private bool movieTouched;
+    private bool loading;
+    private bool saving;
+    private ApiError? error;
+
+    private string? lastId;
+    private string? lastMovieId;
+    private bool parametersSeen;
+
+    protected override void OnInitialized() => form.WatchedOn = today;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (parametersSeen && Id == lastId && MovieId == lastMovieId)
+        {
+            return;
+        }
+
+        parametersSeen = true;
+        lastId = Id;
+        lastMovieId = MovieId;
+        if (Id is not null)
+        {
+            await LoadEntryAsync(Id);
+        }
+        else if (MovieId is not null)
+        {
+            await PreselectMovieAsync(MovieId);
+        }
+    }
+
+    private async Task LoadEntryAsync(string id)
+    {
+        loading = true;
+        try
+        {
+            var entry = Guid.TryParse(id, out var entryId)
+                ? await Api.Diary.GetAsync(entryId)
+                : throw new ApiException(new ApiError(404, "Not found.", []));
+            movie = entry.Movie;
+            form.WatchedOn = entry.WatchedOn;
+            form.Rating = entry.Rating;
+            form.Review = entry.Review ?? "";
+            form.IsRewatch = entry.IsRewatch;
+            form.Liked = entry.Liked;
+            form.Tags = Core.Tags.Format(entry.Tags);
+        }
+        catch (Exception failure)
+        {
+            error = ApiError.From(failure);
+        }
+
+        loading = false;
+    }
+
+    private async Task PreselectMovieAsync(string movieId)
+    {
+        try
+        {
+            var preselected = Guid.TryParse(movieId, out var id)
+                ? await Api.Movies.GetAsync(id)
+                : throw new ApiException(new ApiError(404, "Not found.", []));
+            movie = preselected.ToRef();
+            // Watched before: most likely a rewatch.
+            if (preselected.WatchCount > 0)
+            {
+                form.IsRewatch = true;
+            }
+        }
+        catch (Exception failure)
+        {
+            error = ApiError.From(failure);
+        }
+    }
+
+    /// <summary>What is wrong with the field.</summary>
+    private bool Invalid(Field field) => field switch
+    {
+        Field.WatchedOn => form.WatchedOn is null,
+        Field.Review => form.Review.Length > MaxReviewLength,
+        Field.Tags => Core.Tags.Error(form.Tags) is not null,
+        _ => false,
+    };
+
+    /// <summary>Problems are only shown for fields the user has touched, not on a fresh form.</summary>
+    private bool IsInvalid(Field field) => touched.Contains(field) && Invalid(field);
+
+    private string? Danger(Field field) => IsInvalid(field) ? "is-danger" : null;
+
+    private void Touch(Field field) => touched.Add(field);
+
+    private string CancelLink => MovieId is not null && movie is not null ? $"/movies/{movie.Id}" : "/diary";
+
+    private void OnRating(ChangeEventArgs args) => form.Rating = Parse.Number(args.Value?.ToString());
+
+    private async Task SaveAsync()
+    {
+        var picked = movie;
+        if (Enum.GetValues<Field>().Any(Invalid) || picked is null)
+        {
+            foreach (var field in Enum.GetValues<Field>())
+            {
+                touched.Add(field);
+            }
+
+            movieTouched = true;
+            return;
+        }
+
+        var request = new DiaryEntryRequest(
+            picked.Id,
+            form.WatchedOn!.Value,
+            form.Rating,
+            Parse.NullIfEmpty(form.Review.Trim()),
+            form.IsRewatch,
+            form.Liked,
+            Core.Tags.Parse(form.Tags));
+
+        saving = true;
+        error = null;
+        try
+        {
+            var entry = Id is not null
+                ? await Api.Diary.UpdateAsync(Guid.Parse(Id), request)
+                : await Api.Diary.CreateAsync(request);
+            Navigation.NavigateTo($"/movies/{entry.Movie.Id}");
+        }
+        catch (Exception failure)
+        {
+            saving = false;
+            error = ApiError.From(failure);
+        }
+    }
+}
