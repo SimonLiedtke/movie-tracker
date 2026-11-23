@@ -1,0 +1,163 @@
+@page "/activity"
+@inject Api Api
+@inject NavigationManager Navigation
+
+<PageTitle>Activity log · Movie Tracker</PageTitle>
+
+<h1 class="title">Activity log</h1>
+<p class="subtitle is-6 has-text-grey">
+    Everything you did that changed your data, most recent first.
+</p>
+
+<ErrorNotification Error="error" OnDismiss="() => error = null" />
+
+@if (result is not null)
+{
+    <p class="mb-4 has-text-grey">
+        @result.TotalCount @(result.TotalCount == 1 ? "action" : "actions")
+        @if (loading)
+        {
+            <span class="ml-2">· loading…</span>
+        }
+    </p>
+
+    @if (result.Items.Count > 0)
+    {
+        <div class="table-container">
+            <table class="table is-fullwidth is-hoverable">
+                <thead>
+                    <tr>
+                        <th>When</th>
+                        <th>Action</th>
+                        <th>Movie</th>
+                        <th class="is-hidden-mobile">Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var entry in result.Items)
+                    {
+                        <tr @key="entry.Id">
+                            <td class="is-nowrap">
+                                <time datetime="@entry.OccurredAt.ToString("O")">@Dates.FormatDateTime(entry.OccurredAt)</time>
+                            </td>
+                            <td>
+                                @Label(entry.Type)
+                                @if (!string.IsNullOrEmpty(entry.Detail))
+                                {
+                                    <span class="is-hidden-tablet is-block is-size-7 has-text-grey">@entry.Detail</span>
+                                }
+                            </td>
+                            <td>
+                                @if (entry.MovieId is { } movieId)
+                                {
+                                    <a href="/movies/@movieId" class="has-text-weight-semibold">@entry.MovieTitle</a>
+                                }
+                                else if (!string.IsNullOrEmpty(entry.MovieTitle))
+                                {
+                                    <span class="has-text-weight-semibold">@entry.MovieTitle</span>
+                                }
+                            </td>
+                            <td class="is-hidden-mobile">@entry.Detail</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="notification">Nothing yet. Log a viewing or add a movie to your watchlist.</div>
+    }
+
+    <Pagination Page="result.Page" PageSize="result.PageSize" TotalCount="result.TotalCount" OnPageChange="GoToPage" />
+}
+else if (loading)
+{
+    <progress class="progress is-small is-primary" max="100"></progress>
+}
+
+@code {
+    private const int PageSize = 50;
+
+    /// <summary>What each kind of action is called in the log.</summary>
+    private static string Label(ActivityType type) => type switch
+    {
+        ActivityType.DiaryEntryAdded => "Logged a viewing",
+        ActivityType.DiaryEntryUpdated => "Changed a viewing",
+        ActivityType.DiaryEntryDeleted => "Deleted a viewing",
+        ActivityType.WatchlistItemAdded => "Added to the watchlist",
+        ActivityType.WatchlistNoteChanged => "Changed a watchlist note",
+        ActivityType.WatchlistTagsChanged => "Changed watchlist tags",
+        ActivityType.WatchlistItemRemoved => "Removed from the watchlist",
+        ActivityType.MovieImported => "Imported a movie from TMDB",
+        ActivityType.MovieAdded => "Added a movie manually",
+        ActivityType.MovieUpdated => "Changed a movie",
+        ActivityType.MovieDeleted => "Deleted a movie",
+        ActivityType.LetterboxdImported => "Imported from Letterboxd",
+        _ => type.ToString(),
+    };
+
+    /// <summary>The page, from the URL's query parameters.</summary>
+    [SupplyParameterFromQuery(Name = "page")] public string? PageText { get; set; }
+
+    private PageQuery query = new();
+    private PageQuery? loadedQuery;
+    private PagedResponse<ActivityLogEntry>? result;
+    private bool loading = true;
+    private ApiError? error;
+
+    /// <summary>Numbers the requests, so that the answer to an outdated one is ignored.</summary>
+    private int latestLoad;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        query = new PageQuery(Parse.Page(PageText), PageSize);
+        if (query == loadedQuery)
+        {
+            return;
+        }
+
+        loadedQuery = query;
+        await LoadAsync();
+    }
+
+    /// <summary>Loads the current page of the log.</summary>
+    private async Task LoadAsync()
+    {
+        var thisLoad = ++latestLoad;
+        loading = true;
+        PagedResponse<ActivityLogEntry>? loaded;
+        try
+        {
+            loaded = await Api.ActivityLog.ListAsync(query);
+            if (thisLoad != latestLoad)
+            {
+                return;
+            }
+
+            error = null;
+        }
+        catch (Exception failure)
+        {
+            if (thisLoad != latestLoad)
+            {
+                return;
+            }
+
+            error = ApiError.From(failure);
+            loaded = null;
+        }
+
+        // The page is past the end, e.g. from an old bookmark.
+        if (loaded is { Items.Count: 0, Page: > 1 })
+        {
+            GoToPage(Math.Max(1, (int)Math.Ceiling(loaded.TotalCount / (double)loaded.PageSize)));
+            return;
+        }
+
+        result = loaded;
+        loading = false;
+    }
+
+    private void GoToPage(int page) => Navigation.NavigateWith(("page", page > 1 ? page : null));
+}
