@@ -1,0 +1,332 @@
+@page "/diary"
+@inject Api Api
+@inject NavigationManager Navigation
+@inject IJSRuntime Js
+
+<PageTitle>Diary · Movie Tracker</PageTitle>
+
+<div class="level is-mobile">
+    <div class="level-left">
+        <h1 class="title level-item">Diary</h1>
+    </div>
+    <div class="level-right">
+        <a class="button is-primary level-item" href="/diary/new">Log a viewing</a>
+    </div>
+</div>
+
+<div class="box">
+    <div class="columns is-mobile is-multiline is-align-items-flex-end">
+        <div class="column is-half-mobile is-2-tablet">
+            <div class="field">
+                <label class="label" for="from">From</label>
+                <div class="control">
+                    <input id="from" class="input" type="date" value="@query.From" max="@query.To"
+                           @onchange="OnFrom" />
+                </div>
+            </div>
+        </div>
+        <div class="column is-half-mobile is-2-tablet">
+            <div class="field">
+                <label class="label" for="to">To</label>
+                <div class="control">
+                    <input id="to" class="input" type="date" value="@query.To" min="@query.From"
+                           @onchange="OnTo" />
+                </div>
+            </div>
+        </div>
+        <div class="column is-half-mobile is-2-tablet">
+            <div class="field">
+                <label class="label" for="ratingFrom">Min rating</label>
+                <div class="control">
+                    <div class="select is-fullwidth">
+                        <select id="ratingFrom" value="@(query.RatingFrom?.ToString() ?? "")" @onchange="OnRatingFrom">
+                            <option value="">Any</option>
+                            @foreach (var option in RatingFormat.Options)
+                            {
+                                <option value="@option.Value" disabled="@(query.RatingTo is { } to && option.Value > to)">@option.Label</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="column is-half-mobile is-2-tablet">
+            <div class="field">
+                <label class="label" for="ratingTo">Max rating</label>
+                <div class="control">
+                    <div class="select is-fullwidth">
+                        <select id="ratingTo" value="@(query.RatingTo?.ToString() ?? "")" @onchange="OnRatingTo">
+                            <option value="">Any</option>
+                            @foreach (var option in RatingFormat.Options)
+                            {
+                                <option value="@option.Value" disabled="@(query.RatingFrom is { } from && option.Value < from)">@option.Label</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="column is-half-mobile is-3-tablet">
+            <div class="field">
+                <label class="label" for="tag">Tag</label>
+                <div class="control">
+                    <input id="tag" class="input" type="text" autocomplete="off" value="@query.Tag" @onchange="OnTag" />
+                </div>
+            </div>
+        </div>
+        @if (HasFilter)
+        {
+            <div class="column is-narrow">
+                <button class="button is-light" @onclick="Navigation.ClearQuery">Clear</button>
+            </div>
+        }
+    </div>
+</div>
+
+<ErrorNotification Error="error" OnDismiss="() => error = null" />
+
+@if (result is not null)
+{
+    <p class="mb-4 has-text-grey">
+        @result.TotalCount @(result.TotalCount == 1 ? "entry" : "entries")
+        @if (loading)
+        {
+            <span class="ml-2">· loading…</span>
+        }
+    </p>
+
+    @if (result.Items.Count > 0)
+    {
+        <div class="table-container">
+            <table class="table is-fullwidth is-hoverable">
+                <thead>
+                    <tr>
+                        <th>Day</th>
+                        <th>Movie</th>
+                        <th>Rating</th>
+                        <th class="is-hidden-mobile">Review</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                @foreach (var group in Groups())
+                {
+                    <tbody @key="group.Key">
+                        <tr class="has-background-light">
+                            <th colspan="5" class="has-text-weight-semibold">@group.Label</th>
+                        </tr>
+                        @foreach (var entry in group.Entries)
+                        {
+                            <tr @key="entry.Id">
+                                <td class="is-nowrap">@Dates.FormatDay(entry.WatchedOn)</td>
+                                <td>
+                                    <a href="/movies/@entry.Movie.Id" class="has-text-weight-semibold">@entry.Movie.Title</a>
+                                    @if (entry.Movie.ReleaseDate is not null)
+                                    {
+                                        <span class="has-text-grey"> (@Dates.YearOf(entry.Movie.ReleaseDate))</span>
+                                    }
+                                    @if (entry.IsRewatch)
+                                    {
+                                        <span class="tag is-light ml-1" title="Rewatch">↻</span>
+                                    }
+                                    @if (entry.Liked)
+                                    {
+                                        <span class="has-text-danger ml-1" title="Liked">♥</span>
+                                    }
+                                    <TagList Tags="entry.Tags" Route="/diary" Active="@query.Tag" />
+                                </td>
+                                <td><Rating HalfStars="entry.Rating" /></td>
+                                <td class="is-hidden-mobile pre-wrap">@entry.Review</td>
+                                <td>
+                                    <div class="buttons is-right are-small is-flex-wrap-nowrap">
+                                        <a class="button" href="/diary/@entry.Id/edit">Edit</a>
+                                        <button class="button is-danger is-outlined" @onclick="() => DeleteEntryAsync(entry)">
+                                            Delete
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                }
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="notification">
+            No diary entries
+            @if (query.Tag is not null || query.RatingFrom is not null || query.RatingTo is not null)
+            {
+                <text>for this filter.</text>
+            }
+            else if (query.From is not null || query.To is not null)
+            {
+                <text>in this period.</text>
+            }
+            else
+            {
+                <text>yet. <a href="/diary/new">Log your first viewing</a>.</text>
+            }
+        </div>
+    }
+
+    <Pagination Page="result.Page" PageSize="result.PageSize" TotalCount="result.TotalCount" OnPageChange="GoToPage" />
+}
+else if (loading)
+{
+    <progress class="progress is-small is-primary" max="100"></progress>
+}
+
+@code {
+    private const int PageSize = 25;
+
+    private sealed record MonthGroup(string Key, string Label, List<DiaryEntry> Entries);
+
+    // The filters, from the URL's query parameters.
+    [SupplyParameterFromQuery(Name = "from")] public string? From { get; set; }
+
+    [SupplyParameterFromQuery(Name = "to")] public string? To { get; set; }
+
+    [SupplyParameterFromQuery(Name = "tag")] public string? Tag { get; set; }
+
+    [SupplyParameterFromQuery(Name = "ratingFrom")] public string? RatingFrom { get; set; }
+
+    [SupplyParameterFromQuery(Name = "ratingTo")] public string? RatingTo { get; set; }
+
+    [SupplyParameterFromQuery(Name = "page")] public string? PageText { get; set; }
+
+    private DiaryQuery query = new();
+    private DiaryQuery? loadedQuery;
+    private PagedResponse<DiaryEntry>? result;
+    private bool loading = true;
+    private ApiError? error;
+
+    /// <summary>Increased to load the current page again without the query having changed.</summary>
+    private int reloads;
+    private int loadedReloads = -1;
+
+    /// <summary>Numbers the requests, so that the answer to an outdated one is ignored.</summary>
+    private int latestLoad;
+
+    /// <summary>Whether a filter other than the page is set.</summary>
+    private bool HasFilter =>
+        query.From is not null || query.To is not null || query.Tag is not null
+        || query.RatingFrom is not null || query.RatingTo is not null;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        query = new DiaryQuery(
+            From: Parse.NullIfEmpty(From),
+            To: Parse.NullIfEmpty(To),
+            Tag: Parse.NullIfEmpty(Tag?.Trim()),
+            RatingFrom: Parse.Number(RatingFrom),
+            RatingTo: Parse.Number(RatingTo),
+            Page: Parse.Page(PageText),
+            PageSize: PageSize);
+
+        // Every load goes through here, so that a newer one always cancels an older one.
+        if (query == loadedQuery && reloads == loadedReloads)
+        {
+            return;
+        }
+
+        loadedQuery = query;
+        loadedReloads = reloads;
+        await LoadAsync();
+    }
+
+    /// <summary>The current page's entries grouped by month, in the order the API returned them.</summary>
+    private List<MonthGroup> Groups()
+    {
+        var groups = new List<MonthGroup>();
+        foreach (var entry in result?.Items ?? [])
+        {
+            var key = Dates.MonthOf(entry.WatchedOn);
+            if (groups.Count == 0 || groups[^1].Key != key)
+            {
+                groups.Add(new MonthGroup(key, Dates.FormatMonth(entry.WatchedOn), []));
+            }
+
+            groups[^1].Entries.Add(entry);
+        }
+
+        return groups;
+    }
+
+    /// <summary>Loads the current page of the diary.</summary>
+    private async Task LoadAsync()
+    {
+        var thisLoad = ++latestLoad;
+        loading = true;
+        PagedResponse<DiaryEntry>? loaded;
+        try
+        {
+            loaded = await Api.Diary.ListAsync(query);
+            if (thisLoad != latestLoad)
+            {
+                return;
+            }
+
+            error = null;
+        }
+        catch (Exception failure)
+        {
+            if (thisLoad != latestLoad)
+            {
+                return;
+            }
+
+            error = ApiError.From(failure);
+            loaded = null;
+        }
+
+        // E.g. after deleting the only entry on the last page.
+        if (loaded is { Items.Count: 0, Page: > 1 })
+        {
+            GoToPage(Math.Max(1, (int)Math.Ceiling(loaded.TotalCount / (double)loaded.PageSize)));
+            return;
+        }
+
+        result = loaded;
+        loading = false;
+    }
+
+    private void OnFilter(string key, string? value) =>
+        Navigation.NavigateWith((key, value), ("page", null));
+
+    private void OnFrom(ChangeEventArgs args) => OnFilter("from", args.Value?.ToString());
+
+    private void OnTo(ChangeEventArgs args) => OnFilter("to", args.Value?.ToString());
+
+    private void OnRatingFrom(ChangeEventArgs args) => OnFilter("ratingFrom", args.Value?.ToString());
+
+    private void OnRatingTo(ChangeEventArgs args) => OnFilter("ratingTo", args.Value?.ToString());
+
+    private void OnTag(ChangeEventArgs args) => OnFilter("tag", args.Value?.ToString()?.Trim());
+
+    private void GoToPage(int page) => Navigation.NavigateWith(("page", page));
+
+    private async Task DeleteEntryAsync(DiaryEntry entry)
+    {
+        var question = $"Delete the diary entry for \"{entry.Movie.Title}\" from {Dates.FormatDate(entry.WatchedOn)}?";
+        if (!await Js.InvokeAsync<bool>("confirm", question))
+        {
+            return;
+        }
+
+        try
+        {
+            await Api.Diary.DeleteAsync(entry.Id);
+        }
+        catch (Exception failure)
+        {
+            error = ApiError.From(failure);
+            return;
+        }
+
+        reloads++;
+        loadedReloads = reloads;
+        loadedQuery = query;
+        await LoadAsync();
+    }
+}
