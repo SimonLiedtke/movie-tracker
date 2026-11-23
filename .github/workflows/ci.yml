@@ -261,3 +261,30 @@ jobs:
 
       - name: Test
         run: npm test
+
+  frontend-blazor:
+    name: Frontend (Blazor)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend/blazor
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: frontend/blazor/global.json
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore
+
+      - name: Test
+        run: dotnet test --no-build
+
+      # The published (trimmed) app can break where the debug build does not.
+      - name: Publish
+        run: dotnet publish src/MovieTracker.Blazor -c Release --no-restore -o publish
