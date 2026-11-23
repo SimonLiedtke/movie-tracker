@@ -157,15 +157,15 @@
             No diary entries
             @if (query.Tag is not null || query.RatingFrom is not null || query.RatingTo is not null)
             {
-                <text>for this filter.</text>
+                <text> for this filter.</text>
             }
             else if (query.From is not null || query.To is not null)
             {
-                <text>in this period.</text>
+                <text> in this period.</text>
             }
             else
             {
-                <text>yet. <a href="/diary/new">Log your first viewing</a>.</text>
+                <text> yet. <a href="/diary/new">Log your first viewing</a>.</text>
             }
         </div>
     }

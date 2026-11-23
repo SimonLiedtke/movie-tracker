@@ -99,7 +99,7 @@
                                 @Dates.YearOf(movie.ReleaseDate)
                                 @if (movie.WatchCount > 0)
                                 {
-                                    <text>· watched @movie.WatchCount×</text>
+                                    <text> · watched @movie.WatchCount×</text>
                                 }
                             </p>
                             <div class="is-flex is-justify-content-space-between is-align-items-center mt-1">
@@ -121,7 +121,7 @@
             No movies found.
             @if (query.Search is { Length: > 0 } || query.GenreId is not null || query.Year is not null)
             {
-                <button class="button is-small is-ghost" @onclick="Navigation.ClearQuery">Clear filters</button>
+                <button class="button is-small is-ghost ml-2" @onclick="Navigation.ClearQuery">Clear filters</button>
             }
             else
             {

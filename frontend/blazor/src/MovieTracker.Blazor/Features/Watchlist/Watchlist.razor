@@ -145,15 +145,7 @@
 @if (result is not null)
 {
     <p class="mb-4 has-text-grey">
-        @result.TotalCount@if (Filtered)
-        {
-            <text> of @result.UnfilteredCount</text>
-        }
-        @(result.UnfilteredCount == 1 ? "movie" : "movies") to watch
-        @if (Filtered)
-        {
-            <text> @FilterDescription()</text>
-        }
+        @CountText()
         @if (loading)
         {
             <span class="ml-2">· loading…</span>
@@ -246,7 +238,7 @@
     {
         <div class="notification">
             No movie on your watchlist matches the filter.
-            <button type="button" class="button is-small is-ghost" @onclick="ClearFilter">Clear filter</button>
+            <button type="button" class="button is-small is-ghost ml-2" @onclick="ClearFilter">Clear filter</button>
         </div>
     }
     else
@@ -445,6 +437,14 @@ else if (loading)
         (null, not null) => $"runtime of at most {to} minutes",
         _ => null,
     };
+
+    /// <summary>E.g. "1 of 3 movies to watch with any of the selected genres".</summary>
+    private string CountText()
+    {
+        var count = result!.TotalCount + (Filtered ? $" of {result.UnfilteredCount}" : "");
+        var noun = result.UnfilteredCount == 1 ? "movie" : "movies";
+        return $"{count} {noun} to watch" + (Filtered ? $" {FilterDescription()}" : "");
+    }
 
     /// <summary>What the filter selects, e.g. "with any of the selected genres, released from May 25, 1979".</summary>
     private string FilterDescription()

@@ -19,7 +19,7 @@
                 @movie.Title
                 @if (movie.ReleaseDate is not null)
                 {
-                    <span class="has-text-grey has-text-weight-normal">(@Dates.YearOf(movie.ReleaseDate))</span>
+                    <span class="has-text-grey has-text-weight-normal"> (@Dates.YearOf(movie.ReleaseDate))</span>
                 }
             </h1>
             @if (movie.OriginalTitle is { Length: > 0 } && movie.OriginalTitle != movie.Title)

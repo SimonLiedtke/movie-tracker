@@ -41,7 +41,7 @@
                 <p class="has-text-weight-semibold mb-2">The import is finished.</p>
                 <ul>
                     <li>
-                        Diary entries imported: @outcome.DiaryEntriesImported
+                        Diary entries imported: @outcome.DiaryEntriesImported@(" ")
                         @if (outcome.DiaryEntriesSkipped > 0)
                         {
                             <span class="has-text-grey">
@@ -50,7 +50,7 @@
                         }
                     </li>
                     <li>
-                        Watchlist items imported: @outcome.WatchlistItemsImported
+                        Watchlist items imported: @outcome.WatchlistItemsImported@(" ")
                         @if (outcome.WatchlistItemsSkipped > 0)
                         {
                             <span class="has-text-grey">
