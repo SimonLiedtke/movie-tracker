@@ -70,6 +70,9 @@ public sealed class Movie
     /// <summary>Movies from TMDB are visible to everyone, manually added movies only to their owner.</summary>
     public bool IsVisibleTo(Guid userId) => OwnerId is null || OwnerId == userId;
 
+    /// <summary>Points the movie's poster at another image, e.g. at an uploaded <see cref="MoviePoster"/>.</summary>
+    public void SetPosterUrl(string? posterUrl) => PosterUrl = posterUrl;
+
     public void Update(MovieDetails details, IEnumerable<Genre> genres)
     {
         ArgumentNullException.ThrowIfNull(details);
