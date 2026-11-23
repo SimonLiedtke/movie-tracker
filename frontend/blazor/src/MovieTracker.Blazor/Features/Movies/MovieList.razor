@@ -1,0 +1,307 @@
+@page "/movies"
+@implements IDisposable
+@inject Api Api
+@inject NavigationManager Navigation
+
+<PageTitle>My movies · Movie Tracker</PageTitle>
+
+<h1 class="title">My movies</h1>
+<p class="subtitle is-6 has-text-grey">
+    The movies you have logged, put on your watchlist or added manually.
+</p>
+
+<div class="field">
+    <label class="label" for="find">Find any movie</label>
+    <MoviePicker InputId="find" Placeholder="Search TMDB and your own movies" KeepSelection="false"
+                 OnPicked="OpenMovie" />
+</div>
+
+<div class="box">
+    <div class="columns is-multiline">
+        <div class="column is-12-tablet is-5-desktop">
+            <div class="field">
+                <label class="label" for="search">Search my movies</label>
+                <div class="control">
+                    <input id="search" class="input" type="search" placeholder="Title or original title"
+                           value="@searchText" @oninput="OnSearch" />
+                </div>
+            </div>
+        </div>
+        <div class="column is-4-tablet is-2-desktop">
+            <div class="field">
+                <label class="label" for="genre">Genre</label>
+                <div class="control">
+                    <div class="select is-fullwidth">
+                        <select id="genre" value="@(query.GenreId?.ToString() ?? "")"
+                                @onchange="OnGenre">
+                            <option value="">All genres</option>
+                            @foreach (var genre in genres)
+                            {
+                                <option value="@genre.Id">@genre.Name</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="column is-4-tablet is-2-desktop">
+            <div class="field">
+                <label class="label" for="year">Release year</label>
+                <div class="control">
+                    <input id="year" class="input" type="number" min="1870" max="2100" placeholder="Any"
+                           value="@yearText" @oninput="OnYearInput" @onchange="OnYear" />
+                </div>
+            </div>
+        </div>
+        <div class="column is-4-tablet is-3-desktop">
+            <div class="field">
+                <label class="label" for="sort">Sort by</label>
+                <div class="control">
+                    <div class="select is-fullwidth">
+                        <select id="sort" value="@query.Sort" @onchange="OnSort">
+                            @foreach (var option in SortOptions)
+                            {
+                                <option value="@option.Value">@option.Label</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<ErrorNotification Error="error" OnDismiss="() => error = null" />
+
+@if (result is not null)
+{
+    <p class="mb-4 has-text-grey">
+        @result.TotalCount @(result.TotalCount == 1 ? "movie" : "movies")
+        @if (loading)
+        {
+            <span class="ml-2">· loading…</span>
+        }
+    </p>
+
+    @if (result.Items.Count > 0)
+    {
+        <div class="columns is-multiline is-mobile">
+            @foreach (var movie in result.Items)
+            {
+                <div class="column is-half-mobile is-one-third-tablet is-one-fifth-desktop is-2-widescreen" @key="movie.Id">
+                    <a class="card is-block" href="/movies/@movie.Id">
+                        <div class="card-image">
+                            <Poster Url="@movie.PosterUrl" Title="@movie.Title" />
+                        </div>
+                        <div class="card-content p-3">
+                            <p class="has-text-weight-semibold">@movie.Title</p>
+                            <p class="is-size-7 has-text-grey">
+                                @Dates.YearOf(movie.ReleaseDate)
+                                @if (movie.WatchCount > 0)
+                                {
+                                    <text>· watched @movie.WatchCount×</text>
+                                }
+                            </p>
+                            <div class="is-flex is-justify-content-space-between is-align-items-center mt-1">
+                                <Rating HalfStars="movie.LatestRating" />
+                                @if (movie.OnWatchlist)
+                                {
+                                    <span class="tag is-info is-light" title="On your watchlist">Watchlist</span>
+                                }
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="notification">
+            No movies found.
+            @if (query.Search is { Length: > 0 } || query.GenreId is not null || query.Year is not null)
+            {
+                <button class="button is-small is-ghost" @onclick="Navigation.ClearQuery">Clear filters</button>
+            }
+            else
+            {
+                <text>Find a movie above, then log a viewing or put it on your watchlist.</text>
+            }
+        </div>
+    }
+
+    <Pagination Page="result.Page" PageSize="result.PageSize" TotalCount="result.TotalCount" OnPageChange="GoToPage" />
+}
+else if (loading)
+{
+    <progress class="progress is-small is-primary" max="100"></progress>
+}
+
+@code {
+    private const int PageSize = 24;
+    private const int SearchDebounceMs = 300;
+
+    private static readonly (string Value, string Label)[] SortOptions =
+    [
+        (MovieSort.Title, "Title (A–Z)"),
+        (MovieSort.TitleDescending, "Title (Z–A)"),
+        (MovieSort.ReleaseDateDescending, "Newest releases"),
+        (MovieSort.ReleaseDate, "Oldest releases"),
+        (MovieSort.CreatedAtDescending, "Recently added"),
+        (MovieSort.CreatedAt, "First added"),
+    ];
+
+    // The filters, from the URL's query parameters.
+    [SupplyParameterFromQuery(Name = "search")] public string? Search { get; set; }
+
+    [SupplyParameterFromQuery(Name = "genreId")] public string? GenreIdText { get; set; }
+
+    [SupplyParameterFromQuery(Name = "year")] public string? YearParameter { get; set; }
+
+    [SupplyParameterFromQuery(Name = "sort")] public string? SortText { get; set; }
+
+    [SupplyParameterFromQuery(Name = "page")] public string? PageText { get; set; }
+
+    private MovieQuery query = new(Sort: MovieSort.Title);
+    private MovieQuery? loadedQuery;
+    private IReadOnlyList<Genre> genres = [];
+    private PagedResponse<MovieSummary>? result;
+    private bool loading = true;
+    private ApiError? error;
+
+    // The fields show the URL's values, but keep what the user types until the URL has caught up.
+    private string searchText = "";
+    private string yearText = "";
+    private CancellationTokenSource? searchDebounce;
+
+    /// <summary>Numbers the requests, so that the answer to an outdated one is ignored.</summary>
+    private int latestLoad;
+
+    protected override void OnInitialized() => _ = LoadGenresAsync();
+
+    public void Dispose()
+    {
+        searchDebounce?.Cancel();
+        searchDebounce?.Dispose();
+        latestLoad++;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var previous = query;
+        query = new MovieQuery(
+            Search,
+            Parse.Number(GenreIdText),
+            Parse.Number(YearParameter),
+            SortOptions.FirstOrDefault(option => option.Value == SortText).Value ?? MovieSort.Title,
+            Parse.Number(PageText) ?? 1,
+            PageSize);
+
+        if (loadedQuery is null || query.Search != previous.Search)
+        {
+            searchText = query.Search ?? "";
+        }
+
+        if (loadedQuery is null || query.Year != previous.Year)
+        {
+            yearText = query.Year?.ToString() ?? "";
+        }
+
+        if (query == loadedQuery)
+        {
+            return;
+        }
+
+        loadedQuery = query;
+        await LoadAsync(query);
+    }
+
+    private async Task LoadGenresAsync()
+    {
+        try
+        {
+            genres = await Api.Genres.ListAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+        catch
+        {
+            // Without genres, the filter just has no choices.
+        }
+    }
+
+    private async Task LoadAsync(MovieQuery movieQuery)
+    {
+        var thisLoad = ++latestLoad;
+        loading = true;
+        try
+        {
+            var loaded = await Api.Movies.ListAsync(movieQuery);
+            if (thisLoad != latestLoad)
+            {
+                return;
+            }
+
+            error = null;
+            result = loaded;
+        }
+        catch (Exception failure)
+        {
+            if (thisLoad != latestLoad)
+            {
+                return;
+            }
+
+            error = ApiError.From(failure);
+            result = null;
+        }
+
+        loading = false;
+    }
+
+    private void OnSearch(ChangeEventArgs args)
+    {
+        var value = args.Value?.ToString() ?? "";
+        searchText = value;
+        searchDebounce?.Cancel();
+        searchDebounce?.Dispose();
+        searchDebounce = new CancellationTokenSource();
+        _ = SearchAfterPauseAsync(value, searchDebounce.Token);
+    }
+
+    private async Task SearchAfterPauseAsync(string value, CancellationToken cancellation)
+    {
+        try
+        {
+            await Task.Delay(SearchDebounceMs, cancellation);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        // Not trimmed here: the input shows the URL value, so trimming would eat spaces while typing.
+        if (value != (Search ?? ""))
+        {
+            await InvokeAsync(() => UpdateQuery(replace: true, ("search", value)));
+        }
+    }
+
+    private void OnGenre(ChangeEventArgs args) => UpdateQuery(replace: false, ("genreId", args.Value?.ToString()));
+
+    private void OnYearInput(ChangeEventArgs args) => yearText = args.Value?.ToString() ?? "";
+
+    private void OnYear(ChangeEventArgs args) => UpdateQuery(replace: false, ("year", args.Value?.ToString()));
+
+    private void OnSort(ChangeEventArgs args) => UpdateQuery(replace: false, ("sort", args.Value?.ToString()));
+
+    private void OpenMovie(MovieRef movie) => Navigation.NavigateTo($"/movies/{movie.Id}");
+
+    private void GoToPage(int page) => Navigation.NavigateWith(("page", page));
+
+    /// <summary>Changing a filter starts again at page 1.</summary>
+    private void UpdateQuery(bool replace, params (string Key, object? Value)[] changes)
+    {
+        var url = Navigation.UrlWith([.. changes, ("page", null)]);
+        Navigation.NavigateTo(url, replace: replace);
+    }
+}
