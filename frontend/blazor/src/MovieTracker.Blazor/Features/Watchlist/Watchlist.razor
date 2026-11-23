@@ -1,0 +1,679 @@
+@page "/watchlist"
+@implements IDisposable
+@inject Api Api
+@inject NavigationManager Navigation
+
+<PageTitle>Watchlist · Movie Tracker</PageTitle>
+
+<h1 class="title">Watchlist</h1>
+
+<div class="field">
+    <label class="label" for="add">Add a movie</label>
+    <MoviePicker InputId="add" Placeholder="Search a movie to watch later" AfterManualAdd="@AfterManualAdd.Watchlist"
+                 KeepSelection="false" OnPicked="AddAsync" />
+</div>
+
+<div class="box">
+    <div class="field">
+        <label class="label" for="search">Title</label>
+        <div class="control">
+            <input id="search" class="input is-small" type="search" placeholder="Title or original title"
+                   value="@searchText" @oninput="OnSearch" />
+        </div>
+    </div>
+    <div class="field">
+        <label class="label" for="tag">Tag</label>
+        <div class="control">
+            <input id="tag" class="input is-small" type="text" autocomplete="off" placeholder="e.g. weekend"
+                   list="tag-suggestions" value="@query.Tag" @onchange="OnTag" />
+            <datalist id="tag-suggestions">
+                @foreach (var tag in TagSuggestions())
+                {
+                    <option value="@tag"></option>
+                }
+            </datalist>
+        </div>
+    </div>
+    <div class="field">
+        <label class="label" id="genre-label">Genres</label>
+        <div class="buttons are-small" role="group" aria-labelledby="genre-label">
+            @foreach (var genre in genres)
+            {
+                var selected = IsSelected(genre);
+                <button type="button" class="button @(selected ? "is-link" : null)" aria-pressed="@(selected ? "true" : "false")"
+                        @key="genre.Id" @onclick="() => ToggleGenre(genre)">
+                    @genre.Name
+                </button>
+            }
+        </div>
+    </div>
+    <div class="field is-flex is-flex-wrap-wrap is-align-items-center">
+        <span class="mr-3" id="genre-match-label">Show movies with</span>
+        <div class="buttons has-addons are-small mb-0" role="group" aria-labelledby="genre-match-label">
+            @foreach (var option in MatchOptions)
+            {
+                var selected = query.GenreMatch == option.Value;
+                <button type="button" class="button mb-0 @(selected ? "is-link is-selected" : null)"
+                        aria-pressed="@(selected ? "true" : "false")" @key="option.Value"
+                        @onclick="() => SetGenreMatch(option.Value)">
+                    @option.Label
+                </button>
+            }
+        </div>
+    </div>
+    <div class="field">
+        <label class="label" id="runtime-label">Runtime</label>
+        <div class="buttons are-small mb-0" role="group" aria-labelledby="runtime-label">
+            @foreach (var preset in RuntimePresets)
+            {
+                var selected = IsRuntimePreset(preset);
+                <button type="button" class="button @(selected ? "is-link" : null)" aria-pressed="@(selected ? "true" : "false")"
+                        @key="preset.Label" @onclick="() => ToggleRuntimePreset(preset)">
+                    @preset.Label
+                </button>
+            }
+        </div>
+    </div>
+    <div class="columns is-mobile is-multiline is-align-items-flex-end mb-0">
+        <div class="column is-half-mobile is-3-tablet">
+            <div class="field">
+                <label class="label" for="runtime-from">Runtime from (min)</label>
+                <div class="control">
+                    <input id="runtime-from" class="input is-small" type="number" min="1" max="1500" step="1"
+                           placeholder="Any" value="@query.RuntimeFrom" @onchange="OnRuntimeFrom" />
+                </div>
+            </div>
+        </div>
+        <div class="column is-half-mobile is-3-tablet">
+            <div class="field">
+                <label class="label" for="runtime-to">Runtime until (min)</label>
+                <div class="control">
+                    <input id="runtime-to" class="input is-small" type="number" min="1" max="1500" step="1"
+                           placeholder="Any" value="@query.RuntimeTo" @onchange="OnRuntimeTo" />
+                </div>
+            </div>
+        </div>
+        <div class="column is-half-mobile is-3-tablet">
+            <div class="field">
+                <label class="label" for="released-from">Released from</label>
+                <div class="control">
+                    <input id="released-from" class="input is-small" type="date" value="@query.ReleasedFrom"
+                           max="@query.ReleasedTo" @onchange="OnReleasedFrom" />
+                </div>
+            </div>
+        </div>
+        <div class="column is-half-mobile is-3-tablet">
+            <div class="field">
+                <label class="label" for="released-to">Released until</label>
+                <div class="control">
+                    <input id="released-to" class="input is-small" type="date" value="@query.ReleasedTo"
+                           min="@query.ReleasedFrom" @onchange="OnReleasedTo" />
+                </div>
+            </div>
+        </div>
+        <div class="column is-half-mobile is-3-tablet">
+            <div class="field">
+                <label class="label" for="added-from">Added from</label>
+                <div class="control">
+                    <input id="added-from" class="input is-small" type="date" value="@query.AddedFrom"
+                           max="@query.AddedTo" @onchange="OnAddedFrom" />
+                </div>
+            </div>
+        </div>
+        <div class="column is-half-mobile is-3-tablet">
+            <div class="field">
+                <label class="label" for="added-to">Added until</label>
+                <div class="control">
+                    <input id="added-to" class="input is-small" type="date" value="@query.AddedTo"
+                           min="@query.AddedFrom" @onchange="OnAddedTo" />
+                </div>
+            </div>
+        </div>
+        @if (Filtered)
+        {
+            <div class="column is-narrow">
+                <div class="field">
+                    <button type="button" class="button is-small is-light" @onclick="ClearFilter">Clear filter</button>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<ErrorNotification Error="error" OnDismiss="() => error = null" />
+
+@if (result is not null)
+{
+    <p class="mb-4 has-text-grey">
+        @result.TotalCount@if (Filtered)
+        {
+            <text> of @result.UnfilteredCount</text>
+        }
+        @(result.UnfilteredCount == 1 ? "movie" : "movies") to watch
+        @if (Filtered)
+        {
+            <text> @FilterDescription()</text>
+        }
+        @if (loading)
+        {
+            <span class="ml-2">· loading…</span>
+        }
+    </p>
+
+    @if (result.Items.Count > 0)
+    {
+        @foreach (var item in result.Items)
+        {
+            <article class="media media-wrap box" @key="item.Movie.Id">
+                <figure class="media-left" style="width: 64px">
+                    <a href="/movies/@item.Movie.Id">
+                        <Poster Url="@item.Movie.PosterUrl" Title="@item.Movie.Title" />
+                    </a>
+                </figure>
+                <div class="media-content">
+                    <p>
+                        <a class="has-text-weight-semibold" href="/movies/@item.Movie.Id">@item.Movie.Title</a>
+                        @if (item.Movie.ReleaseDate is not null)
+                        {
+                            <span class="has-text-grey"> (@Dates.YearOf(item.Movie.ReleaseDate))</span>
+                        }
+                    </p>
+                    <p class="is-size-7 has-text-grey">
+                        Added @item.AddedAt.ToString("yyyy-MM-dd")
+                        @if (item.RuntimeMinutes is > 0)
+                        {
+                            <text> · @item.RuntimeMinutes min</text>
+                        }
+                    </p>
+                    @if (item.Genres.Count > 0)
+                    {
+                        <div class="tags mt-2 mb-0">
+                            @foreach (var genre in item.Genres)
+                            {
+                                <a class="tag is-link @(IsSelected(genre) ? null : "is-light")" @key="genre.Id"
+                                   href="@GenreFilterLink(genre)">@genre.Name</a>
+                            }
+                        </div>
+                    }
+
+                    @if (editing == item.Movie.Id)
+                    {
+                        <form class="mt-2" @onsubmit="() => SaveDetailsAsync(item)" @onsubmit:preventDefault>
+                            <div class="field">
+                                <input class="input is-small" maxlength="500" aria-label="Note"
+                                       placeholder="Why do you want to watch it?" @bind="noteDraft" @bind:event="oninput"
+                                       @onkeydown="OnDraftKeyDown" />
+                            </div>
+                            <div class="field">
+                                <input class="input is-small @(tagsProblem is not null ? "is-danger" : null)" aria-label="Tags"
+                                       autocomplete="off" placeholder="Tags, separated by commas" @bind="tagsDraft"
+                                       @bind:event="oninput" @onkeydown="OnDraftKeyDown" />
+                                @if (tagsProblem is not null)
+                                {
+                                    <p class="help is-danger">@tagsProblem</p>
+                                }
+                            </div>
+                            <div class="buttons are-small">
+                                <button type="submit" class="button is-primary @(saving ? "is-loading" : null)">Save</button>
+                                <button type="button" class="button" @onclick="CancelEdit">Cancel</button>
+                            </div>
+                        </form>
+                    }
+                    else
+                    {
+                        @if (!string.IsNullOrEmpty(item.Note))
+                        {
+                            <p class="mt-2 pre-wrap">@item.Note</p>
+                        }
+                        <div class="mt-2">
+                            <TagList Tags="item.Tags" Route="/watchlist" Active="@query.Tag" />
+                        </div>
+                    }
+                </div>
+                <div class="media-right">
+                    <div class="buttons are-small is-right">
+                        <a class="button is-primary" href="/diary/new?movieId=@item.Movie.Id">Log a viewing</a>
+                        <button class="button" @onclick="() => Edit(item)">
+                            @(!string.IsNullOrEmpty(item.Note) || item.Tags.Count > 0 ? "Edit note and tags" : "Add note or tags")
+                        </button>
+                        <button class="button is-danger is-outlined" @onclick="() => RemoveAsync(item)">Remove</button>
+                    </div>
+                </div>
+            </article>
+        }
+    }
+    else if (Filtered)
+    {
+        <div class="notification">
+            No movie on your watchlist matches the filter.
+            <button type="button" class="button is-small is-ghost" @onclick="ClearFilter">Clear filter</button>
+        </div>
+    }
+    else
+    {
+        <div class="notification">Your watchlist is empty. Search a movie above to add it.</div>
+    }
+
+    <Pagination Page="result.Page" PageSize="result.PageSize" TotalCount="result.TotalCount" OnPageChange="GoToPage" />
+}
+else if (loading)
+{
+    <progress class="progress is-small is-primary" max="100"></progress>
+}
+
+@code {
+    private const int PageSize = 20;
+    private const int SearchDebounceMs = 300;
+
+    private static readonly (GenreMatch Value, string Label)[] MatchOptions =
+    [
+        (GenreMatch.Any, "Any of them"),
+        (GenreMatch.All, "All of them"),
+    ];
+
+    private sealed record RuntimePreset(string Label, int? From, int? To);
+
+    /// <summary>
+    /// Quick picks for the runtime, so that the usual questions need one click. They do not overlap:
+    /// "Under 90 min" is up to 89 minutes, "Over 120 min" from 121.
+    /// </summary>
+    private static readonly RuntimePreset[] RuntimePresets =
+    [
+        new("Under 90 min", null, 89),
+        new("90 to 120 min", 90, 120),
+        new("Over 120 min", 121, null),
+    ];
+
+    // The filter and the page, from the URL's query parameters.
+    [SupplyParameterFromQuery(Name = "genreId")] public string[]? GenreId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "genreMatch")] public string? GenreMatchText { get; set; }
+
+    [SupplyParameterFromQuery(Name = "releasedFrom")] public string? ReleasedFrom { get; set; }
+
+    [SupplyParameterFromQuery(Name = "releasedTo")] public string? ReleasedTo { get; set; }
+
+    [SupplyParameterFromQuery(Name = "addedFrom")] public string? AddedFrom { get; set; }
+
+    [SupplyParameterFromQuery(Name = "addedTo")] public string? AddedTo { get; set; }
+
+    [SupplyParameterFromQuery(Name = "runtimeFrom")] public string? RuntimeFrom { get; set; }
+
+    [SupplyParameterFromQuery(Name = "runtimeTo")] public string? RuntimeTo { get; set; }
+
+    [SupplyParameterFromQuery(Name = "search")] public string? Search { get; set; }
+
+    [SupplyParameterFromQuery(Name = "tag")] public string? Tag { get; set; }
+
+    [SupplyParameterFromQuery(Name = "page")] public string? PageText { get; set; }
+
+    private WatchlistQuery query = new(GenreIds: [], GenreMatch: GenreMatch.Any);
+    private string? loadedKey;
+    private IReadOnlyList<Genre> genres = [];
+    private WatchlistPage? result;
+
+    /// <summary>The tags on the watchlist, which the tag filter suggests. Without them, the filter just has no suggestions.</summary>
+    private IReadOnlyList<string> knownTags = [];
+
+    private bool loading = true;
+    private ApiError? error;
+
+    /// <summary>Movie ID of the item whose note and tags are being edited.</summary>
+    private Guid? editing;
+    private string noteDraft = "";
+    private string tagsDraft = "";
+
+    /// <summary>Why the tags that are being edited are refused; null if they are fine.</summary>
+    private string? tagsProblem;
+    private bool saving;
+
+    // The field shows the URL's value, but keeps what the user types until the URL has caught up.
+    private string searchText = "";
+    private CancellationTokenSource? searchDebounce;
+
+    /// <summary>Numbers the requests, so that the answer to an outdated one is ignored.</summary>
+    private int latestLoad;
+
+    private bool HasGenres => query.GenreIds is { Count: > 0 };
+
+    private bool Filtered =>
+        HasGenres
+        || query.ReleasedFrom is not null || query.ReleasedTo is not null
+        || query.AddedFrom is not null || query.AddedTo is not null
+        || query.RuntimeFrom is not null || query.RuntimeTo is not null
+        || query.Search is not null || query.Tag is not null;
+
+    protected override void OnInitialized()
+    {
+        _ = LoadGenresAsync();
+        _ = LoadKnownTagsAsync();
+    }
+
+    public void Dispose()
+    {
+        searchDebounce?.Cancel();
+        searchDebounce?.Dispose();
+        latestLoad++;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var previousSearch = query.Search;
+        query = new WatchlistQuery(
+            // Whatever is not a genre ID (e.g. from a hand-edited URL) is left out.
+            GenreIds: (GenreId ?? []).Select(id => int.TryParse(id, out var number) ? (int?)number : null)
+                .OfType<int>().Distinct().ToList(),
+            GenreMatch: GenreMatchText == "all" ? GenreMatch.All : GenreMatch.Any,
+            ReleasedFrom: Parse.NullIfEmpty(ReleasedFrom),
+            ReleasedTo: Parse.NullIfEmpty(ReleasedTo),
+            AddedFrom: Parse.NullIfEmpty(AddedFrom),
+            AddedTo: Parse.NullIfEmpty(AddedTo),
+            RuntimeFrom: Parse.Minutes(RuntimeFrom),
+            RuntimeTo: Parse.Minutes(RuntimeTo),
+            // Not trimmed: the field shows the URL's value, and trimming would eat spaces while typing.
+            Search: string.IsNullOrWhiteSpace(Search) ? null : Search,
+            Tag: Parse.NullIfEmpty(Tag?.Trim()),
+            Page: Parse.Page(PageText),
+            PageSize: PageSize);
+
+        if (loadedKey is null || query.Search != previousSearch)
+        {
+            searchText = query.Search ?? "";
+        }
+
+        // What the request depends on. The match mode means nothing without genres, and spaces around the
+        // search text do not matter, so changing them must not load the same list again.
+        var key = string.Join('|',
+            string.Join(',', query.GenreIds!),
+            HasGenres ? query.GenreMatch : "",
+            query.ReleasedFrom, query.ReleasedTo, query.AddedFrom, query.AddedTo,
+            query.RuntimeFrom, query.RuntimeTo, query.Search?.Trim(), query.Tag, query.Page);
+        if (key == loadedKey)
+        {
+            return;
+        }
+
+        loadedKey = key;
+        await LoadAsync();
+    }
+
+    private async Task LoadGenresAsync()
+    {
+        try
+        {
+            genres = await Api.Genres.ListAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+        catch
+        {
+            // Without genres, the filter just has no choices.
+        }
+    }
+
+    private async Task LoadKnownTagsAsync()
+    {
+        try
+        {
+            knownTags = await Api.Watchlist.TagsAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+        catch
+        {
+            // Without them, the filter just has no suggestions.
+        }
+    }
+
+    /// <summary>The known tags, and those of the items shown, which may be newer. Alphabetically.</summary>
+    private IEnumerable<string> TagSuggestions() =>
+        knownTags.Concat(result?.Items.SelectMany(item => item.Tags) ?? [])
+            .Distinct().Order(StringComparer.Ordinal);
+
+    /// <summary>E.g. "released from May 25, 1979 to November 3, 1989" or "added until ..."; null without dates.</summary>
+    private static string? DescribePeriod(string what, string? from, string? to) => (from, to) switch
+    {
+        (not null, not null) => $"{what} from {Dates.FormatDate(from)} to {Dates.FormatDate(to)}",
+        (not null, null) => $"{what} from {Dates.FormatDate(from)}",
+        (null, not null) => $"{what} until {Dates.FormatDate(to)}",
+        _ => null,
+    };
+
+    /// <summary>E.g. "runtime of at least 90 minutes"; null without runtime.</summary>
+    private static string? DescribeRuntime(int? from, int? to) => (from, to) switch
+    {
+        (not null, not null) => $"runtime of {from} to {to} minutes",
+        (not null, null) => $"runtime of at least {from} minutes",
+        (null, not null) => $"runtime of at most {to} minutes",
+        _ => null,
+    };
+
+    /// <summary>What the filter selects, e.g. "with any of the selected genres, released from May 25, 1979".</summary>
+    private string FilterDescription()
+    {
+        var genreText = HasGenres
+            ? $"with {(query.GenreMatch == GenreMatch.All ? "all" : "any")} of the selected genres"
+            : null;
+        return string.Join(", ", new[]
+        {
+            query.Search is { } search ? $"matching \"{search.Trim()}\"" : null,
+            query.Tag is { } tag ? $"tagged \"{tag}\"" : null,
+            genreText,
+            DescribeRuntime(query.RuntimeFrom, query.RuntimeTo),
+            DescribePeriod("released", query.ReleasedFrom, query.ReleasedTo),
+            DescribePeriod("added", query.AddedFrom, query.AddedTo),
+        }.OfType<string>());
+    }
+
+    /// <summary>Loads the current page of the watchlist.</summary>
+    private async Task LoadAsync()
+    {
+        var thisLoad = ++latestLoad;
+        loading = true;
+        WatchlistPage? loaded;
+        try
+        {
+            loaded = await Api.Watchlist.ListAsync(query);
+            if (thisLoad != latestLoad)
+            {
+                return;
+            }
+
+            error = null;
+        }
+        catch (Exception failure)
+        {
+            if (thisLoad != latestLoad)
+            {
+                return;
+            }
+
+            error = ApiError.From(failure);
+            loaded = null;
+        }
+
+        // E.g. after removing the only item on the last page.
+        if (loaded is { Items.Count: 0, Page: > 1 })
+        {
+            GoToPage(Math.Max(1, (int)Math.Ceiling(loaded.TotalCount / (double)loaded.PageSize)));
+            return;
+        }
+
+        result = loaded;
+        loading = false;
+    }
+
+    private void GoToPage(int page) => Navigation.NavigateWith(("page", page));
+
+    private bool IsSelected(Genre genre) => query.GenreIds?.Contains(genre.Id) == true;
+
+    /// <summary>Selects the genre, or deselects it if it is selected. Changing the filter starts again at page 1.</summary>
+    private void ToggleGenre(Genre genre)
+    {
+        var selected = query.GenreIds ?? [];
+        var genreIds = selected.Contains(genre.Id)
+            ? selected.Where(id => id != genre.Id).ToList()
+            : [.. selected, genre.Id];
+        UpdateFilter(false, ("genreId", genreIds));
+    }
+
+    private void SetGenreMatch(GenreMatch match) =>
+        // "any" is the default, so it needs no parameter.
+        UpdateFilter(false, ("genreMatch", match == GenreMatch.All ? "all" : null));
+
+    /// <summary>Where a genre tag leads: the watchlist filtered by this genre only, from page 1.</summary>
+    private string GenreFilterLink(Genre genre) => Navigation.UrlWith(("genreId", new[] { genre.Id }), ("page", null));
+
+    private void OnTag(ChangeEventArgs args) =>
+        UpdateFilter(false, ("tag", Parse.NullIfEmpty(args.Value?.ToString()?.Trim())));
+
+    private void OnRuntimeFrom(ChangeEventArgs args) => UpdateFilter(false, ("runtimeFrom", args.Value?.ToString()));
+
+    private void OnRuntimeTo(ChangeEventArgs args) => UpdateFilter(false, ("runtimeTo", args.Value?.ToString()));
+
+    private void OnReleasedFrom(ChangeEventArgs args) => UpdateFilter(false, ("releasedFrom", args.Value?.ToString()));
+
+    private void OnReleasedTo(ChangeEventArgs args) => UpdateFilter(false, ("releasedTo", args.Value?.ToString()));
+
+    private void OnAddedFrom(ChangeEventArgs args) => UpdateFilter(false, ("addedFrom", args.Value?.ToString()));
+
+    private void OnAddedTo(ChangeEventArgs args) => UpdateFilter(false, ("addedTo", args.Value?.ToString()));
+
+    private bool IsRuntimePreset(RuntimePreset preset) => query.RuntimeFrom == preset.From && query.RuntimeTo == preset.To;
+
+    /// <summary>Sets the runtime to the quick pick, or removes it if it is selected already.</summary>
+    private void ToggleRuntimePreset(RuntimePreset preset)
+    {
+        var selected = IsRuntimePreset(preset);
+        UpdateFilter(false, ("runtimeFrom", selected ? null : preset.From), ("runtimeTo", selected ? null : preset.To));
+    }
+
+    private void ClearFilter() => UpdateFilter(
+        false,
+        ("genreId", null), ("genreMatch", null), ("releasedFrom", null), ("releasedTo", null),
+        ("addedFrom", null), ("addedTo", null), ("runtimeFrom", null), ("runtimeTo", null),
+        ("search", null), ("tag", null));
+
+    private void UpdateFilter(bool replace, params (string Key, object? Value)[] changes) =>
+        Navigation.NavigateTo(Navigation.UrlWith([.. changes, ("page", null)]), replace: replace);
+
+    private void OnSearch(ChangeEventArgs args)
+    {
+        var value = args.Value?.ToString() ?? "";
+        searchText = value;
+        searchDebounce?.Cancel();
+        searchDebounce?.Dispose();
+        searchDebounce = new CancellationTokenSource();
+        _ = SearchAfterPauseAsync(value, searchDebounce.Token);
+    }
+
+    private async Task SearchAfterPauseAsync(string value, CancellationToken cancellation)
+    {
+        try
+        {
+            await Task.Delay(SearchDebounceMs, cancellation);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        if (value != (Search ?? ""))
+        {
+            await InvokeAsync(() => UpdateFilter(true, ("search", string.IsNullOrWhiteSpace(value) ? null : value)));
+        }
+    }
+
+    /// <summary>Adds the movie at the top of the list (the newest come first). Already on it: nothing changes.</summary>
+    private async Task AddAsync(MovieRef movie)
+    {
+        try
+        {
+            // PUT replaces the note, so a movie that is already on the watchlist is left alone.
+            var details = await Api.Movies.GetAsync(movie.Id);
+            if (!details.OnWatchlist)
+            {
+                await Api.Watchlist.PutAsync(movie.Id, null);
+            }
+        }
+        catch (Exception failure)
+        {
+            error = ApiError.From(failure);
+            return;
+        }
+
+        if (result?.Page == 1)
+        {
+            await LoadAsync();
+        }
+        else
+        {
+            GoToPage(1);
+        }
+    }
+
+    private void Edit(WatchlistItem item)
+    {
+        noteDraft = item.Note ?? "";
+        tagsDraft = Tags.Format(item.Tags);
+        tagsProblem = null;
+        editing = item.Movie.Id;
+    }
+
+    private void CancelEdit() => editing = null;
+
+    private void OnDraftKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape")
+        {
+            editing = null;
+        }
+    }
+
+    /// <summary>Saves the note and the tags: the server replaces both, so the one that is not edited is sent along.</summary>
+    private async Task SaveDetailsAsync(WatchlistItem item)
+    {
+        tagsProblem = Tags.Error(tagsDraft);
+        if (tagsProblem is not null)
+        {
+            return;
+        }
+
+        saving = true;
+        WatchlistItem updated;
+        try
+        {
+            updated = await Api.Watchlist.PutAsync(
+                item.Movie.Id, Parse.NullIfEmpty(noteDraft.Trim()), Tags.Parse(tagsDraft));
+        }
+        catch (Exception failure)
+        {
+            saving = false;
+            error = ApiError.From(failure);
+            return;
+        }
+
+        saving = false;
+        editing = null;
+        if (result is not null)
+        {
+            result = result with
+            {
+                Items = result.Items.Select(i => i.Movie.Id == updated.Movie.Id ? updated : i).ToList(),
+            };
+        }
+    }
+
+    private async Task RemoveAsync(WatchlistItem item)
+    {
+        try
+        {
+            await Api.Watchlist.RemoveAsync(item.Movie.Id);
+        }
+        catch (Exception failure)
+        {
+            error = ApiError.From(failure);
+            return;
+        }
+
+        await LoadAsync();
+    }
+}
